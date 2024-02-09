@@ -16,3 +16,5 @@ Note: contains far fewer capabilities compared to REINVENT 4. The purpose of thi
 
 
 Be careful diversity filter stores "min similarity" np.max(bulk tanimoto)
+
+Curriculum learning
