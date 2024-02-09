@@ -3,6 +3,8 @@ Based on the implementation from https://github.com/MolecularAI/reinvent-models
 """
 from typing import Tuple, List
 import torch
+import torch.nn as nn
+import numpy as np
 # import model architectures
 from models.rnn import RNN
 from models.decoder_transformer import DecoderTransformer
@@ -42,7 +44,7 @@ class Model:
         if torch.cuda.is_available() and not no_cuda:
             self.network.cuda()
 
-        self._nll_loss = tnn.NLLLoss(reduction="none")
+        self._nll_loss = nn.NLLLoss(reduction="none")
 
     def set_mode(self, mode: str):
         if mode == self._model_modes.TRAINING:
