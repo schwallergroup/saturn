@@ -1,0 +1,63 @@
+from typing import List, Union
+import random
+import numpy as np
+import rdkit
+from rdkit import Chem
+from rdkit.Chem.rdmolops import RenumberAtoms
+from rdkit.Chem import AllChem
+from rdkit.Chem import DataStructs
+
+
+def canonicalize_smiles(smiles: str) -> str:
+    """
+    Canonicalize a SMILES string based on RDKit convention.
+    """
+    return Chem.MolToSmiles(Chem.MolFromSmiles(smiles), canonical=True)
+
+def canonicalize_smiles_batch(smiles_batch: np.array) -> List[str]:
+    """
+    Canonicalize a batch of SMILES strings based on RDKit convention.
+    """
+    return [canonicalize_smiles(smiles) for smiles in smiles_batch]
+
+def randomize_smiles(self, smiles: str) -> str:
+    """
+    Shuffle atom numbering to generated a randomized SMILES string.
+    """
+    mol = Chem.MolFromSmiles(smiles)
+    if mol:
+        new_atom_order = list(range(mol.GetNumHeavyAtoms()))
+        random.shuffle(new_atom_order)
+        random_mol = RenumberAtoms(mol, newOrder=new_atom_order)
+        return Chem.MolToSmiles(random_mol, canonical=False, isomericSmiles=False)
+    else:
+        return None
+
+def randomize_smiles_batch(smiles_batch: np.array) -> List[str]:
+    """
+    Randomize a batch of SMILES strings.
+    """
+    randomized_smiles_batch = []
+    for smiles in smiles_batch:
+        randomized_smiles = randomize_smiles(smiles)
+        # only add the randomized SMILES if it can be encoded
+        if randomized_smiles and can_be_encoded(randomized_smiles):
+            randomized_smiles_batch.append(randomized_smiles)
+        # otherwise, keep the original SMILES
+        else:
+            randomized_smiles_batch.append(smiles)
+
+    return randomized_smiles_batch
+
+def can_be_encoded(smiles: str) -> bool:
+    """
+    Check if a SMILES string can be encoded by the Vocabulary.
+    """
+    try:
+        # there may be tokens in the randomized SMILES that are not in the Vocabulary
+        # check if the randomized SMILES can be encoded
+        _ = _ST.tokenize(smiles)
+        _ = prior.get_vocabulary().encode(tokens)
+        return True
+    except KeyError:
+        return False
