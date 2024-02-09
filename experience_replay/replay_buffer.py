@@ -9,6 +9,7 @@ from typing import Tuple, List
 from running_modes.configurations.reinforcement_learning.inception_configuration import InceptionConfiguration
 from reinvent_chemistry.conversions import Conversions
 from copy import deepcopy
+from utils import chemistry_utils
 
 
 class ReplayBuffer:
@@ -74,7 +75,7 @@ class ReplayBuffer:
         if len(self.memory) != 0:
             smiles = self.memory["smiles"].values
             # randomize the smiles
-            randomized_smiles = self._chemistry.get_randomized_smiles(smiles, prior)
+            randomized_smiles = chemistry_utils.get_randomized_smiles(smiles, prior)
             reward = self.memory["reward"].values
             prior_likelihood = -prior.likelihood_smiles(randomized_smiles).cpu()
             return randomized_smiles, reward, prior_likelihood
@@ -97,16 +98,16 @@ class ReplayBuffer:
             reward: np.array
         ) -> None:
         """
-        Augmented Memory's key operation to prevent mode collapse:
+        Augmented Memory's key operation to prevent mode collapse and promite diversity:
         Purges the memory of SMILES that have penalized rewards (0.0) *before* executing Augmented Memory updates.
         Intuitively, this operation prevents penalized SMILES from directing the chemical space exploration.
         """
         zero_reward_indices = np.where(reward == 0.)[0]
         if len(zero_reward_indices) > 0:
             smiles_to_purge = smiles[zero_reward_indices]
-            scaffolds_to_purge = [self._chemistry.get_scaffold(smiles) for smiles in smiles_to_purge]
+            scaffolds_to_purge = [chemistry_utils.get_bemis_murcko_scaffold(smiles) for smiles in smiles_to_purge]
             purged_memory = deepcopy(self.memory)
-            purged_memory["scaffolds"] = purged_memory["smiles"].apply(self._chemistry.get_scaffold)
+            purged_memory["scaffolds"] = purged_memory["smiles"].apply(chemistry_utils.get_bemis_murcko_scaffold)
             purged_memory = purged_memory.loc[~purged_memory["scaffolds"].isin(scaffolds_to_purge)]
             purged_memory.drop("scaffolds", axis=1, inplace=True)
             self.memory = purged_memory

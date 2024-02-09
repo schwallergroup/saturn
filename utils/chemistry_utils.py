@@ -6,6 +6,7 @@ from rdkit import Chem
 from rdkit.Chem.rdmolops import RenumberAtoms
 from rdkit.Chem import AllChem
 from rdkit.Chem import DataStructs
+from rdkit.Chem.Scaffolds.MurckoScaffold import GetScaffoldForMol
 
 
 def canonicalize_smiles(smiles: str) -> str:
@@ -61,3 +62,17 @@ def can_be_encoded(smiles: str) -> bool:
         return True
     except KeyError:
         return False
+    
+def get_bemis_murcko_scaffold(smiles: str) -> str:
+    """
+    Get the Bemis-Murcko scaffold: https://pubs.acs.org/doi/10.1021/jm9602928 of a SMILES string.
+    """
+    mol = Chem.MolFromSmiles(smiles)
+    if mol:
+        try:
+            scaffold = GetScaffoldForMol(mol)
+            return Chem.MolToSmiles(scaffold, canonical=True)
+        except Exception:
+            return ""
+    else:
+        return ""

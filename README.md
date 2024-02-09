@@ -13,3 +13,6 @@ Note: contains far fewer capabilities compared to REINVENT 4. The purpose of thi
 * canonical smiles storing
 * every generated smiles needs to be canonicalized 
 * option to incept SMILES????
+
+
+Be careful diversity filter stores "min similarity" np.max(bulk tanimoto)
