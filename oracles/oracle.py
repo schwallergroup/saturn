@@ -31,9 +31,13 @@ class Oracle:
         # TODO: have option to flag which component of the oracle is "expensive" - 
         #       in this scenario, check the other cheap components are satisfied before calling the expensive component 
         #       (e.g., MW < 500 and QED > 0.4 before docking)
+    
+        # TODO: construct oracle should return a list of OracleComponent objects. __call__ should iterate through each component and call it
+        #       each return value should already be subjected to a transformation function in the OracleComponent class
+        #       the __call__ method should just aggregate the rewards either by weighted sum or weighted mean 
         
         
-    def construct_oracle(self):
+    def construct_oracle(self) -> list:
         """
         Construct the oracle function.
         """
