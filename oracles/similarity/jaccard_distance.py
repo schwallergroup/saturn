@@ -6,7 +6,7 @@ from rdkit.Chem import Mol
 from rdkit.Chem.AllChem import GetMorganFingerprint
 from rdkit.DataStructs import BulkTanimotoSimilarity
 
-class TanimotoSimilarity(OracleComponent):
+class JaccardDistance(OracleComponent):
     def __init__(self, parameters: OracleComponentParameters):
         super().__init__(parameters)
 
@@ -28,4 +28,4 @@ class TanimotoSimilarity(OracleComponent):
                 [BulkTanimotoSimilarity(fp, ref_fp) for ref_fp in self.reference_fingerprints])
             )
 
-        return np.array(sims, dtype=np.float32)
+        return 1 - np.array(sims, dtype=np.float32)

@@ -1,0 +1,137 @@
+"""
+Contains 2 utility functions:
+    1. Construct the OracleComponents
+    2. Construct the Reward Shaping Function
+"""
+
+from typing import List
+import numpy as np
+from oracles.oracle_component import OracleComponent
+from oracles.oracle_component_parameters import OracleComponentParameters
+
+# similarity metrics
+from oracles.similarity.tanimoto_similarity import TanimotoSimilarity
+from oracles.similarity.jaccard_distance import JaccardDistance
+
+# physchem properties
+from oracles.physchem.aliphatic_rings import NumAliphaticRings
+from oracles.physchem.aromatic_rings import NumAromaticRings
+from oracles.physchem.hba import NumHydrogenBondAcceptors
+from oracles.physchem.hbd import NumHydrogenBondDonors
+from oracles.physchem.mw import MolecularWeight
+from oracles.physchem.qed import QED
+from oracles.physchem.rings import NumRings
+from oracles.physchem.rotatable_bonds import NumRotatableBonds
+from oracles.physchem.stereocenters import NumStereoCenters
+from oracles.physchem.tpsa import tPSA
+
+# structural
+from oracles.structural.matching_substructure import MatchingSubstructure
+from oracles.structural.smarts_alerts import SMARTSAlert
+
+# synthesizability
+from oracles.synthesizability.sa_score import SAScore
+
+# xTB electronic properties
+from oracles.xtb.chemical_potential import ChemicalPotential
+from oracles.xtb.dipole import Dipole
+from oracles.xtb.electron_affinity import ElectronAffinity
+from oracles.xtb.electrophilicity_index import ElectrophilicityIndex
+from oracles.xtb.electrophilicity import Electrophilicity
+from oracles.xtb.hardness import Hardness
+from oracles.xtb.homo import HOMO
+from oracles.xtb.ionization_potential import IonizationPotential
+from oracles.xtb.lumo import LUMO
+from oracles.xtb.nucleophilicity_index import NucleophilicityIndex
+from oracles.xtb.nucleophilicity import Nucleophilicity
+
+# reward shaping function
+from oracles.reward_shaping.function_parameters import RewardShapingFunctionParameters
+from oracles.reward_shaping.reward_shaping_function import RewardShapingFunction
+
+
+def construct_oracle_component(oracle_component_parameters: OracleComponentParameters) -> OracleComponent:
+    """
+    Constructs an oracle component consisting of:
+        1. The specific oracle based on name ID (e.g., Tanimoto similarity)
+        2. The desired reward shaping function to associate with the oracle component
+    """
+    name = oracle_component_parameters.name.lower()
+    # similarity metrics
+    if name == "tanimoto_similarity":
+        return TanimotoSimilarity(oracle_component_parameters)
+    elif name == "jaccard_distance":
+        return JaccardDistance(oracle_component_parameters)
+    # physchem properties
+    elif name == "num_aliphatic_rings":
+        return NumAliphaticRings(oracle_component_parameters)
+    elif name == "num_aromatic_rings":
+        return NumAromaticRings(oracle_component_parameters)
+    elif name == "num_hba":
+        return NumHydrogenBondAcceptors(oracle_component_parameters)
+    elif name == "num_hbd":
+        return NumHydrogenBondDonors(oracle_component_parameters)
+    elif name == "mw":
+        return MolecularWeight(oracle_component_parameters)
+    elif name == "qed":
+        return QED(oracle_component_parameters)
+    elif name == "num_rings":
+        return NumRings(oracle_component_parameters)
+    elif name == "num_rotatable_bonds":
+        return NumRotatableBonds(oracle_component_parameters)
+    elif name == "num_stereocenteres":
+        return NumStereoCenters(oracle_component_parameters)
+    elif name == "tpsa":
+        return tPSA(oracle_component_parameters)
+    # structural
+    elif name == "matching_substructure":
+        return MatchingSubstructure(oracle_component_parameters)
+    elif name == "smarts_alerts":
+        return SMARTSAlert(oracle_component_parameters)
+    # synthesizability
+    elif name == "sa_score":
+        return SAScore(oracle_component_parameters)
+    # xTB electronic properties
+    elif name == "chemical_potential":
+        return ChemicalPotential(oracle_component_parameters)
+    elif name == "dipole":
+        return Dipole(oracle_component_parameters)
+    elif name == "electron_affinity":
+        return ElectronAffinity(oracle_component_parameters)
+    elif name == "electrophilicity_index":
+        return ElectrophilicityIndex(oracle_component_parameters)
+    elif name == "electrophilicity":
+        return Electrophilicity(oracle_component_parameters)
+    elif name == "hardness":
+        return Hardness(oracle_component_parameters)
+    elif name == "homo":
+        return HOMO(oracle_component_parameters)
+    elif name == "ionization_potential":
+        return IonizationPotential(oracle_component_parameters)
+    elif name == "lumo":
+        return LUMO(oracle_component_parameters) 
+    elif name == "nucleophilicity_index":
+        return NucleophilicityIndex(oracle_component_parameters)
+    elif name == "nucleophilicity":
+        return Nucleophilicity(oracle_component_parameters)
+    # TODO: docking
+    else:
+        raise NotImplementedError(f"Oracle: {name} is not implemented.")
+    
+def construct_reward_shaping_function(reward_shaping_function_parameters: RewardShapingFunctionParameters) -> RewardShapingFunction:
+    """
+    Constructs the reward shaping function based on the specified parameters.
+    """
+
+def create_score_components(self) -> [BaseScoreComponent]:
+    def create_component(component_params):
+        if component_params.component_type in self._current_components:
+            component = self._current_components[component_params.component_type]
+            component_instance = component(component_params)
+        else:
+            raise KeyError(f'Component: {component_params.component_type} is not implemented.'
+                            f' Consider checking your input.')
+        return component_instance
+
+    components = [create_component(component) for component in self._parameters]
+    return components

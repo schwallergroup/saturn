@@ -1,15 +1,23 @@
 """
-This module contains the OracleComponent class, which is a base class for all oracles.
+This module contains the OracleComponent class, which is the base class for all oracles.
 """
 
 from abc import ABC, abstractmethod
 from rdkit.Chem import Mol
 import numpy as np
+from oracles.oracle_component_parameters import OracleComponentParameters
+from oracles.utils import construct_reward_shaping_function
 
 
 class OracleComponent(ABC):
-    def __init__(self, parameters: ComponentParameters):
+    def __init__(
+            self, 
+            parameters: OracleComponentParameters):
         self.parameters = parameters
+        # TODO: implement this
+        self.reward_shaping_function = construct_reward_shaping_function(
+            self.parameters.reward_shaping_function_parameters
+            )
 
     @abstractmethod
     def __call__(self, mols: np.array[Mol]) -> np.array[float]:
@@ -29,6 +37,7 @@ class OracleComponent(ABC):
         return self.apply_reward_shaping_function(raw_property_values)
 
     def apply_reward_shaping_function(self, query_mols) -> np.array:
+        # TODO: if nothing is specified, just return the raw property values
         scores = []
         for mol in query_mols:
             try:

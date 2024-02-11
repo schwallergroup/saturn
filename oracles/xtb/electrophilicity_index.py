@@ -2,11 +2,12 @@ import math
 import numpy as np
 from rdkit.Chem import Mol
 from oracles.oracle_component import OracleComponent
+from oracles.oracle_component_parameters import OracleComponentParameters
 from oracles.xtb.geometry_optimizer import GeometryOptimizer
 from morfeus import read_xyz, XTB
 
 class ElectrophilicityIndex(OracleComponent):
-    def __init__(self, parameters: ComponentParameters):
+    def __init__(self, parameters: OracleComponentParameters):
         super().__init__(parameters)
         self.geometry_optimizer = GeometryOptimizer()
 

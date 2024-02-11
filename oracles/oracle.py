@@ -2,6 +2,7 @@ from typing import List
 import os
 import pandas as pd
 import numpy as np
+from oracles.oracle_component import OracleComponent
 
 
 class Oracle:
@@ -23,7 +24,7 @@ class Oracle:
         """
         Args:
             smiles_batch: np.array of strings of smiles
-        Returns:
+        Returns:a
             np.array of rewards (float) of the same length as smiles_batch
         """
         pass
@@ -35,13 +36,15 @@ class Oracle:
         # TODO: construct oracle should return a list of OracleComponent objects. __call__ should iterate through each component and call it
         #       each return value should already be subjected to a transformation function in the OracleComponent class
         #       the __call__ method should just aggregate the rewards either by weighted sum or weighted mean 
+        # NOTE: DO NOT forget to assign the OracleComponent weight 
+    
         
         
-    def construct_oracle(self) -> list:
+    def construct_oracle(self) -> List[OracleComponent]:
         """
         Construct the oracle function.
         """
-        # for each individual oracle, extract the transformation function and finally form the equation
+        # TODO: aggregate the individual oracles into a single oracle function
         raise NotImplementedError
     
 
