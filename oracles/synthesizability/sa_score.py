@@ -1,14 +1,14 @@
 from oracles.oracle_component import OracleComponent
 from rdkit.Chem import Mol
 import numpy as np
-from rdkit.Chem.Crippen import MolLogP
+from oracles.synthesizability.sascorer import calculateScore
 
-class SlogP(OracleComponent):
+class SAScore(OracleComponent):
     """
-    Wildman-Crippen LogP based on: https://pubs.acs.org/doi/full/10.1021/ci990307l.
+    Synthetic Accessibility score based on: https://jcheminf.biomedcentral.com/articles/10.1186/1758-2946-1-8.
     """
     def __init__(self, parameters: ComponentParameters):
         super().__init__(parameters)
 
     def __call__(self, mols: np.array[Mol]) -> np.array[float]:
-        return np.vectorize(MolLogP)(mols)
+        return np.vectorize(calculateScore)(mols)
