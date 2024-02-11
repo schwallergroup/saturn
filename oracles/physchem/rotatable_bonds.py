@@ -1,6 +1,6 @@
+import numpy as np
 from oracles.oracle_component import OracleComponent
 from rdkit.Chem import Mol
-import numpy as np
 from rdkit.Chem.Lipinski import NumRotatableBonds
 
 class NumRotatableBonds(OracleComponent):
