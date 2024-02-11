@@ -24,3 +24,6 @@ Need to be able to:
 2. just sample
 3. run RL
 4. run CL
+
+
+Lightning support for pre-train, RL, CL
