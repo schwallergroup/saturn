@@ -40,6 +40,7 @@ class ReinforcementLearningAgent:
         self.selective_memory_purge = configuration.reinforcement_learning.selective_memory_purge
 
         # Replay buffer
+        self.replay_buffer = ReplayBuffer(configuration.experience_replay)
 
 
 

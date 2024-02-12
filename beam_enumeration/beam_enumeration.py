@@ -10,7 +10,7 @@ import json
 from rdkit import Chem
 from rdkit.Chem.Scaffolds import MurckoScaffold
 
-from running_modes.beam_enumeration.reward_tracker import RewardTracker
+from beam_enumeration.reward_tracker import RewardTracker
 from reinvent_models.model_factory.generative_model_base import GenerativeModelBase
 
 class BeamEnumeration:

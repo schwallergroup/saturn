@@ -1,15 +1,14 @@
 """
 Some code is based on the implementation from https://github.com/MolecularAI/Reinvent.
 """
-
+from typing import Tuple, List
 import numpy as np
 import pandas as pd
-from typing import Tuple, List
-
-from running_modes.configurations.reinforcement_learning.inception_configuration import InceptionConfiguration
-from reinvent_chemistry.conversions import Conversions
 from copy import deepcopy
 from utils import chemistry_utils
+
+from experience_replay.dataclass import ExperienceReplayParameters
+
 
 
 class ReplayBuffer:
@@ -24,10 +23,13 @@ class ReplayBuffer:
     """
     def __init__(
         self, 
-        configuration: InceptionConfiguration, 
-        scoring_function
+        parameters: ExperienceReplayParameters, 
+        # TODO: keep this for Inception purposes?
+        scoring_function=None
         ):
-        self.configuration = configuration
+        print(type(parameters))
+        exit()
+        self.parameters = parameters
         # stores the top N highest reward molecules generated so far
         self.memory = pd.DataFrame(
             columns=[

@@ -1,11 +1,11 @@
-from rdkit import Chem
+# FIXME: change this
 from reinvent_models.model_factory.generative_model_base import GenerativeModelBase
-from running_modes.hallucination.sequence_mutator import SequenceMutator
-from running_modes.hallucination.genetic_mutator import GeneticMutator
-from running_modes.configurations import HallucinatedMemoryConfiguration
+from hallucinated_memory.sequence_mutator import SequenceMutator
+from hallucinated_memory.genetic_mutator import GeneticMutator
+from hallucinated_memory.dataclass import HallucinatedMemoryParameters
 
 
-def initialize_hallucinator(prior: GenerativeModelBase, hallucination_config: HallucinatedMemoryConfiguration):
+def initialize_hallucinator(prior: GenerativeModelBase, hallucination_config: HallucinatedMemoryParameters):
     """Initializes and returns the Hallucinator"""
     if hallucination_config.hallucination_method.lower() == "sequence":
         return SequenceMutator(prior=prior,

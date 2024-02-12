@@ -5,7 +5,7 @@ import random
 import numpy as np
 from rdkit import Chem, rdBase
 from rdkit.Chem import AllChem
-from running_modes.hallucination.graphga_utils import crossover
+from hallucinated_memory.graphga_utils import crossover
 rdBase.DisableLog('rdApp.*')
 
 
