@@ -1,8 +1,9 @@
-from typing import List
+from typing import List, Tuple
 import pandas as pd
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem import Mol
+from utils.chemistry_utils import canonicalize_smiles_batch
 
 from oracles.oracle_component import OracleComponent
 from oracles.oracle_dataclass import OracleComponentParameters, OracleConfiguration
@@ -56,36 +57,35 @@ class Oracle:
         The Oracle is called at every generation epoch and performs the following:
             1. Calls each oracle component in the Oracle 
             2. Aggregates the oracle feedback into a single scalar reward
-            3. Penalizes the reward based on the diversity filter
+            3. Penalizes the reward based on the Diversity Filter
+            4. Updates the Diversity Filter
             4. Updates the Oracle History which tracks oracle calls, rewards, and penalized rewards
             5. Updates the Oracle Cache to store the results of previous oracle calls
         """
         pass
-        # 1. Only keep the valid SMILES (RDKit parsable)
+        # 1. Only keep the valid SMILES (RDKit parsable into Mols)
         smiles = [s for s in smiles if Chem.MolFromSmiles(s) is not None]
-        # 2. Get the Mols
-        mols = np.vectorize(Chem.MolFromSmiles)(smiles)
-        # 3. Execute preliminary check (if applicable)
+        # 2. Rewards can be obtained directly for SMILES in the Oracle Cache 
+        repeat_smiles, cached_rewards, new_smiles = self.rewards_from_oracle_cache(smiles)
+        # 3. Get the Mols for the new SMILES
+        mols = np.vectorize(Chem.MolFromSmiles)(new_smiles)
+        # 4. Execute preliminary check (if applicable) which removes Mols that do not satisfy the (relatively) cheaper oracle components
+        #    e.g., molecular weight is too high (> 500 Da), so discard without wasting computational resources on a docking oracle
         mols = self.execute_preliminary_check(mols)
-        # 4. 
+        # 5. Call each oracle component and aggregate the rewards
     
 
     
         # TODO: construct oracle should return a list of OracleComponent objects. __call__ should iterate through each component and call it
         #       each return value should already be subjected to a transformation function in the OracleComponent class
         #       the __call__ method should just aggregate the rewards either by weighted sum or weighted mean
-     
-        # NOTE: DO NOT forget to assign the OracleComponent weight 
     
-        # each OracleComponent has a calculate reward method --> run through all of them in the list and then aggregate
-    
-        # NOTE: check the preliminary_check flag!!!!
     
         # TODO: only increment the NEW SMILES - check this by canonicalization BUT make sure not to return the canonicalization for backpropagation
         #       because augmented SMILES can be useful for likelihood learning
     
 
-        # TODO: apply diversity filter!!
+        # TODO: apply diversity filter and update it!
         reward = np.ones((30, 10000))
         penalized_reward = diversity_filter.penalize_reward(smiles, reward)
 
@@ -115,6 +115,30 @@ class Oracle:
             oracle.append(oracle_component)
 
         return oracle
+    
+    def rewards_from_oracle_cache(self, smiles: np.ndarray[str]) -> Tuple[np.ndarray[str], np.ndarray[float], np.ndarray[str]]:
+        """
+        Checks if there are any Cached rewards in a sampled batch of SMILES.
+        """
+        # canonicalize the SMILES before checking Cache
+        canonical_smiles = canonicalize_smiles_batch(smiles)
+        repeat_indices = []
+        cached_rewards = []
+        for idx, s in enumerate(canonical_smiles):
+            if s in self.cache:
+                repeat_indices.append(idx)
+                cached_rewards.append(self.cache[s])
+        
+        return smiles[repeat_indices], np.array(cached_rewards), np.delete(smiles, repeat_indices)
+    
+    def update_oracle_cache(self, smiles: np.ndarray[str], rewards: np.ndarray[float]) -> None:
+        """
+        Updates the Oracle Cache to store the results of previous oracle calls.
+        """
+        # canonicalize the SMILES before adding to Cache
+        canonical_smiles = canonicalize_smiles_batch(smiles)
+        for s, r in zip(canonical_smiles, rewards):
+            self.cache[s] = r
     
     def execute_preliminary_check(self, mols: np.ndarray[Mol]) -> np.ndarray[Mol]:
         """
@@ -156,27 +180,6 @@ class Oracle:
                 "smiles": smiles,
                 "reward": reward, 
                 "penalized_reward": penalized_reward, 
-            })
-        
-        self.oracle_history = pd.concat([self.oracle_history, df])
-
-    def update_generative_history(
-        self, 
-        num_valid_smiles: int,
-        smiles: np.ndarray[str],
-        reward: np.ndarray[float]
-    ) -> None:
-        """
-        This method performs 2 updates on every epoch:
-        1. Increments the number of oracle calls so far
-        2. Updates the Oracle History that tracks the generative sampling as a function of oracle calls
-        """
-        self.calls += num_valid_smiles
-        # track generated SMILES + reward as a function of oracle calls
-        df = pd.DataFrame({
-                "oracle_calls": np.full_like(smiles, self.calls),
-                "reward": reward, 
-                "smiles": smiles
             })
         
         self.oracle_history = pd.concat([self.oracle_history, df])
