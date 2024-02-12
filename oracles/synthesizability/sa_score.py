@@ -11,5 +11,5 @@ class SAScore(OracleComponent):
     def __init__(self, parameters: OracleComponentParameters):
         super().__init__(parameters)
 
-    def __call__(self, mols: np.array[Mol]) -> np.array[float]:
+    def __call__(self, mols: np.ndarray[Mol]) -> np.ndarray[float]:
         return np.vectorize(calculateScore)(mols)
