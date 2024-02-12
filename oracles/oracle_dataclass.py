@@ -5,7 +5,7 @@ from oracles.reward_shaping.function_parameters import RewardShapingFunctionPara
 @dataclass
 class OracleComponentParameters:
     name: str
-    weight: float
+    weight: float = 1.0
     # preliminary_check is a flag to indicate whether an OracleComponent should be executed first.
     # If this OracleComponent is not satisfied, the SMILES is discarded. 
     # The intended use case is for MPO objectives with expensive components, e.g., MD, 

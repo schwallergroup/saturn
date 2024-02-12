@@ -7,32 +7,30 @@ Both can assign different weights to individual OracleComponents
 """
 
 import numpy as np
-import math
 
 class RewardAggregator:
 
     def __init__(self, aggregator: str):
         self.aggregator = aggregator.lower()
+        assert self.aggregator in ["sum", "product"], f"{self.aggregator} reward aggregator is not implemented."
 
     def __call__(
         self, 
-        rewards: np.array[float], 
-        weights: np.array[float]
+        rewards: np.array[float],  # (number of OracleComponents, number of SMILES)
+        weights: np.array[float]  # (number of OracleComponents, 1)
     ) -> np.array[float]:
         """
         Takes as input the list of transformed rewards based on the OracleComponent and aggregates them into a single scalar.
         """
         if self.aggregator == "sum":
-            return self.sum(rewards, weights)
+            return self.sum(rewards, weights)  # (number of SMILES,)
         elif self.aggregator == "product":
-            return self.product(rewards, weights)
-        else:
-            raise NotImplementedError(f"{self.aggregator} reward aggregator is not implemented.")
+            return self.product(rewards, weights)  # (number of SMILES,)
 
     def sum(
         self, 
-        rewards: np.ndarray,  # (number of OracleComponents, number of SMILES)
-        weights: np.ndarray  # (number of OracleComponents, 1)
+        rewards: np.ndarray[float],  # (number of OracleComponents, number of SMILES)
+        weights: np.ndarray[float]  # (number of OracleComponents, 1)
     ) -> np.array[float]:
         """
         Weighted Sum aggregation.
@@ -43,8 +41,8 @@ class RewardAggregator:
         
     def product(
         self, 
-        rewards: np.ndarray,  # (number of OracleComponents, number of SMILES, 1)
-        weights: np.ndarray  # (number of OracleComponents, 1)
+        rewards: np.ndarray[float],  # (number of OracleComponents, number of SMILES, 1)
+        weights: np.ndarray[float]  # (number of OracleComponents, 1)
     ) -> np.array[float]:
         """
         Weighted Product aggregation.

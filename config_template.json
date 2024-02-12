@@ -1,0 +1,102 @@
+{
+  "logging": {
+    "logging_frequency": 1000,
+    "recipient": "local",
+    "logging_path": "logging.log",
+    "result_folder": "results"
+  },
+  "parameters": {
+    "diversity_filter": {
+      "minscore": 0.0,
+      "minsimilarity": 0.4,
+      "name": "IdenticalMurckoScaffold",
+      "nbmax": 10
+    },
+    "inception": {
+      "memory_size": 100,
+      "sample_size": 10,
+      "smiles": [],
+      "augmented_memory_mode_collapse_guard": false
+    },
+    "reinforcement_learning": {
+      "agent": "/home/jeguo/Desktop/ReinventCommunity/notebooks/models/random.prior.new",
+      "batch_size": 64,
+      "learning_rate": 0.0001,
+      "margin_threshold": 50,
+      "n_steps": 1000000,
+      "oracle_limit": 1000,
+      "prior": "/home/jeguo/Desktop/ReinventCommunity/notebooks/models/random.prior.new",
+      "sigma": 128,
+      "optimization_algorithm": "augmented_memory",
+      "augmented_memory": true,
+      "augmentation_rounds": 2,
+      "selective_memory_purge": true
+    },
+    "hallucinated_memory": {
+      "execute_hallucinated_memory": true,
+      "hallucination_method": "ga",
+      "num_hallucinations": 100,
+      "num_selected": 10,
+      "selection_criterion": "tanimoto_distance"
+    },
+    "beam_enumeration": {
+      "execute_beam_enumeration": false,
+      "beam_k": 2,
+      "beam_steps": 18,
+      "substructure_type": "structure",
+      "structure_min_size": 15,
+      "pool_size": 4,
+      "pool_saving_frequency": 1000,
+      "patience": 5,
+      "token_sampling_method": "topk",
+      "patience_filter_limit": 100000
+    },
+    "scoring_function": {
+      "name": "custom_product",
+      "parallel": false,
+      "parameters": [
+        {
+          "component_type": "tpsa",
+          "name": "tPSA",
+          "specific_parameters": {
+            "transformation": {
+              "transformation_type": "sigmoid",
+              "low": 75,
+              "high": 350,
+              "k": 0.15
+            }
+          },
+          "weight": 1
+        },
+        {
+          "component_type": "molecular_weight",
+          "name": "MW",
+          "specific_parameters": {
+            "transformation": {
+              "transformation_type": "double_sigmoid",
+              "low": 0,
+              "high": 350,
+              "coef_div": 500,
+              "coef_si": 250,
+              "coef_se": 250
+            }
+          },
+          "weight": 1
+        },
+        {
+          "component_type": "num_rings",
+          "name": "rings",
+          "specific_parameters": {
+            "transformation": {
+              "transformation_type": "step",
+              "low": 2,
+              "high": 5
+            }
+          },
+          "weight": 1
+        }
+      ]
+    }
+  },
+  "running_mode": "goal_directed_generation"
+}

@@ -20,6 +20,14 @@ class RewardShapingFunction:
         self.transformation_function = parameters.transformation_function
         self.parameters = parameters.parameters
 
+        assert self.transformation_function in [
+            "no_transformation", 
+            "step", 
+            "sigmoid", 
+            "reverse_sigmoid", 
+            "double_sigmoid"
+        ], f"{self.transformation_function} reward shaping function is not implemented."
+
     def __call__(self, raw_property_values: np.array[float]) -> np.array[float]:
         """
         Takes as input the raw property values based on the OracleComponent and applies reward shaping.
@@ -36,6 +44,7 @@ class RewardShapingFunction:
             elif self.transformation_function == "double_sigmoid":
                 return self.double_sigmoid_transformation(raw_property_values, **self.parameters)
         except Exception:
+            # in case not all required parameters are specified
             raise ValueError(f"Oracle: {self.oracle_name} is using {self.transformation_function} reward shaping function but not all parameters have been specified.")
 
 
