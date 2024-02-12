@@ -16,7 +16,7 @@ class Oracle:
     ):
         self.oracle_configuration = oracle_configuration
         # construct the oracle function which can be composed of >1 individual oracles (multi-parameter optimization)
-        self.oracle = self.construct_oracle(oracle_configuration.components)
+        self.oracle = self.construct_oracle(oracle_configuration["components"])
         self.aggregator = oracle_configuration.aggregator
 
         # track oracle budget

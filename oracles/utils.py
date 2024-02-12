@@ -43,18 +43,12 @@ from oracles.xtb.lumo import LUMO
 from oracles.xtb.nucleophilicity_index import NucleophilicityIndex
 from oracles.xtb.nucleophilicity import Nucleophilicity
 
-# reward shaping function
-from oracles.reward_shaping.function_parameters import RewardShapingFunctionParameters
-from oracles.reward_shaping.reward_shaping_function import RewardShapingFunction
-
 
 def construct_oracle_component(oracle_component_parameters: OracleComponentParameters) -> OracleComponent:
     """
-    Constructs an OracleComponent consisting of:
-        1. The specific oracle based on name ID (e.g., Tanimoto similarity)
-        2. The desired reward shaping function to associate with the oracle component
+    Matches the OracleComponent name and returns the OracleComponent class.
     """
-    name = oracle_component_parameters.name.lower()
+    name = oracle_component_parameters["name"]
     # similarity metrics
     if name == "tanimoto_similarity":
         return TanimotoSimilarity(oracle_component_parameters)
@@ -117,16 +111,3 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
     # TODO: MD --> GROMACS
     else:
         raise NotImplementedError(f"Oracle: {name} is not implemented.")
-
-def create_score_components(self) -> [BaseScoreComponent]:
-    def create_component(component_params):
-        if component_params.component_type in self._current_components:
-            component = self._current_components[component_params.component_type]
-            component_instance = component(component_params)
-        else:
-            raise KeyError(f'Component: {component_params.component_type} is not implemented.'
-                            f' Consider checking your input.')
-        return component_instance
-
-    components = [create_component(component) for component in self._parameters]
-    return components

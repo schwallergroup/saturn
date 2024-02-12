@@ -13,8 +13,8 @@ class OracleComponent(ABC):
     def __init__(self, parameters: OracleComponentParameters):
         self.parameters = parameters
         self.reward_shaping_function = RewardShapingFunction(
-            parameters.name,
-            parameters.reward_shaping_function_parameters.parameters
+            oracle_name=parameters["name"],
+            parameters=parameters["reward_shaping_function_parameters"]
         )
 
     @abstractmethod

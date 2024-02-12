@@ -17,8 +17,8 @@ class RewardShapingFunction:
 
     def __init__(self, oracle_name: str, parameters: RewardShapingFunctionParameters):
         self.oracle_name = oracle_name
-        self.transformation_function = parameters.transformation_function
-        self.parameters = parameters.parameters
+        self.transformation_function = parameters["transformation_function"]
+        self.parameters = parameters["parameters"]
 
         assert self.transformation_function in [
             "no_transformation", 
