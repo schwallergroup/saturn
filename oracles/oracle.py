@@ -19,6 +19,7 @@ class Oracle:
         oracle_configuration: OracleConfiguration
     ):
         self.oracle_configuration = oracle_configuration
+        
         # construct the oracle function which can be composed of >1 individual oracles (multi-parameter optimization)
         self.oracle = self.construct_oracle(oracle_configuration["components"])
         self.oracle_weights = [oracle.weight for oracle in self.oracle]
@@ -30,7 +31,6 @@ class Oracle:
 
         # cache dictionary to store the results of previous oracle calls
         self.cache = dict()
-        self.calls = 0
 
         # oracle history to assess sample efficiency via Generative Yield and Oracle Burden metrics
         self.oracle_history = pd.DataFrame({
@@ -43,9 +43,6 @@ class Oracle:
         for oracle in self.oracle:
             self.oracle_history[f"{oracle.name}_raw_values"] = []
             self.oracle_history[f"{oracle.name}_reward"] = []
-
-        # NOTE: assume no repeated oracle calls are allowed
-
 
     def __call__(
         self, 
@@ -170,7 +167,6 @@ class Oracle:
         else:
             return smiles, mols
 
-    
     def update_oracle_history(
         self, 
         smiles: np.ndarray[str],

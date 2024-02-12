@@ -34,8 +34,8 @@ class OracleComponent(ABC):
         Errors are assigned a reward of 0.0.
         """
         # calculate the raw property values
-        # FIXME: np.vectorize may not handle computation errors
         raw_property_values = self(mols)
         # apply reward shaping
+        # FIXME: in case raw_property_values of 0.0 are good, then there will be a problem when reward shaping
         rewards = self.reward_shaping_function(raw_property_values)
         return raw_property_values, rewards
