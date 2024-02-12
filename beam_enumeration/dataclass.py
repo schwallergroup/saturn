@@ -11,4 +11,4 @@ class BeamEnumerationParameters:
     pool_saving_frequency: int = 1000
     patience: int = 5
     token_sampling_method: str = "topk"
-    patience_filter_limit: int = 100000
+    filter_patience_limit: int = 100000

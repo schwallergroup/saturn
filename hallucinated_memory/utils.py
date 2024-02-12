@@ -5,18 +5,18 @@ from hallucinated_memory.genetic_mutator import GeneticMutator
 from hallucinated_memory.dataclass import HallucinatedMemoryParameters
 
 
-def initialize_hallucinator(prior: GenerativeModelBase, hallucination_config: HallucinatedMemoryParameters):
+def initialize_hallucinator(prior: GenerativeModelBase, parameters: HallucinatedMemoryParameters):
     """Initializes and returns the Hallucinator"""
-    if hallucination_config.hallucination_method.lower() == "sequence":
+    if parameters.hallucination_method.lower() == "sequence":
         return SequenceMutator(prior=prior,
-                               num_hallucinations=hallucination_config.num_hallucinations,
-                               num_selected=hallucination_config.num_selected,
-                               selection_criterion=hallucination_config.selection_criterion.lower())
+                               num_hallucinations=parameters.num_hallucinations,
+                               num_selected=parameters.num_selected,
+                               selection_criterion=parameters.selection_criterion.lower())
                                
-    elif hallucination_config.hallucination_method.lower() == "ga":
+    elif parameters.hallucination_method.lower() == "ga":
         return GeneticMutator(prior=prior,
-                              num_hallucinations=hallucination_config.num_hallucinations,
-                              num_selected=hallucination_config.num_selected,
-                              selection_criterion=hallucination_config.selection_criterion.lower())
+                              num_hallucinations=parameters.num_hallucinations,
+                              num_selected=parameters.num_selected,
+                              selection_criterion=parameters.selection_criterion.lower())
     else:
-        raise NotImplementedError(f"Hallucination method {hallucination_config.hallucination_method} not implemented.")
+        raise NotImplementedError(f"Hallucination method {parameters.hallucination_method} not implemented.")

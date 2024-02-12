@@ -89,7 +89,7 @@
       "pool_saving_frequency": 1000,
       "patience": 5,
       "token_sampling_method": "topk",
-      "patience_filter_limit": 100000
+      "filter_patience_limit": 100000
     },
     "diversity_filter": {
       "name": "IdenticalMurckoScaffold",
