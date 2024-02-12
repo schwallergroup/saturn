@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from oracles.oracle_component import OracleComponent
 from oracles.oracle_dataclass import OracleComponentParameters, OracleConfiguration
+from diversity_filter.diversity_filter import DiversityFilter
 
 
 class Oracle:
@@ -22,15 +23,24 @@ class Oracle:
         # cache dictionary to store the results of previous oracle calls
         self.cache = dict()
         self.calls = 0
+
+        # oracle history to assess sample efficiency via Generative Yield and Oracle Burden metrics
+        # TODO: need to also track reward of each component
         self.oracle_history = pd.DataFrame({
             "oracle_calls": [],
             "smiles": [],
-            "reward": []
+            "reward": [],
+            "penalized_reward": []
         })
+
+        self.scaffold_memory
         # NOTE: assume no repeated oracle calls are allowed
 
 
-    def __call__(self, smiles_batch: np.ndarray[str]) -> np.ndarray[float]:
+    def __call__(
+        self, 
+        smiles_batch: np.ndarray[str],
+        diversity_filter: DiversityFilter) -> np.ndarray[float]:
         """
         Args:
             smiles_batch: np.array of strings of smiles
@@ -38,19 +48,33 @@ class Oracle:
             np.array of rewards (float) of the same length as smiles_batch
         """
         pass
-        # increment the number of calls by the unique (canonicalized) SMILES
         # TODO: have option to flag which component of the oracle is "expensive" - 
         #       in this scenario, check the other cheap components are satisfied before calling the expensive component 
         #       (e.g., MW < 500 and QED > 0.4 before docking)
     
         # TODO: construct oracle should return a list of OracleComponent objects. __call__ should iterate through each component and call it
         #       each return value should already be subjected to a transformation function in the OracleComponent class
-        #       the __call__ method should just aggregate the rewards either by weighted sum or weighted mean 
+        #       the __call__ method should just aggregate the rewards either by weighted sum or weighted mean
+     
         # NOTE: DO NOT forget to assign the OracleComponent weight 
     
         # each OracleComponent has a calculate reward method --> run through all of them in the list and then aggregate
     
         # NOTE: check the preliminary_check flag!!!!
+    
+
+        # TODO: apply diversity filter!!
+        reward = np.ones((30, 10000))
+        penalized_reward = diversity_filter.penalize_reward(smiles_batch, reward)
+
+        # TODO: add raw rewards to this
+        self.update_oracle_history(
+            num_valid_smiles=len(reward),
+            smiles=smiles_batch,
+            reward=reward,
+            penalized_reward=penalized_reward
+        )
+                                   
         
         
     def construct_oracle(self, oracle_components: List[OracleComponentParameters]) -> List[OracleComponent]:
@@ -60,7 +84,30 @@ class Oracle:
         # TODO: aggregate the individual oracles into a single oracle function
         raise NotImplementedError
     
-    def update_history(
+    def update_oracle_history(
+        self, 
+        num_valid_smiles: int,
+        smiles: np.ndarray[str],
+        reward: np.ndarray[float],
+        penalized_reward: np.ndarray[float]
+    ) -> None:
+        """
+        This method performs 2 updates on every epoch:
+        1. Increments the number of oracle calls so far
+        2. Updates the Oracle History that tracks the generative sampling as a function of oracle calls
+        """
+        self.calls += num_valid_smiles
+        # track generated SMILES + reward as a function of oracle calls
+        df = pd.DataFrame({
+                "oracle_calls": np.full_like(smiles, self.calls),
+                "smiles": smiles,
+                "reward": reward, 
+                "penalized_reward": penalized_reward, 
+            })
+        
+        self.oracle_history = pd.concat([self.oracle_history, df])
+
+    def update_generative_history(
         self, 
         num_valid_smiles: int,
         smiles: np.ndarray[str],
@@ -86,12 +133,6 @@ class Oracle:
         Check if the oracle budget has been exceeded.
         """
         return self.calls >= self.budget
-
-    def logging(self):
-        # TODO: should save to scaffold memory each component of the oracle reward and also the aggregated reward
-        df = 0
-        self.scaffold_memory = pd.concat([df, self.scaffold_memory])
-        pass
 
     def write_out_oracle_history(self):
         """

@@ -3,7 +3,6 @@ Some code is based on the implementation from https://github.com/MolecularAI/Rei
 Implements Diversity Filter as described in the paper: https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00473-0
 """
 
-from typing import List
 import numpy as np
 from utils import chemistry_utils
 
@@ -20,7 +19,7 @@ class DiversityFilter:
 
     def update(
             self,
-            smiles: np.array
+            smiles: np.ndarray[str]
         ) -> None:
         """
         Update the bucket history based on the sampled (or hallucinated) batch of SMILES.
@@ -35,9 +34,9 @@ class DiversityFilter:
 
     def penalize_reward(
             self,
-            smiles: np.array,
-            rewards: np.array
-        ) -> List[float]:
+            smiles: np.ndarray[str],
+            rewards: np.ndarray[float]
+        ) -> np.ndarray[float]:
         """
         Penalize sampled (or hallucinated) SMILES based on the bucket history.
         """
@@ -50,4 +49,4 @@ class DiversityFilter:
             else:
                 penalized_rewards.append(rewards[idx])
         
-        return penalized_rewards
+        return np.array(penalized_rewards)
