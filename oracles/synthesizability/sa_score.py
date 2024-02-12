@@ -1,6 +1,6 @@
 import numpy as np
 from oracles.oracle_component import OracleComponent
-from oracles.oracle_component_parameters import OracleComponentParameters
+from oracles.oracle_dataclass import OracleComponentParameters
 from rdkit.Chem import Mol
 from oracles.synthesizability.sascorer import calculateScore
 

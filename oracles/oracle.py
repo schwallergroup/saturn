@@ -1,9 +1,12 @@
 from typing import List
 import pandas as pd
 import numpy as np
+
 from oracles.oracle_component import OracleComponent
 from oracles.oracle_dataclass import OracleComponentParameters, OracleConfiguration
 from diversity_filter.diversity_filter import DiversityFilter
+
+from oracles.utils import construct_oracle_component
 
 
 class Oracle:
@@ -33,7 +36,6 @@ class Oracle:
             "penalized_reward": []
         })
 
-        self.scaffold_memory
         # NOTE: assume no repeated oracle calls are allowed
 
 
@@ -62,6 +64,9 @@ class Oracle:
     
         # NOTE: check the preliminary_check flag!!!!
     
+        # TODO: only increment the NEW SMILES - check this by canonicalization BUT make sure not to return the canonicalization for backpropagation
+        #       because augmented SMILES can be useful for likelihood learning
+    
 
         # TODO: apply diversity filter!!
         reward = np.ones((30, 10000))
@@ -74,6 +79,11 @@ class Oracle:
             reward=reward,
             penalized_reward=penalized_reward
         )
+
+        # TODO: update the cache!!! 
+        # ******
+        # cache the penalized rewards!!!!!
+        # ******
                                    
         
         
@@ -81,8 +91,15 @@ class Oracle:
         """
         Construct the oracle function.
         """
-        # TODO: aggregate the individual oracles into a single oracle function
-        raise NotImplementedError
+        oracle = []
+        for component in oracle_components:
+            # construct the OracleComponent
+            oracle_component = construct_oracle_component(component)
+            print(oracle_component)
+            exit()
+            oracle.append(oracle_component)
+
+        return oracle
     
     def update_oracle_history(
         self, 

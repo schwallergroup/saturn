@@ -1,6 +1,6 @@
 import numpy as np
 from oracles.oracle_component import OracleComponent
-from oracles.oracle_component_parameters import OracleComponentParameters
+from oracles.oracle_dataclass import OracleComponentParameters
 from rdkit import Chem
 from rdkit.Chem import Mol
 
@@ -9,7 +9,7 @@ class MatchingSubstructure(OracleComponent):
         super().__init__(parameters)
         self.smarts = parameters.specific_parameters.get("smarts", [])
 
-    def __call__(self, mols: np.array[Mol]) -> np.array[float]:
+    def __call__(self, mols: np.ndarray[Mol]) -> np.ndarray[float]:
         # in case of empty list of SMARTS
         if len(self.smarts) == 0:
             return np.ones(len(mols), dtype=np.float32)

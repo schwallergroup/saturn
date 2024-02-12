@@ -1,7 +1,7 @@
 import numpy as np
 from rdkit.Chem import Mol
 from oracles.oracle_component import OracleComponent
-from oracles.oracle_component_parameters import OracleComponentParameters
+from oracles.oracle_dataclass import OracleComponentParameters
 from oracles.xtb.geometry_optimizer import GeometryOptimizer
 from morfeus import read_xyz, XTB
 
@@ -10,7 +10,7 @@ class LUMO(OracleComponent):
         super().__init__(parameters)
         self.geometry_optimizer = GeometryOptimizer()
 
-    def __call__(self, mols: np.array[Mol]) -> np.array[float]:
+    def __call__(self, mols: np.ndarray[Mol]) -> np.ndarray[float]:
         raw_lumo_values = []
         for mol in mols:
             try:

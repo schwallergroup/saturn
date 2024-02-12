@@ -1,6 +1,6 @@
 import numpy as np
 from oracles.oracle_component import OracleComponent
-from oracles.oracle_component_parameters import OracleComponentParameters
+from oracles.oracle_dataclass import OracleComponentParameters
 from rdkit import Chem
 from rdkit.Chem import Mol
 from rdkit.Chem.AllChem import GetMorganFingerprint
@@ -19,7 +19,7 @@ class JaccardDistance(OracleComponent):
             GetMorganFingerprint(mol=mol, radius=self.radius, useCounts=self.use_counts, useFeatures=self.use_features) for mol in self.reference_mols
         ]
 
-    def __call__(self, mols: np.array[Mol]) -> np.array[float]:
+    def __call__(self, mols: np.ndarray[Mol]) -> np.ndarray[float]:
         sims = []
         fps = [GetMorganFingerprint(mol=mol, radius=self.radius, useCounts=self.use_counts, useFeatures=self.use_features) for mol in mols]
 
