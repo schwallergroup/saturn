@@ -18,13 +18,13 @@ class OracleComponent(ABC):
         )
 
     @abstractmethod
-    def __call__(self, mols: np.array[Mol]) -> np.array[float]:
+    def __call__(self, mols: np.ndarray[Mol]) -> np.ndarray[float]:
         """
         Each OracleComponent implements this method with specifics depending on the property being calculated.
         """
         raise NotImplementedError("__call__ method is not implemented")
 
-    def calculate_reward(self, mols: np.array[Mol]) -> np.array[Mol]:
+    def calculate_reward(self, mols: np.ndarray[Mol]) -> np.ndarray[Mol]:
         """
         All OracleComponents execute __call__ and then apply the reward shaping function to get normalized rewards [0, 1]. 
         Errors are assigned a reward of 0.0.

@@ -1,5 +1,4 @@
 from typing import List
-import os
 import pandas as pd
 import numpy as np
 from oracles.oracle_component import OracleComponent
@@ -8,9 +7,9 @@ from oracles.oracle_dataclass import OracleComponentParameters, OracleConfigurat
 
 class Oracle:
     def __init__(
-            self, 
-            oracle_configuration: OracleConfiguration
-        ):
+        self, 
+        oracle_configuration: OracleConfiguration
+    ):
         self.oracle_configuration = oracle_configuration
         # construct the oracle function which can be composed of >1 individual oracles (multi-parameter optimization)
         self.oracle = self.construct_oracle(oracle_configuration.components)
@@ -22,7 +21,7 @@ class Oracle:
         # NOTE: assume no repeated oracle calls are allowed
 
 
-    def __call__(self, smiles_batch: np.array[str]) -> np.array[float]:
+    def __call__(self, smiles_batch: np.ndarray[str]) -> np.ndarray[float]:
         """
         Args:
             smiles_batch: np.array of strings of smiles

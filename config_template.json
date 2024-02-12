@@ -5,6 +5,54 @@
     "logging_path": "logging.log",
     "result_folder": "results"
   },
+  "oracle": {
+    "aggregator": "product",
+    "components": [
+      {
+        "name": "tpsa",
+        "weight": 1,
+        "prelimary_check": false,
+        "specific_parameters": {},
+        "reward_shaping_function_parameters": {
+            "transformation_function": "sigmoid",
+            "parameters": {
+                "low": 75,
+                "high": 350,
+                "k": 0.15
+                }
+            }
+      },
+      {
+        "name": "mw",
+        "weight": 1,
+        "prelimary_check": false,
+        "specific_parameters": {},
+        "reward_shaping_function_parameters": {
+            "transformation_function": "double_sigmoid",
+            "parameters": {
+                "low": 0,
+                "high": 350,
+                "coef_div": 500,
+                "coef_si": 250,
+                "coef_se": 250
+                }
+            }
+      },
+      {
+        "name": "num_rings",
+        "weight": 1,
+        "prelimary_check": false,
+        "specific_parameters": {},
+        "reward_shaping_function_parameters": {
+            "transformation_function": "step",
+            "parameters": {
+                "low": 2,
+                "high": 5
+                }
+            }
+      }
+    ]
+  },
   "parameters": {
     "diversity_filter": {
       "minscore": 0.0,
@@ -50,52 +98,6 @@
       "patience": 5,
       "token_sampling_method": "topk",
       "patience_filter_limit": 100000
-    },
-    "scoring_function": {
-      "name": "custom_product",
-      "parallel": false,
-      "parameters": [
-        {
-          "component_type": "tpsa",
-          "name": "tPSA",
-          "specific_parameters": {
-            "transformation": {
-              "transformation_type": "sigmoid",
-              "low": 75,
-              "high": 350,
-              "k": 0.15
-            }
-          },
-          "weight": 1
-        },
-        {
-          "component_type": "molecular_weight",
-          "name": "MW",
-          "specific_parameters": {
-            "transformation": {
-              "transformation_type": "double_sigmoid",
-              "low": 0,
-              "high": 350,
-              "coef_div": 500,
-              "coef_si": 250,
-              "coef_se": 250
-            }
-          },
-          "weight": 1
-        },
-        {
-          "component_type": "num_rings",
-          "name": "rings",
-          "specific_parameters": {
-            "transformation": {
-              "transformation_type": "step",
-              "low": 2,
-              "high": 5
-            }
-          },
-          "weight": 1
-        }
-      ]
     }
   },
   "running_mode": "goal_directed_generation"

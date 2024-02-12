@@ -69,7 +69,7 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return NumHydrogenBondAcceptors(oracle_component_parameters)
     elif name == "num_hbd":
         return NumHydrogenBondDonors(oracle_component_parameters)
-    elif name == "mw":
+    elif name in ["mw", "molecular_weight"]:
         return MolecularWeight(oracle_component_parameters)
     elif name == "qed":
         return QED(oracle_component_parameters)
@@ -113,6 +113,8 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
     elif name == "nucleophilicity":
         return Nucleophilicity(oracle_component_parameters)
     # TODO: docking
+    # TODO: pharmacophore and shape match --> ShapeLinker
+    # TODO: MD --> GROMACS
     else:
         raise NotImplementedError(f"Oracle: {name} is not implemented.")
 

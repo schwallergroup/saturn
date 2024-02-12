@@ -1,7 +1,8 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Dict
 
 @dataclass
 class RewardShapingFunctionParameters:
     # defaults to no transformation
     transformation_function: str = "no_transformation"
-    parameters: dict = {}
+    parameters: Dict[str, float] = field(default_factory=dict)

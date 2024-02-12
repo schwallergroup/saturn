@@ -28,7 +28,7 @@ class RewardShapingFunction:
             "double_sigmoid"
         ], f"{self.transformation_function} reward shaping function is not implemented."
 
-    def __call__(self, raw_property_values: np.array[float]) -> np.array[float]:
+    def __call__(self, raw_property_values: np.ndarray[float]) -> np.ndarray[float]:
         """
         Takes as input the raw property values based on the OracleComponent and applies reward shaping.
         """
@@ -50,10 +50,10 @@ class RewardShapingFunction:
 
     def step_transformation(
         self, 
-        raw_property_values: np.array[float],
+        raw_property_values: np.ndarray[float],
         low: float,
         high: float
-    ) -> np.array[float]:
+    ) -> np.ndarray[float]:
 
         def _step_formula(value, low, high) -> float:
             if low <= value <= high:
@@ -65,11 +65,11 @@ class RewardShapingFunction:
 
     def sigmoid_transformation(
         self, 
-        raw_property_values: np.array[float], 
+        raw_property_values: np.ndarray[float], 
         low: float,
         high: float,
         k: float
-    ) -> np.array[float]:
+    ) -> np.ndarray[float]:
 
         def _sigmoid(value, low, high, k) -> float:
             return math.pow(10, (10 * k * (value - (low + high) * 0.5) / (low - high)))
@@ -79,11 +79,11 @@ class RewardShapingFunction:
 
     def reverse_sigmoid_transformation(
         self, 
-        raw_property_values: np.array[float], 
+        raw_property_values: np.ndarray[float], 
         low: float,
         high: float,
         k: float
-    ) -> np.array[float]:
+    ) -> np.ndarray[float]:
 
         def _reverse_sigmoid_formula(value, low, high, k) -> float:
             try:
@@ -96,13 +96,13 @@ class RewardShapingFunction:
 
     def double_sigmoid_transformation(
         self, 
-        raw_property_values: np.array[float], 
+        raw_property_values: np.ndarray[float], 
         low: float,
         high: float,
         coef_div: float,
         coef_si: float,
         coef_se: float
-    ) -> np.array[float]:
+    ) -> np.ndarray[float]:
 
         def _double_sigmoid_formula(value, low, high, coef_div, coef_si, coef_se):
             try:
