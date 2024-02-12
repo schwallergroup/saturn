@@ -36,6 +36,7 @@ if __name__ == "__main__":
         # 1. Construct the Oracle
         oracle = Oracle(config["oracle"])
         # 2. Construct the Reinforcement Learning Agent
+        print("success")
         pass
     else:
         raise ValueError(f"Running mode: {config.running_mode} is not implemented.")

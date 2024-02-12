@@ -1,9 +1,6 @@
 """
-Contains utility functions to initialize the OracleComponents
+Contains utility function to initialize OracleComponents.
 """
-
-from typing import List
-import numpy as np
 from oracles.oracle_component import OracleComponent
 from oracles.oracle_dataclass import OracleComponentParameters
 
