@@ -15,8 +15,7 @@ from oracles.reward_shaping.function_parameters import RewardShapingFunctionPara
 
 class RewardShapingFunction:
 
-    def __init__(self, oracle_name: str, parameters: RewardShapingFunctionParameters):
-        self.oracle_name = oracle_name
+    def __init__(self, parameters: RewardShapingFunctionParameters):
         self.transformation_function = parameters["transformation_function"]
         self.parameters = parameters["parameters"]
 

@@ -14,9 +14,12 @@ class OracleComponent(ABC):
     def __init__(self, parameters: OracleComponentParameters):
         self.parameters = parameters
         self.reward_shaping_function = RewardShapingFunction(
-            oracle_name=parameters["name"],
-            parameters=parameters["reward_shaping_function_parameters"]
+            parameters["reward_shaping_function_parameters"]
         )
+        self.name = parameters["name"]
+        self.weight = parameters["weight"]
+        self.preliminary_check = parameters["preliminary_check"]
+        self.specific_parameters = parameters["specific_parameters"]
 
     @abstractmethod
     def __call__(self, mols: np.ndarray[Mol]) -> np.ndarray[float]:

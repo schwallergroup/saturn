@@ -1,6 +1,8 @@
 from typing import List
 import pandas as pd
 import numpy as np
+from rdkit import Chem
+from rdkit.Chem import Mol
 
 from oracles.oracle_component import OracleComponent
 from oracles.oracle_dataclass import OracleComponentParameters, OracleConfiguration
@@ -17,6 +19,7 @@ class Oracle:
         self.oracle_configuration = oracle_configuration
         # construct the oracle function which can be composed of >1 individual oracles (multi-parameter optimization)
         self.oracle = self.construct_oracle(oracle_configuration["components"])
+        self.oracle_weights = [oracle.weight for oracle in self.oracle]
         self.aggregator = oracle_configuration["aggregator"]
 
         # track oracle budget
@@ -28,31 +31,45 @@ class Oracle:
         self.calls = 0
 
         # oracle history to assess sample efficiency via Generative Yield and Oracle Burden metrics
-        # TODO: need to also track reward of each component
         self.oracle_history = pd.DataFrame({
             "oracle_calls": [],
             "smiles": [],
             "reward": [],
             "penalized_reward": []
         })
+        # add each oracle component's raw value and reward to the oracle history DataFrame
+        for oracle in self.oracle:
+            self.oracle_history[f"{oracle.name}_raw_values"] = []
+            self.oracle_history[f"{oracle.name}_reward"] = []
 
+        print(self.oracle_history)
+        exit()
         # NOTE: assume no repeated oracle calls are allowed
 
 
     def __call__(
         self, 
-        smiles_batch: np.ndarray[str],
-        diversity_filter: DiversityFilter) -> np.ndarray[float]:
+        smiles: np.ndarray[str],
+        diversity_filter: DiversityFilter
+    ) -> np.ndarray[float]:
         """
-        Args:
-            smiles_batch: np.array of strings of smiles
-        Returns:a
-            np.array of rewards (float) of the same length as smiles_batch
+        The Oracle is called at every generation epoch and performs the following:
+            1. Calls each oracle component in the Oracle 
+            2. Aggregates the oracle feedback into a single scalar reward
+            3. Penalizes the reward based on the diversity filter
+            4. Updates the Oracle History which tracks oracle calls, rewards, and penalized rewards
+            5. Updates the Oracle Cache to store the results of previous oracle calls
         """
         pass
-        # TODO: have option to flag which component of the oracle is "expensive" - 
-        #       in this scenario, check the other cheap components are satisfied before calling the expensive component 
-        #       (e.g., MW < 500 and QED > 0.4 before docking)
+        # 1. Only keep the valid SMILES (RDKit parsable)
+        smiles = [s for s in smiles if Chem.MolFromSmiles(s) is not None]
+        # 2. Get the Mols
+        mols = np.vectorize(Chem.MolFromSmiles)(smiles)
+        # 3. Execute preliminary check (if applicable)
+        mols = self.execute_preliminary_check(mols)
+        # 4. 
+    
+
     
         # TODO: construct oracle should return a list of OracleComponent objects. __call__ should iterate through each component and call it
         #       each return value should already be subjected to a transformation function in the OracleComponent class
@@ -70,12 +87,12 @@ class Oracle:
 
         # TODO: apply diversity filter!!
         reward = np.ones((30, 10000))
-        penalized_reward = diversity_filter.penalize_reward(smiles_batch, reward)
+        penalized_reward = diversity_filter.penalize_reward(smiles, reward)
 
         # TODO: add raw rewards to this
         self.update_oracle_history(
-            num_valid_smiles=len(reward),
-            smiles=smiles_batch,
+            num_valid_smiles=len(mols),
+            smiles=smiles,
             reward=reward,
             penalized_reward=penalized_reward
         )
@@ -98,6 +115,27 @@ class Oracle:
             oracle.append(oracle_component)
 
         return oracle
+    
+    def execute_preliminary_check(self, mols: np.ndarray[Mol]) -> np.ndarray[Mol]:
+        """
+        Executes a preliminary check (if applicable). Each oracle component has a preliminary_check flag that can be set to True.
+        Components set to True will be executed first to check that the molecule satisfies that component based on a reward threshold.
+        If the molecule does not satisfy the threshold, it is removed from the sampled batch.
+        """
+        # FIXME: set a threshold for each component. If not using Step transformation, rewards are not necessarily 0
+        THRESHOLD = 0.05
+        preliminary_check_oracles = [oracle for oracle in self.oracle if oracle.preliminary_check]
+
+        if len(preliminary_check_oracles) != 0:
+            filtered_mols = []
+            for mol in mols:
+                for idx, oracle in enumerate(preliminary_check_oracles):
+                    _, rewards = oracle.calculate_reward(mol)
+                    if (rewards > THRESHOLD) and (idx == len(preliminary_check_oracles) - 1):
+                        filtered_mols.append(mol)
+        else:
+            return mols
+
     
     def update_oracle_history(
         self, 
