@@ -42,6 +42,9 @@ class ReinforcementLearningAgent:
         # Replay buffer
         self.replay_buffer = ReplayBuffer(configuration.experience_replay)
 
+        # Diversity filter
+        self.diversity_filter = DiversityFilter(configuration.diversity_filter)
+
 
 
 

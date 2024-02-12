@@ -27,8 +27,6 @@ class ReplayBuffer:
         # TODO: keep this for Inception purposes?
         scoring_function=None
         ):
-        print(type(parameters))
-        exit()
         self.parameters = parameters
         # stores the top N highest reward molecules generated so far
         self.memory = pd.DataFrame(

@@ -5,17 +5,18 @@ Implements Diversity Filter as described in the paper: https://jcheminf.biomedce
 
 import numpy as np
 from utils import chemistry_utils
+from diversity_filter.dataclass import DiversityFilterParameters
 
 class DiversityFilter:
     def __init__(
             self, 
-            diversity_filter_configuration
+            parameters: DiversityFilterParameters
         ):
-        self.diversity_filter_configuration = diversity_filter_configuration
+        self.parameters = parameters
         # track the number of times a given Bemis-Murcko scaffold has been generated
         self.bucket_history = dict()
-        self.bucket_size = diversity_filter_configuration.bucket_size
-        self.min_similarity = diversity_filter_configuration.min_similarity
+        self.bucket_size = parameters.bucket_size
+        self.min_similarity = parameters.min_similarity
 
     def update(
             self,
