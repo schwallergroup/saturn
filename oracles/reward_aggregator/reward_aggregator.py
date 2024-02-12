@@ -16,9 +16,9 @@ class RewardAggregator:
 
     def __call__(
         self, 
-        rewards: np.array[float],  # (number of OracleComponents, number of SMILES)
-        weights: np.array[float]  # (number of OracleComponents, 1)
-    ) -> np.array[float]:
+        rewards: np.ndarray[float],  # (number of OracleComponents, number of SMILES)
+        weights: np.ndarray[float]  # (number of OracleComponents, 1)
+    ) -> np.ndarray[float]:
         """
         Takes as input the list of transformed rewards based on the OracleComponent and aggregates them into a single scalar.
         """
@@ -31,7 +31,7 @@ class RewardAggregator:
         self, 
         rewards: np.ndarray[float],  # (number of OracleComponents, number of SMILES)
         weights: np.ndarray[float]  # (number of OracleComponents, 1)
-    ) -> np.array[float]:
+    ) -> np.ndarray[float]:
         """
         Weighted Sum aggregation.
         """
@@ -43,7 +43,7 @@ class RewardAggregator:
         self, 
         rewards: np.ndarray[float],  # (number of OracleComponents, number of SMILES, 1)
         weights: np.ndarray[float]  # (number of OracleComponents, 1)
-    ) -> np.array[float]:
+    ) -> np.ndarray[float]:
         """
         Weighted Product aggregation.
         """
