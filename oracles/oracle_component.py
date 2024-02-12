@@ -3,6 +3,7 @@ This module contains the OracleComponent class, which is the base class for all 
 """
 
 from abc import ABC, abstractmethod
+from typing import Tuple
 from rdkit.Chem import Mol
 import numpy as np
 from oracles.oracle_dataclass import OracleComponentParameters
@@ -24,7 +25,7 @@ class OracleComponent(ABC):
         """
         raise NotImplementedError("__call__ method is not implemented")
 
-    def calculate_reward(self, mols: np.ndarray[Mol]) -> np.ndarray[Mol]:
+    def calculate_reward(self, mols: np.ndarray[Mol]) -> Tuple[np.ndarray[float], np.ndarray[float]]:
         """
         All OracleComponents execute __call__ and then apply the reward shaping function to get normalized rewards [0, 1]. 
         Errors are assigned a reward of 0.0.
@@ -33,4 +34,5 @@ class OracleComponent(ABC):
         # FIXME: np.vectorize may not handle computation errors
         raw_property_values = self(mols)
         # apply reward shaping
-        return self.reward_shaping_function(raw_property_values)
+        rewards = self.reward_shaping_function(raw_property_values)
+        return raw_property_values, rewards
