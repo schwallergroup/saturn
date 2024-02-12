@@ -6,12 +6,13 @@
     "result_folder": "results"
   },
   "oracle": {
+    "budget": 3000,
     "aggregator": "product",
     "components": [
       {
         "name": "tpsa",
         "weight": 1,
-        "prelimary_check": false,
+        "preliminary_check": false,
         "specific_parameters": {},
         "reward_shaping_function_parameters": {
             "transformation_function": "sigmoid",
@@ -25,7 +26,7 @@
       {
         "name": "mw",
         "weight": 1,
-        "prelimary_check": false,
+        "preliminary_check": false,
         "specific_parameters": {},
         "reward_shaping_function_parameters": {
             "transformation_function": "double_sigmoid",
@@ -41,7 +42,7 @@
       {
         "name": "num_rings",
         "weight": 1,
-        "prelimary_check": false,
+        "preliminary_check": false,
         "specific_parameters": {},
         "reward_shaping_function_parameters": {
             "transformation_function": "step",

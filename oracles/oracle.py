@@ -13,11 +13,20 @@ class Oracle:
         self.oracle_configuration = oracle_configuration
         # construct the oracle function which can be composed of >1 individual oracles (multi-parameter optimization)
         self.oracle = self.construct_oracle(oracle_configuration.components)
-        self.aggregator = 0.
+        self.aggregator = oracle_configuration.aggregator
+
+        # track oracle budget
+        self.budget = oracle_configuration.budget
+        self.calls = 0
+
         # cache dictionary to store the results of previous oracle calls
         self.cache = dict()
         self.calls = 0
-        self.budget = oracle_configuration.budget
+        self.oracle_history = pd.DataFrame({
+            "oracle_calls": [],
+            "smiles": [],
+            "reward": []
+        })
         # NOTE: assume no repeated oracle calls are allowed
 
 
@@ -51,6 +60,26 @@ class Oracle:
         # TODO: aggregate the individual oracles into a single oracle function
         raise NotImplementedError
     
+    def update_history(
+        self, 
+        num_valid_smiles: int,
+        smiles: np.ndarray[str],
+        reward: np.ndarray[float]
+    ) -> None:
+        """
+        This method performs 2 updates on every epoch:
+        1. Increments the number of oracle calls so far
+        2. Updates the Oracle History that tracks the generative sampling as a function of oracle calls
+        """
+        self.calls += num_valid_smiles
+        # track generated SMILES + reward as a function of oracle calls
+        df = pd.DataFrame({
+                "oracle_calls": np.full_like(smiles, self.calls),
+                "reward": reward, 
+                "smiles": smiles
+            })
+        
+        self.oracle_history = pd.concat([self.oracle_history, df])
 
     def oracle_budget_exceeded(self) -> bool:
         """
@@ -63,3 +92,9 @@ class Oracle:
         df = 0
         self.scaffold_memory = pd.concat([df, self.scaffold_memory])
         pass
+
+    def write_out_oracle_history(self):
+        """
+        Write out the oracle history as a CSV.
+        """
+        self.oracle_history.to_csv("oracle_history.csv")
