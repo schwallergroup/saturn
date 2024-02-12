@@ -45,7 +45,7 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
     """
     Matches the OracleComponent name and returns the OracleComponent class.
     """
-    name = oracle_component_parameters["name"]
+    name = oracle_component_parameters.name
     # similarity metrics
     if name == "tanimoto_similarity":
         return TanimotoSimilarity(oracle_component_parameters)

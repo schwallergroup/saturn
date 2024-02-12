@@ -7,6 +7,8 @@ import torch
 import numpy as np
 
 from oracles.oracle import Oracle
+from goal_directed_generation.dataclass import GoalDirectedGenerationConfiguration
+#from models.model import Model
 
 
 
@@ -14,17 +16,19 @@ class ReinforcementLearningAgent:
 
     def __init__(
         self, 
-        critic: GenerativeModelBase, 
-        actor: GenerativeModelBase,
         oracle: Oracle,
-        configuration: ReinforcementLearningConfiguration,
-        beam_configuration: BeamEnumerationConfiguration, 
-        hallucinate_configuration: HallucinatedMemoryConfiguration,
-        scoring_function: BaseScoringFunction, 
-        diversity_filter: BaseDiversityFilter,
-        inception: Inception, 
-        logger: BaseReinforcementLogger
+        parameters: GoalDirectedGenerationConfiguration
     ):
+        # Prior model is not updated so disable gradients
+        #self.prior = Model.load_from_file(parameters["reinforcement_learning"]["prior"])
+        #self._disable_prior_gradients()
+        #self.agent = Model.load_from_file(parameters["reinforcement_learning"]["agent"])
+
+        
+        
+        
+
+
         self._prior = critic
         self._agent = actor
         self._scoring_function = scoring_function
@@ -34,7 +38,8 @@ class ReinforcementLearningAgent:
         self.hallucination_config = hallucinate_configuration
         self._logger = logger
         self._inception = inception
-        self._margin_guard = MarginGuard(self)
+        # TODO: Potentially implement MarginGuard
+        # self._margin_guard = MarginGuard(self)
         self._optimizer = torch.optim.Adam(self._agent.get_network_parameters(), lr=self.config.learning_rate)
 
         # optimization algorithm
@@ -200,19 +205,8 @@ class ReinforcementLearningAgent:
             self.hallucinator.write_out_history()
 
     def _disable_prior_gradients(self):
-        # There might be a more elegant way of disabling gradients
-        for param in self._prior.get_network_parameters():
+        for param in self.prior.get_network_parameters():
             param.requires_grad = False
-
-    def _stats_and_chekpoint(self, score, start_time, step, smiles, score_summary: FinalSummary,
-                             agent_likelihood, prior_likelihood, augmented_likelihood):
-        self._margin_guard.adjust_margin(step)
-        mean_score = np.mean(score)
-        self._margin_guard.store_run_stats(agent_likelihood, prior_likelihood, augmented_likelihood, score)
-        self._logger.timestep_report(start_time, self.config.n_steps, step, smiles,
-                                     mean_score, score_summary, score,
-                                     agent_likelihood, prior_likelihood, augmented_likelihood, self._diversity_filter)
-        self._logger.save_checkpoint(step, self._diversity_filter, self._agent)
 
     def _sample_unique_sequences(self, agent, batch_size):
         seqs, smiles, agent_likelihood = agent.sample(batch_size)

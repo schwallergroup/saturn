@@ -21,12 +21,12 @@ class Oracle:
         self.oracle_configuration = oracle_configuration
         
         # construct the oracle function which can be composed of >1 individual oracles (multi-parameter optimization)
-        self.oracle = self.construct_oracle(oracle_configuration["components"])
+        self.oracle = self.construct_oracle(oracle_configuration.components)
         self.oracle_weights = [oracle.weight for oracle in self.oracle]
-        self.aggregator = RewardAggregator(oracle_configuration["aggregator"])
+        self.aggregator = RewardAggregator(oracle_configuration.aggregator)
 
         # track oracle budget
-        self.budget = oracle_configuration["budget"]
+        self.budget = oracle_configuration.budget
         self.calls = 0
 
         # cache dictionary to store the results of previous oracle calls
@@ -115,7 +115,7 @@ class Oracle:
         oracle = []
         for component in oracle_components:
             # construct the OracleComponent
-            oracle_component = construct_oracle_component(component)
+            oracle_component = construct_oracle_component(OracleComponentParameters(**component))
             oracle.append(oracle_component)
 
         return oracle

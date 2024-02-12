@@ -62,7 +62,6 @@
       "learning_rate": 0.0001,
       "margin_threshold": 50,
       "sigma": 128,
-      "optimization_algorithm": "augmented_memory",
       "augmented_memory": true,
       "augmentation_rounds": 2,
       "selective_memory_purge": true
@@ -93,7 +92,6 @@
       "patience_filter_limit": 100000
     },
     "diversity_filter": {
-      "minscore": 0.0,
       "minsimilarity": 0.4,
       "name": "IdenticalMurckoScaffold",
       "nbmax": 10

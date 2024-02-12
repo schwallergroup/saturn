@@ -7,6 +7,15 @@ import json
 import argparse
 
 from oracles.oracle import Oracle
+from oracles.dataclass import OracleConfiguration
+
+from goal_directed_generation.reinforcement_learning import ReinforcementLearningAgent
+from goal_directed_generation.dataclass import ReinforcementLearningParameters, GoalDirectedGenerationConfiguration
+from experience_replay.dataclass import ExperienceReplayParameters
+from hallucinated_memory.dataclass import HallucinatedMemoryParameters
+from beam_enumeration.dataclass import BeamEnumerationParameters
+from diversity_filter.dataclass import DiversityFilterParameters
+
 
 parser = argparse.ArgumentParser(description="Run SATURN.")
 parser.add_argument(
@@ -34,9 +43,18 @@ if __name__ == "__main__":
         pass
     elif running_mode == "goal_directed_generation":
         # 1. Construct the Oracle
-        oracle = Oracle(config["oracle"])
+        oracle = Oracle(OracleConfiguration(**config["oracle"]))
         # 2. Construct the Reinforcement Learning Agent
-
+        reinforcement_learning_agent = ReinforcementLearningAgent(
+            oracle=oracle,
+            parameters=GoalDirectedGenerationConfiguration(
+                ReinforcementLearningParameters(**config["goal_directed_generation"]["reinforcement_learning"]),
+                ExperienceReplayParameters(**config["goal_directed_generation"]["experience_replay"]),
+                HallucinatedMemoryParameters(**config["goal_directed_generation"]["hallucinated_memory"]),
+                BeamEnumerationParameters(**config["goal_directed_generation"]["beam_enumeration"]),
+                DiversityFilterParameters(**config["goal_directed_generation"]["diversity_filter"])
+            )
+        )
         pass
     else:
         raise ValueError(f"Running mode: {config.running_mode} is not implemented.")
