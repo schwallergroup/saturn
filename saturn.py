@@ -35,8 +35,9 @@ if __name__ == "__main__":
     elif running_mode == "goal_directed_generation":
         # 1. Construct the Oracle
         oracle = Oracle(config["oracle"])
+        exit()
         # 2. Construct the Reinforcement Learning Agent
-        print("success")
+
         pass
     else:
         raise ValueError(f"Running mode: {config.running_mode} is not implemented.")

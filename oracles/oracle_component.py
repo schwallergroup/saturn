@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Tuple
 from rdkit.Chem import Mol
 import numpy as np
-from oracles.oracle_dataclass import OracleComponentParameters
+from oracles.dataclass import OracleComponentParameters
 from oracles.reward_shaping.reward_shaping_function import RewardShapingFunction
 
 

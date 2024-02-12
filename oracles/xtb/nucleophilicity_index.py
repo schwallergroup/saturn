@@ -2,7 +2,7 @@ import math
 import numpy as np
 from rdkit.Chem import Mol
 from oracles.oracle_component import OracleComponent
-from oracles.oracle_dataclass import OracleComponentParameters
+from oracles.dataclass import OracleComponentParameters
 from oracles.xtb.geometry_optimizer import GeometryOptimizer
 from morfeus import read_xyz, XTB
 

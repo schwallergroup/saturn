@@ -6,7 +6,7 @@ from rdkit.Chem import Mol
 from utils.chemistry_utils import canonicalize_smiles_batch
 
 from oracles.oracle_component import OracleComponent
-from oracles.oracle_dataclass import OracleComponentParameters, OracleConfiguration
+from oracles.dataclass import OracleComponentParameters, OracleConfiguration
 from oracles.reward_aggregator.reward_aggregator import RewardAggregator
 from diversity_filter.diversity_filter import DiversityFilter
 

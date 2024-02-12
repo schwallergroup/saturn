@@ -1,45 +1,30 @@
 """
 Some code is based on the implementation from https://github.com/MolecularAI/Reinvent
 """
-
+from typing import List, Tuple
 import time
-
-import numpy as np
 import torch
-from reinvent_chemistry.utils import get_indices_of_unique_smiles
-from reinvent_models.lib_invent.enums.generative_model_regime import GenerativeModelRegimeEnum
-from reinvent_models.model_factory.configurations.model_configuration import ModelConfiguration
-from reinvent_models.model_factory.enums.model_type_enum import ModelTypeEnum
-from reinvent_models.model_factory.generative_model import GenerativeModel
-from reinvent_models.model_factory.generative_model_base import GenerativeModelBase
-from reinvent_scoring import FinalSummary
-from reinvent_scoring.scoring.diversity_filters.reinvent_core.base_diversity_filter import BaseDiversityFilter
-from reinvent_scoring.scoring.function.base_scoring_function import BaseScoringFunction
+import numpy as np
 
-from running_modes.configurations import ReinforcementLearningConfiguration, BeamEnumerationConfiguration, HallucinatedMemoryConfiguration
-from running_modes.constructors.base_running_mode import BaseRunningMode
-from running_modes.reinforcement_learning.inception import Inception
-from running_modes.reinforcement_learning.logging.base_reinforcement_logger import BaseReinforcementLogger
-from running_modes.reinforcement_learning.margin_guard import MarginGuard
-from running_modes.utils.general import to_tensor
-
-from reinvent_chemistry.conversions import Conversions
-from copy import deepcopy
-
-from running_modes.beam_enumeration.beam_enumeration import BeamEnumeration
-from running_modes.beam_enumeration.oracle_tracker import OracleTracker
-
-from running_modes.hallucination.utils import initialize_hallucinator
+from oracles.oracle import Oracle
 
 
-class CoreReinforcementRunner(BaseRunningMode):
 
-    def __init__(self, critic: GenerativeModelBase, actor: GenerativeModelBase,
-                 configuration: ReinforcementLearningConfiguration,
-                 beam_configuration: BeamEnumerationConfiguration, 
-                 hallucinate_configuration: HallucinatedMemoryConfiguration,
-                 scoring_function: BaseScoringFunction, diversity_filter: BaseDiversityFilter,
-                 inception: Inception, logger: BaseReinforcementLogger):
+class ReinforcementLearningAgent:
+
+    def __init__(
+        self, 
+        critic: GenerativeModelBase, 
+        actor: GenerativeModelBase,
+        oracle: Oracle,
+        configuration: ReinforcementLearningConfiguration,
+        beam_configuration: BeamEnumerationConfiguration, 
+        hallucinate_configuration: HallucinatedMemoryConfiguration,
+        scoring_function: BaseScoringFunction, 
+        diversity_filter: BaseDiversityFilter,
+        inception: Inception, 
+        logger: BaseReinforcementLogger
+    ):
         self._prior = critic
         self._agent = actor
         self._scoring_function = scoring_function

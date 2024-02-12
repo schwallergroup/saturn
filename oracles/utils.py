@@ -2,7 +2,7 @@
 Contains utility function to initialize OracleComponents.
 """
 from oracles.oracle_component import OracleComponent
-from oracles.oracle_dataclass import OracleComponentParameters
+from oracles.dataclass import OracleComponentParameters
 
 # similarity metrics
 from oracles.similarity.tanimoto_similarity import TanimotoSimilarity

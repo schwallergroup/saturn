@@ -1,6 +1,6 @@
 import numpy as np
 from oracles.oracle_component import OracleComponent
-from oracles.oracle_dataclass import OracleComponentParameters
+from oracles.dataclass import OracleComponentParameters
 from rdkit.Chem import Mol
 from rdkit.Chem.MolSurf import TPSA
 
