@@ -5,18 +5,17 @@ This module contains the OracleComponent class, which is the base class for all 
 from abc import ABC, abstractmethod
 from rdkit.Chem import Mol
 import numpy as np
-from oracles.oracle_component_parameters import OracleComponentParameters
+from oracles.oracle_dataclass import OracleComponentParameters
 from oracles.reward_shaping.reward_shaping_function import RewardShapingFunction
 
 
 class OracleComponent(ABC):
-    def __init__(
-            self, 
-            parameters: OracleComponentParameters):
+    def __init__(self, parameters: OracleComponentParameters):
         self.parameters = parameters
         self.reward_shaping_function = RewardShapingFunction(
+            parameters.name,
             parameters.reward_shaping_function_parameters.parameters
-            )
+        )
 
     @abstractmethod
     def __call__(self, mols: np.array[Mol]) -> np.array[float]:
@@ -31,6 +30,7 @@ class OracleComponent(ABC):
         Errors are assigned a reward of 0.0.
         """
         # calculate the raw property values
+        # FIXME: np.vectorize may not handle computation errors
         raw_property_values = self(mols)
         # apply reward shaping
         return self.reward_shaping_function(raw_property_values)

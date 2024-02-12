@@ -5,7 +5,7 @@ Contains utility functions to initialize the OracleComponents
 from typing import List
 import numpy as np
 from oracles.oracle_component import OracleComponent
-from oracles.oracle_component_parameters import OracleComponentParameters
+from oracles.oracle_dataclass import OracleComponentParameters
 
 # similarity metrics
 from oracles.similarity.tanimoto_similarity import TanimotoSimilarity

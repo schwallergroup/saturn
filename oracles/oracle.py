@@ -3,16 +3,18 @@ import os
 import pandas as pd
 import numpy as np
 from oracles.oracle_component import OracleComponent
+from oracles.oracle_dataclass import OracleComponentParameters, OracleConfiguration
 
 
 class Oracle:
     def __init__(
             self, 
-            oracle_configuration
+            oracle_configuration: OracleConfiguration
         ):
         self.oracle_configuration = oracle_configuration
         # construct the oracle function which can be composed of >1 individual oracles (multi-parameter optimization)
-        self.oracle = self.construct_oracle()
+        self.oracle = self.construct_oracle(oracle_configuration.components)
+        self.aggregator = 0.
         # cache dictionary to store the results of previous oracle calls
         self.cache = dict()
         self.calls = 0
@@ -20,7 +22,7 @@ class Oracle:
         # NOTE: assume no repeated oracle calls are allowed
 
 
-    def __call__(self, smiles_batch: np.array) -> np.array:
+    def __call__(self, smiles_batch: np.array[str]) -> np.array[float]:
         """
         Args:
             smiles_batch: np.array of strings of smiles
@@ -38,9 +40,12 @@ class Oracle:
         #       the __call__ method should just aggregate the rewards either by weighted sum or weighted mean 
         # NOTE: DO NOT forget to assign the OracleComponent weight 
     
+        # each OracleComponent has a calculate reward method --> run through all of them in the list and then aggregate
+    
+        # NOTE: check the preliminary_check flag!!!!
         
         
-    def construct_oracle(self) -> List[OracleComponent]:
+    def construct_oracle(self, oracle_components: List[OracleComponentParameters]) -> List[OracleComponent]:
         """
         Construct the oracle function.
         """
@@ -53,3 +58,9 @@ class Oracle:
         Check if the oracle budget has been exceeded.
         """
         return self.calls >= self.budget
+
+    def logging(self):
+        # TODO: should save to scaffold memory each component of the oracle reward and also the aggregated reward
+        df = 0
+        self.scaffold_memory = pd.concat([df, self.scaffold_memory])
+        pass

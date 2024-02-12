@@ -23,7 +23,7 @@ def canonicalize_smiles_batch(smiles_batch: np.array) -> List[str]:
 
 def randomize_smiles(self, smiles: str) -> str:
     """
-    Shuffle atom numbering to generated a randomized SMILES string.
+    Shuffle atom numbering to generate a randomized SMILES string.
     """
     mol = Chem.MolFromSmiles(smiles)
     if mol:

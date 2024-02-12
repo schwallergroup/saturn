@@ -15,7 +15,8 @@ from oracles.reward_shaping.function_parameters import RewardShapingFunctionPara
 
 class RewardShapingFunction:
 
-    def __init__(self, parameters: RewardShapingFunctionParameters):
+    def __init__(self, oracle_name: str, parameters: RewardShapingFunctionParameters):
+        self.oracle_name = oracle_name
         self.transformation_function = parameters.transformation_function
         self.parameters = parameters.parameters
 
@@ -23,16 +24,20 @@ class RewardShapingFunction:
         """
         Takes as input the raw property values based on the OracleComponent and applies reward shaping.
         """
-        if self.transformation_function == "no_transformation":
-            return raw_property_values
-        elif self.transformation_function == "step":
-            return self.step_transformation(raw_property_values, **self.parameters)
-        elif self.transformation_function == "sigmoid":
-            return self.sigmoid_transformation(raw_property_values, **self.parameters)
-        elif self.transformation_function == "reverse_sigmoid":
-            return self.reverse_sigmoid_transformation(raw_property_values, **self.parameters)
-        elif self.transformation_function == "double_sigmoid":
-            return self.double_sigmoid_transformation(raw_property_values, **self.parameters)
+        try:
+            if self.transformation_function == "no_transformation":
+                return raw_property_values
+            elif self.transformation_function == "step":
+                return self.step_transformation(raw_property_values, **self.parameters)
+            elif self.transformation_function == "sigmoid":
+                return self.sigmoid_transformation(raw_property_values, **self.parameters)
+            elif self.transformation_function == "reverse_sigmoid":
+                return self.reverse_sigmoid_transformation(raw_property_values, **self.parameters)
+            elif self.transformation_function == "double_sigmoid":
+                return self.double_sigmoid_transformation(raw_property_values, **self.parameters)
+        except Exception:
+            raise ValueError(f"Oracle: {self.oracle_name} is using {self.transformation_function} reward shaping function but not all parameters have been specified.")
+
 
     def step_transformation(
         self, 
