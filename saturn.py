@@ -35,7 +35,6 @@ if __name__ == "__main__":
     elif running_mode == "goal_directed_generation":
         # 1. Construct the Oracle
         oracle = Oracle(config["oracle"])
-        exit()
         # 2. Construct the Reinforcement Learning Agent
 
         pass
