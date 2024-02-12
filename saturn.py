@@ -47,14 +47,14 @@ if __name__ == "__main__":
         # 2. Construct the Reinforcement Learning Agent
         reinforcement_learning_agent = ReinforcementLearningAgent(
             oracle=oracle,
-            parameters=GoalDirectedGenerationConfiguration(
+            configuration=GoalDirectedGenerationConfiguration(
                 ReinforcementLearningParameters(**config["goal_directed_generation"]["reinforcement_learning"]),
                 ExperienceReplayParameters(**config["goal_directed_generation"]["experience_replay"]),
+                DiversityFilterParameters(**config["goal_directed_generation"]["diversity_filter"]),
                 HallucinatedMemoryParameters(**config["goal_directed_generation"]["hallucinated_memory"]),
                 BeamEnumerationParameters(**config["goal_directed_generation"]["beam_enumeration"]),
-                DiversityFilterParameters(**config["goal_directed_generation"]["diversity_filter"])
             )
         )
         pass
     else:
-        raise ValueError(f"Running mode: {config.running_mode} is not implemented.")
+        raise ValueError(f"Running mode: {running_mode} is not implemented.")

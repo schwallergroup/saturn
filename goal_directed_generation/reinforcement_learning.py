@@ -9,6 +9,10 @@ import numpy as np
 from oracles.oracle import Oracle
 from goal_directed_generation.dataclass import GoalDirectedGenerationConfiguration
 #from models.model import Model
+from experience_replay.replay_buffer import ReplayBuffer
+from diversity_filter.diversity_filter import DiversityFilter
+from hallucinated_memory.utils import initialize_hallucinator
+from beam_enumeration.beam_enumeration import BeamEnumeration
 
 
 
@@ -17,21 +21,31 @@ class ReinforcementLearningAgent:
     def __init__(
         self, 
         oracle: Oracle,
-        parameters: GoalDirectedGenerationConfiguration
+        configuration: GoalDirectedGenerationConfiguration
     ):
         # Prior model is not updated so disable gradients
         #self.prior = Model.load_from_file(parameters["reinforcement_learning"]["prior"])
         #self._disable_prior_gradients()
         #self.agent = Model.load_from_file(parameters["reinforcement_learning"]["agent"])
 
-        
-        
-        
+        self.oracle = oracle
+
+        # RL parameters
+        self.batch_size = configuration.reinforcement_learning.batch_size
+        self.learning_rate = configuration.reinforcement_learning.learning_rate
+        self.margin_threshold = configuration.reinforcement_learning.margin_threshold
+        self.sigma = configuration.reinforcement_learning.sigma
+        self.augmented_memory = configuration.reinforcement_learning.augmented_memory
+        self.augmentation_rounds = configuration.reinforcement_learning.augmentation_rounds
+        self.selective_memory_purge = configuration.reinforcement_learning.selective_memory_purge
+
+        # Replay buffer
 
 
-        self._prior = critic
-        self._agent = actor
-        self._scoring_function = scoring_function
+
+
+
+
         self._diversity_filter = diversity_filter
         self.config = configuration
         self.beam_config = beam_configuration

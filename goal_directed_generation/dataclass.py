@@ -20,6 +20,6 @@ class ReinforcementLearningParameters:
 class GoalDirectedGenerationConfiguration:
     reinforcement_learning: ReinforcementLearningParameters
     experience_replay: ExperienceReplayParameters
+    diversity_filter: DiversityFilterParameters
     hallucinated_memory: HallucinatedMemoryParameters
     beam_enumeration: BeamEnumerationParameters
-    diversity_filter: DiversityFilterParameters
