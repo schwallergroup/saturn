@@ -175,7 +175,7 @@ class Oracle:
         oracle_components_df: pd.DataFrame
     ) -> None:
         """
-        This method performs 2 updates on every epoch:
+        This method performs the following on every generation epoch:
         1. Increments the number of oracle calls so far
         2. Updates the Oracle History that tracks the generative sampling as a function of oracle calls
         """
