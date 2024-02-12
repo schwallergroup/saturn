@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from rdkit.Chem import Mol
 import numpy as np
 from oracles.oracle_component_parameters import OracleComponentParameters
-from oracles.utils import construct_reward_shaping_function
+from oracles.reward_shaping.reward_shaping_function import RewardShapingFunction
 
 
 class OracleComponent(ABC):
@@ -14,9 +14,8 @@ class OracleComponent(ABC):
             self, 
             parameters: OracleComponentParameters):
         self.parameters = parameters
-        # TODO: implement this
-        self.reward_shaping_function = construct_reward_shaping_function(
-            self.parameters.reward_shaping_function_parameters
+        self.reward_shaping_function = RewardShapingFunction(
+            parameters.reward_shaping_function_parameters.parameters
             )
 
     @abstractmethod
@@ -34,19 +33,4 @@ class OracleComponent(ABC):
         # calculate the raw property values
         raw_property_values = self(mols)
         # apply reward shaping
-        return self.apply_reward_shaping_function(raw_property_values)
-
-    def apply_reward_shaping_function(self, query_mols) -> np.array:
-        # TODO: if nothing is specified, just return the raw property values
-        scores = []
-        for mol in query_mols:
-            try:
-                score = self._calculate_phys_chem_property(mol)
-            except ValueError:
-                score = 0.0
-            scores.append(score)
-        transform_params = self.parameters.specific_parameters.get(
-            self.component_specific_parameters.TRANSFORMATION, {}
-        )
-        transformed_scores = self._transformation_function(scores, transform_params)
-        return np.array(transformed_scores, dtype=np.float32), np.array(scores, dtype=np.float32)
+        return self.reward_shaping_function(raw_property_values)

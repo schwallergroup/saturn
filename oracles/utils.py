@@ -1,7 +1,5 @@
 """
-Contains 2 utility functions:
-    1. Construct the OracleComponents
-    2. Construct the Reward Shaping Function
+Contains utility functions to initialize the OracleComponents
 """
 
 from typing import List
@@ -52,7 +50,7 @@ from oracles.reward_shaping.reward_shaping_function import RewardShapingFunction
 
 def construct_oracle_component(oracle_component_parameters: OracleComponentParameters) -> OracleComponent:
     """
-    Constructs an oracle component consisting of:
+    Constructs an OracleComponent consisting of:
         1. The specific oracle based on name ID (e.g., Tanimoto similarity)
         2. The desired reward shaping function to associate with the oracle component
     """
@@ -117,11 +115,6 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
     # TODO: docking
     else:
         raise NotImplementedError(f"Oracle: {name} is not implemented.")
-    
-def construct_reward_shaping_function(reward_shaping_function_parameters: RewardShapingFunctionParameters) -> RewardShapingFunction:
-    """
-    Constructs the reward shaping function based on the specified parameters.
-    """
 
 def create_score_components(self) -> [BaseScoreComponent]:
     def create_component(component_params):

@@ -1,5 +1,5 @@
 """
-Some code is based on the implementation from https://github.com/MolecularAI/Reinvent
+Some code is based on the implementation from https://github.com/MolecularAI/Reinvent.
 """
 
 import numpy as np

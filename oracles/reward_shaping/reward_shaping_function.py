@@ -1,91 +1,75 @@
+"""
+Adapted from https://github.com/MolecularAI/reinvent-scoring.
+Implements the following reward shaping functions:
+    1. No transformation
+    2. Step
+    3. Sigmoid
+    4. Reverse Sigmoid
+    5. Double Sigmoid
+"""
+
 import numpy as np
 import math
-from scipy.interpolate import interp1d
 
-from reinvent_scoring.scoring.enums import TransformationTypeEnum
-from reinvent_scoring.scoring.enums import TransformationParametersEnum 
+from oracles.reward_shaping.function_parameters import RewardShapingFunctionParameters
 
 class RewardShapingFunction:
 
-    def __init__(self):
-        self._transformation_function_registry = self._default_transformation_function_registry()
+    def __init__(self, parameters: RewardShapingFunctionParameters):
+        self.transformation_function = parameters.transformation_function
+        self.parameters = parameters.parameters
 
-        # class RewardShapingFunctionParameters:
-        # name: str
-        # parameters: List[dict]
-        # parallel: bool = False
+    def __call__(self, raw_property_values: np.array[float]) -> np.array[float]:
+        """
+        Takes as input the raw property values based on the OracleComponent and applies reward shaping.
+        """
+        if self.transformation_function == "no_transformation":
+            return raw_property_values
+        elif self.transformation_function == "step":
+            return self.step_transformation(raw_property_values, **self.parameters)
+        elif self.transformation_function == "sigmoid":
+            return self.sigmoid_transformation(raw_property_values, **self.parameters)
+        elif self.transformation_function == "reverse_sigmoid":
+            return self.reverse_sigmoid_transformation(raw_property_values, **self.parameters)
+        elif self.transformation_function == "double_sigmoid":
+            return self.double_sigmoid_transformation(raw_property_values, **self.parameters)
 
-    def _default_transformation_function_registry(self) -> dict:
-        enum = TransformationTypeEnum()
-        transformation_list = {
-            enum.SIGMOID: self.sigmoid_transformation,
-            enum.REVERSE_SIGMOID: self.reverse_sigmoid_transformation,
-            enum.DOUBLE_SIGMOID: self.double_sigmoid,
-            enum.NO_TRANSFORMATION: self.no_transformation,
-            enum.RIGHT_STEP: self.right_step,
-            enum.LEFT_STEP: self.left_step,
-            enum.STEP: self.step,
-            enum.CUSTOM_INTERPOLATION: self.custom_interpolation
-        }
-        return transformation_list
+    def step_transformation(
+        self, 
+        raw_property_values: np.array[float],
+        low: float,
+        high: float
+    ) -> np.array[float]:
 
-    def get_transformation_function(self, parameters: dict):
-        transformation_type = parameters[TransformationParametersEnum.TRANSFORMATION_TYPE]
-        transformation_function = self._transformation_function_registry[transformation_type]
-        return transformation_function
-
-    def no_transformation(self, predictions: list, parameters: dict) -> np.array:
-        return np.array(predictions, dtype=np.float32)
-
-    def right_step(self, predictions, parameters) -> np.array:
-        _low = parameters[TransformationParametersEnum.LOW]
-
-        def _right_step_formula(value, low):
-            if value >= low:
-                return 1
-            return 0
-
-        transformed = [_right_step_formula(value, _low) for value in predictions]
-        return np.array(transformed, dtype=np.float32)
-
-    def left_step(self, predictions, parameters) -> np.array:
-        _low = parameters[TransformationParametersEnum.LOW]
-
-        def _left_step_formula(value, low):
-            if value <= low:
-                return 1
-            return 0
-
-        transformed = [_left_step_formula(value, _low) for value in predictions]
-        return np.array(transformed, dtype=np.float32)
-
-    def step(self, predictions, parameters) -> np.array:
-        _low = parameters[TransformationParametersEnum.LOW]
-        _high = parameters[TransformationParametersEnum.HIGH]
-
-        def _step_formula(value, low, high):
+        def _step_formula(value, low, high) -> float:
             if low <= value <= high:
-                return 1
-            return 0
+                return 1.0
+            return 0.0
 
-        transformed = [_step_formula(value, _low, _high) for value in predictions]
+        transformed = [_step_formula(val, low, high) for val in raw_property_values]
         return np.array(transformed, dtype=np.float32)
 
-    def sigmoid_transformation(self, predictions: list, parameters: dict) -> np.array:
-        _low = parameters[TransformationParametersEnum.LOW]
-        _high = parameters[TransformationParametersEnum.HIGH]
-        _k = parameters[TransformationParametersEnum.K]
+    def sigmoid_transformation(
+        self, 
+        raw_property_values: np.array[float], 
+        low: float,
+        high: float,
+        k: float
+    ) -> np.array[float]:
 
-        def _exp(pred_val, low, high, k) -> float:
-            return math.pow(10, (10 * k * (pred_val - (low + high) * 0.5) / (low - high)))
+        def _sigmoid(value, low, high, k) -> float:
+            return math.pow(10, (10 * k * (value - (low + high) * 0.5) / (low - high)))
 
-        transformed = [1 / (1 + _exp(pred_val, _low, _high, _k)) for pred_val in predictions]
+        transformed = [1 / (1 + _sigmoid(val, low, high, k)) for val in raw_property_values]
         return np.array(transformed, dtype=np.float32)
 
-    def reverse_sigmoid_transformation(self, predictions: list, parameters: dict) -> np.array:
-        _low = parameters[TransformationParametersEnum.LOW]
-        _high = parameters[TransformationParametersEnum.HIGH]
-        _k = parameters[TransformationParametersEnum.K]
+    def reverse_sigmoid_transformation(
+        self, 
+        raw_property_values: np.array[float], 
+        low: float,
+        high: float,
+        k: float
+    ) -> np.array[float]:
 
         def _reverse_sigmoid_formula(value, low, high, k) -> float:
             try:
@@ -93,17 +77,20 @@ class RewardShapingFunction:
             except:
                 return 0
 
-        transformed = [_reverse_sigmoid_formula(pred_val, _low, _high, _k) for pred_val in predictions]
+        transformed = [_reverse_sigmoid_formula(val, low, high, k) for val in raw_property_values]
         return np.array(transformed, dtype=np.float32)
 
-    def double_sigmoid(self, predictions: list, parameters: dict) -> np.array:
-        _low = parameters[TransformationParametersEnum.LOW]
-        _high = parameters[TransformationParametersEnum.HIGH]
-        _coef_div = parameters[TransformationParametersEnum.COEF_DIV]
-        _coef_si = parameters[TransformationParametersEnum.COEF_SI]
-        _coef_se = parameters[TransformationParametersEnum.COEF_SE]
+    def double_sigmoid_transformation(
+        self, 
+        raw_property_values: np.array[float], 
+        low: float,
+        high: float,
+        coef_div: float,
+        coef_si: float,
+        coef_se: float
+    ) -> np.array[float]:
 
-        def _double_sigmoid_formula(value, low, high, coef_div=100., coef_si=150., coef_se=150.):
+        def _double_sigmoid_formula(value, low, high, coef_div, coef_si, coef_se):
             try:
                 A = 10 ** (coef_se * (value / coef_div))
                 B = (10 ** (coef_se * (value / coef_div)) + 10 ** (coef_se * (low / coef_div)))
@@ -113,35 +100,5 @@ class RewardShapingFunction:
             except:
                 return 0
 
-        transformed = [_double_sigmoid_formula(pred_val, _low, _high, _coef_div, _coef_si, _coef_se) for pred_val in
-                       predictions]
+        transformed = [_double_sigmoid_formula(val, low, high, coef_div, coef_si, coef_se) for val in raw_property_values]
         return np.array(transformed, dtype=np.float32)
-
-    def custom_interpolation(self, predictions: list, parameters: dict) -> np.array:
-        """Adapted from the paper:
-        'Efficient Multi-Objective Molecular Optimization in a Continuous Latent Space'
-        by Robin Winter, Floriane Montanari, Andreas Steffen, Hans Briem, Frank Noé and Djork-Arné Clevert.
-        """
-
-        def _transformation_function(interpolation_map, truncate_left=True, truncate_right=True):
-            origin = [point['origin'] for point in interpolation_map]
-            destination = [point['destination'] for point in interpolation_map]
-            assert len(origin) == len(destination)
-
-            if truncate_left:
-                origin = [origin[0] - 1] + origin
-                destination = [destination[0]] + destination
-            if truncate_right:
-                origin.append(origin[-1] + 1)
-                destination.append(destination[-1])
-            return interp1d(origin, destination, fill_value='extrapolate')
-
-        desirability = parameters.get(TransformationParametersEnum.INTERPOLATION_MAP, [{"origin": 0.0, "destination": 0.0},
-                                                                         {"origin": 1.0, "destination": 1.0}])
-        truncate_left = parameters.get(TransformationParametersEnum.TRUNCATE_LEFT, True)
-        truncate_right = parameters.get(TransformationParametersEnum.TRUNCATE_RIGHT, True)
-
-        transformation = _transformation_function(desirability, truncate_left, truncate_right)
-        transformed = transformation(predictions)
-
-        return transformed
