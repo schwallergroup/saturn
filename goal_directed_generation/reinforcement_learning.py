@@ -87,11 +87,11 @@ class ReinforcementLearningAgent:
             # 1. Sample unique SMILES from the Agent
             seqs, smiles, sampled_agent_likelihood = sample_unique_sequences(self.agent, self.batch_size)
 
-            # 2. (Optional) Beam Enumeration: Filter SMILES using the Beam Enumeration pool
+            # 2. Beam Enumeration: Filter SMILES using the Beam Enumeration pool
             if (self.execute_beam_enumeration) and (len(self.beam_enumeration.pool) != 0):
                 seqs, smiles, sampled_agent_likelihood = self.beam_enumeration.filter_batch(seqs, smiles, sampled_agent_likelihood)
 
-            # 3. (Optional) Beam Enumeration: If all SMILES are filtered, proceed to next generation epoch
+            # 3. Beam Enumeration: If all SMILES are filtered, proceed to next generation epoch
             if len(smiles) == 0:
                 self.beam_enumeration.filtered_epoch_updates()
                 if self.beam_enumeration.patience_limit_reached():
@@ -103,8 +103,8 @@ class ReinforcementLearningAgent:
             #    Rewards are already penalized by the Diversity Filter
             smiles, penalized_rewards = self.oracle(smiles, self.diversity_filter)
 
-            # 5. (Optional) Beam Enumeration: Check whether to execute Beam Enumeration
-            #               NOTE: Beam Enumeration execution criterion is based only *sampled* batch
+            # 5. Beam Enumeration: Check whether to execute Beam Enumeration
+            #    NOTE: Beam Enumeration execution criterion is based only *sampled* batch
             if self.execute_beam_enumeration:
                 self.beam_enumeration.epoch_updates(
                     agent=self.agent,
@@ -113,12 +113,12 @@ class ReinforcementLearningAgent:
                     oracle_calls=self.oracle.calls
                 )
 
-            # 5. (Optional) Hallucinated Memory: Hallucinate new SMILES from the Replay Buffer
+            # 5. Hallucinated Memory: Hallucinate new SMILES from the Replay Buffer
             if (self.execute_hallucinated_memory) and (len(self.replay_buffer.memory) == 0):
                 hallucinated_smiles = self.hallucinator.hallucinate(self.replay_buffer.memory)
-                # 6. (Optional) Hallucinated Memory: Oracle call on hallucinated batch
+                # 6. Hallucinated Memory: Oracle call on hallucinated batch
                 hallucinated_smiles, hallucinated_penalized_rewards = self.oracle(hallucinated_smiles, self.diversity_filter)
-                # 7. (Optional) Update the hallucation history
+                # 7. Update the hallucination history
                 # FIXME: track how many times the replay buffer is being populated and not just when the hallucinations are the best-so-far
                 #self.hallucinator.epoch_updates(
                 #    epoch=step,
@@ -158,7 +158,7 @@ class ReinforcementLearningAgent:
             loss = torch.cat((loss, er_loss), 0)
             self.backpropagate(loss)
 
-            # 13. (Optional) Augmented Memory
+            # 13. Augmented Memory
             if self.augmented_memory:
                 # NOTE: *Highly* recommended that Selective Memory Purge is enabled
                 #       All penalized scaffolds are removed from the Replay Buffer *before* executing Augmented Memory
