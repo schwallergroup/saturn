@@ -163,7 +163,7 @@ class ReinforcementLearningAgent:
                 # NOTE: *Highly* recommended that Selective Memory Purge is enabled
                 #       All penalized scaffolds are removed from the Replay Buffer *before* executing Augmented Memory
                 if self.selective_memory_purge:
-                    self._inception.selective_memory_purge(smiles, penalized_rewards)
+                    self.replay_buffer.selective_memory_purge(smiles, penalized_rewards)
                 for _ in range(self.augmentation_rounds):
                     # Get randomized SMILES for both the sampled and hallucinated SMILES
                     randomized_smiles = chemistry_utils.randomize_smiles_batch(smiles, self.prior)
