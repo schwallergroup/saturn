@@ -5,6 +5,7 @@ from typing import Tuple, List
 import torch
 import torch.nn as nn
 import numpy as np
+
 # import model architectures
 from models.rnn import RNN
 from models.decoder_transformer import DecoderTransformer
@@ -44,24 +45,25 @@ class Model:
         self.vocabulary = vocabulary
         self.tokenizer = tokenizer
         self.max_sequence_length = max_sequence_length
-        self._model_modes = ModelModeEnum()
 
         if not isinstance(network_params, dict):
             network_params = {}
 
+        # TODO: add support for the Decoder-only Transformer
         self.network = RNN(len(self.vocabulary), **network_params)
+
         if torch.cuda.is_available() and not no_cuda:
             self.network.cuda()
-
-        self._nll_loss = nn.NLLLoss(reduction="none")
+    
+        self.nll_loss = nn.NLLLoss(reduction="none")
 
     def set_mode(self, mode: str):
-        if mode == self._model_modes.TRAINING:
+        if mode == "training":
             self.network.train()
-        elif mode == self._model_modes.INFERENCE:
+        elif mode == "inference":
             self.network.eval()
         else:
-            raise ValueError(f"Invalid model mode '{mode}")
+            raise ValueError(f"Invalid model mode {mode}")
 
     @classmethod
     def load_from_file(cls, file_path: str, sampling_mode=False):
@@ -77,58 +79,63 @@ class Model:
 
         network_params = save_dict.get("network_params", {})
         model = Model(
-            vocabulary=save_dict['vocabulary'],
-            tokenizer=save_dict.get('tokenizer', SMILESTokenizer()),
+            vocabulary=save_dict["vocabulary"],
+            tokenizer=save_dict.get("tokenizer", SMILESTokenizer()),
             network_params=network_params,
-            max_sequence_length=save_dict['max_sequence_length']
+            max_sequence_length=save_dict["max_sequence_length"]
         )
         model.network.load_state_dict(save_dict["network"])
         if sampling_mode:
             model.network.eval()
+            
         return model
 
-    def save(self, file: str):
+    def save(self, save_path: str):
         """
-        Saves the model into a file
-        :param file: it's actually a path
+        Saves the model to save_path.
         """
         save_dict = {
-            'vocabulary': self.vocabulary,
-            'tokenizer': self.tokenizer,
-            'max_sequence_length': self.max_sequence_length,
-            'network': self.network.state_dict(),
-            'network_params': self.network.get_params()
+            "vocabulary": self.vocabulary,
+            "tokenizer": self.tokenizer,
+            "max_sequence_length": self.max_sequence_length,
+            "network": self.network.state_dict(),
+            "network_params": self.network.get_params()
         }
-        torch.save(save_dict, file)
+        torch.save(save_dict, save_path)
 
-    def likelihood_smiles(self, smiles) -> torch.Tensor:
+    def likelihood_smiles(self, smiles: np.ndarray[str]) -> torch.Tensor:
         tokens = [self.tokenizer.tokenize(smile) for smile in smiles]
         encoded = [self.vocabulary.encode(token) for token in tokens]
         sequences = [torch.tensor(encode, dtype=torch.long) for encode in encoded]
 
         def collate_fn(encoded_seqs):
-            """Function to take a list of encoded sequences and turn them into a batch"""
+            """Function to take a list of encoded sequences and turn them into a batch."""
             max_length = max([seq.size(0) for seq in encoded_seqs])
             collated_arr = torch.zeros(len(encoded_seqs), max_length, dtype=torch.long)  # padded with zeroes
-            for i, seq in enumerate(encoded_seqs):
-                collated_arr[i, :seq.size(0)] = seq
+            for idx, seq in enumerate(encoded_seqs):
+                collated_arr[idx, :seq.size(0)] = seq
             return collated_arr
 
         padded_sequences = collate_fn(sequences)
+
         return self.likelihood(padded_sequences)
 
-    def likelihood(self, sequences) -> torch.Tensor:
+    def likelihood(self, sequences: torch.Tensor) -> torch.Tensor:
         """
-        Retrieves the likelihood of a given sequence. Used in training.
+        Retrieves the likelihood of a given sequence.
 
         :param sequences: (batch_size, sequence_length) A batch of sequences
         :return:  (batch_size) Log likelihood for each example.
         """
         logits, _ = self.network(sequences[:, :-1])  # all steps done at once
         log_probs = logits.log_softmax(dim=2)
-        return self._nll_loss(log_probs.transpose(1, 2), sequences[:, 1:]).sum(dim=1)
+        return self.nll_loss(log_probs.transpose(1, 2), sequences[:, 1:]).sum(dim=1)
 
-    def sample_smiles(self, num=128, batch_size=128) -> Tuple[List, np.array]:
+    def sample_smiles(
+        self, 
+        num: int = 128, 
+        batch_size: int =128
+    ) -> Tuple[List[str], np.ndarray[float]]:
         """
         Samples n SMILES from the model.
         :param num: Number of SMILES to sample.
@@ -174,7 +181,7 @@ class Model:
             log_probs = logits.log_softmax(dim=1)
             input_vector = torch.multinomial(probabilities, 1).view(-1)
             sequences.append(input_vector.view(-1, 1))
-            nlls += self._nll_loss(log_probs, input_vector)
+            nlls += self.nll_loss(log_probs, input_vector)
             if input_vector.sum() == 0:
                 break
 
