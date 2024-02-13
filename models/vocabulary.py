@@ -1,26 +1,26 @@
 """
 Based on the implementation from https://github.com/MolecularAI/reinvent-models
 """
+from typing import List
 import re
 import numpy as np
 
 
 class Vocabulary:
-    """
-    Tokens to indices mapping.
-    """
+    """Stores the tokens and their conversion to Vocabulary indices."""
 
     def __init__(self, tokens=None, starting_id=0):
         self.tokens = {}
         self.current_id = starting_id
 
+        # add tokens if they are provided - useful when wanting to incorporate specific chemistry (e.g., atoms, or ring syntax)
         if tokens:
             for token, idx in tokens.items():
                 self._add(token, idx)
-                self._current_id = max(self._current_id, idx + 1)
+                self.current_id = max(self.current_id, idx + 1)
 
     def __getitem__(self, token_or_id):
-        return self._tokens[token_or_id]
+        return self.tokens[token_or_id]
 
     def add(self, token):
         """Adds a token."""
@@ -28,52 +28,53 @@ class Vocabulary:
             raise TypeError("Token is not a string")
         if token in self:
             return self[token]
-        self._add(token, self._current_id)
-        self._current_id += 1
-        return self._current_id - 1
+        self._add(token, self.current_id)
+        self.current_id += 1
+        return self.current_id - 1
 
     def update(self, tokens):
         """Adds many tokens."""
         return [self.add(token) for token in tokens]
 
     def __delitem__(self, token_or_id):
-        other_val = self._tokens[token_or_id]
-        del self._tokens[other_val]
-        del self._tokens[token_or_id]
+        other_val = self.tokens[token_or_id]
+        del self.tokens[other_val]
+        del self.tokens[token_or_id]
 
     def __contains__(self, token_or_id):
-        return token_or_id in self._tokens
+        return token_or_id in self.tokens
 
     def __eq__(self, other_vocabulary):
-        return self._tokens == other_vocabulary._tokens  # pylint: disable=W0212
+        return self.tokens == other_vocabulary.tokens  # pylint: disable=W0212
 
-    def __len__(self):
-        return len(self._tokens) // 2
+    def __len__(self) -> int:
+        return len(self.tokens) // 2  # since self.tokens stores a bidirectional mapping
 
     def encode(self, tokens):
-        """Encodes a list of tokens as vocabulary indexes."""
+        """Encodes a list of tokens as Vocabulary indexes."""
         vocab_index = np.zeros(len(tokens), dtype=np.float32)
-        for i, token in enumerate(tokens):
-            vocab_index[i] = self._tokens[token]
+        for idx, token in enumerate(tokens):
+            vocab_index[idx] = self.tokens[token]
         return vocab_index
 
     def decode(self, vocab_index):
-        """Decodes a vocabulary index matrix to a list of tokens."""
+        """Decodes a Vocabulary index matrix to a list of tokens."""
         tokens = []
         for idx in vocab_index:
             tokens.append(self[idx])
         return tokens
 
     def _add(self, token, idx):
-        if idx not in self._tokens:
-            self._tokens[token] = idx
-            self._tokens[idx] = token
+        if idx not in self.tokens:
+            self.tokens[token] = idx
+            self.tokens[idx] = token
         else:
-            raise ValueError("IDX already present in vocabulary")
+            raise ValueError("Index already present in Vocabulary.")
 
-    def tokens(self):
-        """Returns the tokens from the vocabulary"""
-        return [t for t in self._tokens if isinstance(t, str)]
+    def tokens(self) -> List[str]:
+        """Returns the tokens from the Vocabulary."""
+        return [t for t in self.tokens if isinstance(t, str)]
+    
 
 
 class SMILESTokenizer:
@@ -96,8 +97,8 @@ class SMILESTokenizer:
             regexp = self.REGEXPS[regexps[0]]
             splitted = regexp.split(data)
             tokens = []
-            for i, split in enumerate(splitted):
-                if i % 2 == 0:
+            for idx, split in enumerate(splitted):
+                if idx % 2 == 0:
                     tokens += split_by(split, regexps[1:])
                 else:
                     tokens.append(split)
@@ -119,8 +120,8 @@ class SMILESTokenizer:
         return smi
 
 
-def create_vocabulary(smiles_list, tokenizer):
-    """Creates a vocabulary for the SMILES syntax."""
+def create_vocabulary(smiles_list: List[str], tokenizer):
+    """Creates a Vocabulary given a dataset of SMILES."""
     tokens = set()
     for smi in smiles_list:
         tokens.update(tokenizer.tokenize(smi, with_begin_and_end=False))
