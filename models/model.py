@@ -9,6 +9,9 @@ import numpy as np
 from models.rnn import RNN
 from models.decoder_transformer import DecoderTransformer
 
+# import vocabulary
+from models.vocabulary import Vocabulary, SMILESTokenizer
+
 
 class Model:
     """
@@ -23,8 +26,14 @@ class Model:
         2. Calculating the likelihood of generating given SMILES (based on the model's weights)
     """
 
-    def __init__(self, vocabulary: mv.Vocabulary, tokenizer, network_params=None, max_sequence_length=256,
-                 no_cuda=False):
+    def __init__(
+        self, 
+        vocabulary: Vocabulary, 
+        tokenizer: SMILESTokenizer, 
+        network_params=None, 
+        max_sequence_length: int = 256,
+        no_cuda: bool = False
+    ):
         """
         Implements an RNN.
         :param vocabulary: Vocabulary to use.
@@ -69,7 +78,7 @@ class Model:
         network_params = save_dict.get("network_params", {})
         model = Model(
             vocabulary=save_dict['vocabulary'],
-            tokenizer=save_dict.get('tokenizer', mv.SMILESTokenizer()),
+            tokenizer=save_dict.get('tokenizer', SMILESTokenizer()),
             network_params=network_params,
             max_sequence_length=save_dict['max_sequence_length']
         )

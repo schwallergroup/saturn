@@ -10,7 +10,7 @@ import numpy as np
 
 from oracles.oracle import Oracle
 from goal_directed_generation.dataclass import GoalDirectedGenerationConfiguration
-#from models.model import Model
+from models.model import Model
 from experience_replay.replay_buffer import ReplayBuffer
 from diversity_filter.diversity_filter import DiversityFilter
 from hallucinated_memory.utils import initialize_hallucinator
@@ -26,9 +26,9 @@ class ReinforcementLearningAgent:
         configuration: GoalDirectedGenerationConfiguration
     ):
         # Prior model is not updated so disable gradients
-        #self.prior = Model.load_from_file(parameters["reinforcement_learning"]["prior"])
+        self.prior = Model.load_from_file(configuration.reinforcement_learning.prior)
         #self._disable_prior_gradients()
-        #self.agent = Model.load_from_file(parameters["reinforcement_learning"]["agent"])
+        self.agent = Model.load_from_file(configuration.reinforcement_learning.agent)
         self.seed = configuration.seed
         self.oracle = oracle
 

@@ -6,19 +6,28 @@ from typing import List, Tuple
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as tnnf
+import torch.nn.functional as F
 
 from reinvent_models.model_factory.enums.model_mode_enum import ModelModeEnum
-from reinvent_models.reinvent_core.models import vocabulary as mv
+from models.vocabulary import Vocabulary, SMILESTokenizer
 
 
 class DecoderTransformer(nn.Module):
     """
-    Decoder-only Transformer
+    Implements a decoder-only transformer model (based on GPT-2 architecture).
     """
+    # TODO: implement
 
-    def __init__(self, voc_size, layer_size=512, num_layers=3, cell_type='gru', embedding_layer_size=256, dropout=0.,
-                 layer_normalization=False):
+    def __init__(
+        self, 
+        voc_size, 
+        layer_size: int = 512, 
+        num_layers: int = 3, 
+        cell_type: str = "lstm", 
+        embedding_layer_size: int = 256, 
+        dropout: float = 0.0,
+        layer_normalization=False
+    ):
         """
         Implements a N layer GRU|LSTM cell including an embedding layer and an output linear layer back to the size of the
         vocabulary
@@ -27,7 +36,7 @@ class DecoderTransformer(nn.Module):
         :param num_layers: Number of RNN layers.
         :param embedding_layer_size: Size of the embedding layer.
         """
-        super(RNN, self).__init__()
+        super(DecoderTransformer, self).__init__()
 
         self._layer_size = layer_size
         self._embedding_layer_size = embedding_layer_size
@@ -36,16 +45,16 @@ class DecoderTransformer(nn.Module):
         self._dropout = dropout
         self._layer_normalization = layer_normalization
 
-        self._embedding = tnn.Embedding(voc_size, self._embedding_layer_size)
-        if self._cell_type == 'gru':
-            self._rnn = tnn.GRU(self._embedding_layer_size, self._layer_size, num_layers=self._num_layers,
+        self._embedding = nn.Embedding(voc_size, self._embedding_layer_size)
+        if self._cell_type == "gru":
+            self._rnn = nn.GRU(self._embedding_layer_size, self._layer_size, num_layers=self._num_layers,
                                 dropout=self._dropout, batch_first=True)
-        elif self._cell_type == 'lstm':
-            self._rnn = tnn.LSTM(self._embedding_layer_size, self._layer_size, num_layers=self._num_layers,
+        elif self._cell_type == "lstm":
+            self._rnn = nn.LSTM(self._embedding_layer_size, self._layer_size, num_layers=self._num_layers,
                                  dropout=self._dropout, batch_first=True)
         else:
             raise ValueError('Value of the parameter cell_type should be "gru" or "lstm"')
-        self._linear = tnn.Linear(self._layer_size, voc_size)
+        self._linear = nn.Linear(self._layer_size, voc_size)
 
     def forward(self, input_vector, hidden_state=None):  # pylint: disable=W0221
         """
@@ -64,7 +73,7 @@ class DecoderTransformer(nn.Module):
         output_vector, hidden_state_out = self._rnn(embedded_data, hidden_state)
 
         if self._layer_normalization:
-            output_vector = tnnf.layer_norm(output_vector, output_vector.size()[1:])
+            output_vector = F.layer_norm(output_vector, output_vector.size()[1:])
         output_vector = output_vector.reshape(-1, self._layer_size)
 
         output_data = self._linear(output_vector).view(batch_size, seq_size, -1)
