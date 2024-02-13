@@ -3,6 +3,7 @@
 Based on the implementation from https://github.com/MolecularAI/reinvent-models
 RNN model using LSTM cells. This is the default model in REINVENT versions 2.0, 3.2, and 4 for de novo small molecule generation.
 """
+from typing import Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -57,7 +58,11 @@ class RNN(nn.Module):
         )
         self.linear = nn.Linear(hidden_dim, vocabulary_size)
 
-    def forward(self, input_vector, hidden_state=None):  # pylint: disable=W0221
+    def forward(
+        self, 
+        input_vector: torch.Tensor, 
+        hidden_state=None
+        ) -> Tuple[torch.Tensor, torch.Tensor]:  # pylint: disable=W0221
         """
         Performs a forward pass on the model. 
         Note: you pass the **whole** sequence.
