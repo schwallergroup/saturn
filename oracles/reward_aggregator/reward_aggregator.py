@@ -49,7 +49,7 @@ class RewardAggregator:
         """
         product = np.ones(rewards.shape[1], dtype=np.float32)  # (number of SMILES,)
 
-        def weighted_power(values: np.array[float], weight: float) -> np.array[float]:
+        def weighted_power(values: np.ndarray[float], weight: float) -> np.ndarray[float]:
             """
             Helper function to calculate the weighted power of individual rewards.
             """
