@@ -1,7 +1,9 @@
 """
-Some code is based on the implementation from https://github.com/MolecularAI/Reinvent
+Adapted from https://github.com/MolecularAI/Reinvent with new additions:
+    1. Augmented Memory: https://chemrxiv.org/engage/chemrxiv/article-details/646a353da32ceeff2d014776
+    2. Hallucinated Memory
+    3. Beam Enumeration: https://arxiv.org/abs/2309.13957
 """
-from typing import List, Tuple
 import time
 import torch
 import numpy as np
@@ -69,7 +71,10 @@ class ReinforcementLearningAgent:
         # TODO: Potentially implement MarginGuard
         # self._margin_guard = MarginGuard(self)
         # only the Agent is updated
-        self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)
+        #self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)
+
+        print('ok')
+        exit()
 
         
     def run(self):

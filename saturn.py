@@ -40,6 +40,7 @@ if __name__ == "__main__":
 
     if running_mode == "distribution_learning":
         # TODO: execute distribution learning (either pre-training or fine-tuning)
+        # TODO: lightning trainer, track NLL, track validity and apply randomization during training
         pass
     elif running_mode == "goal_directed_generation":
         # 1. Construct the Oracle
@@ -48,6 +49,7 @@ if __name__ == "__main__":
         reinforcement_learning_agent = ReinforcementLearningAgent(
             oracle=oracle,
             configuration=GoalDirectedGenerationConfiguration(
+                config["goal_directed_generation"]["seed"],
                 ReinforcementLearningParameters(**config["goal_directed_generation"]["reinforcement_learning"]),
                 ExperienceReplayParameters(**config["goal_directed_generation"]["experience_replay"]),
                 DiversityFilterParameters(**config["goal_directed_generation"]["diversity_filter"]),

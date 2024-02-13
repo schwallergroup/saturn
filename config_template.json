@@ -55,6 +55,7 @@
     ]
   },
   "goal_directed_generation": {
+    "seed": 3,
     "reinforcement_learning": {
       "prior": "/home/jeguo/Desktop/ReinventCommunity/notebooks/models/random.prior.new",
       "agent": "/home/jeguo/Desktop/ReinventCommunity/notebooks/models/random.prior.new",

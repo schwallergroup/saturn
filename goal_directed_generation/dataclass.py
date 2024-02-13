@@ -18,6 +18,7 @@ class ReinforcementLearningParameters:
 
 @dataclass
 class GoalDirectedGenerationConfiguration:
+    seed: int
     reinforcement_learning: ReinforcementLearningParameters
     experience_replay: ExperienceReplayParameters
     diversity_filter: DiversityFilterParameters
