@@ -50,10 +50,10 @@ class ReinforcementLearningAgent:
 
         # Hallucinated Memory
         self.execute_hallucinated_memory = configuration.hallucinated_memory.execute_hallucinated_memory
-        #self.hallucinator = initialize_hallucinator(
-        #    prior=self.prior,
-        #    parameters=configuration.hallucinated_memory
-        #)
+        self.hallucinator = initialize_hallucinator(
+            prior=self.prior,
+            parameters=configuration.hallucinated_memory
+        )
 
         # Beam Enumeration
         self.execute_beam_enumeration = configuration.beam_enumeration.execute_beam_enumeration

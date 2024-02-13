@@ -18,7 +18,7 @@ class SequenceMutator(Hallucinator):
                  num_selected=10,
                  selection_criterion: str="random"):
         
-        self.vocabulary = prior.get_vocabulary()
+        self.vocabulary = prior.vocabulary
         self.tokenizer = prior.tokenizer
         self.tokens = self.vocabulary.tokens()
 
