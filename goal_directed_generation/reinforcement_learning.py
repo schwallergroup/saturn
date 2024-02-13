@@ -1,5 +1,5 @@
 """
-Adapted from https://github.com/MolecularAI/Reinvent with new additions:
+Adapted from https://github.com/MolecularAI/Reinvent with code additions for:
     1. Augmented Memory: https://chemrxiv.org/engage/chemrxiv/article-details/646a353da32ceeff2d014776
     2. Hallucinated Memory
     3. Beam Enumeration: https://arxiv.org/abs/2309.13957
@@ -17,17 +17,18 @@ from hallucinated_memory.utils import initialize_hallucinator
 from beam_enumeration.beam_enumeration import BeamEnumeration
 
 
-
 class ReinforcementLearningAgent:
-
+    """
+    RL agent for goal-directed generation.
+    """
     def __init__(
         self, 
         oracle: Oracle,
         configuration: GoalDirectedGenerationConfiguration
     ):
-        # Prior model is not updated so disable gradients
         self.prior = Model.load_from_file(configuration.reinforcement_learning.prior)
-        #self._disable_prior_gradients()
+        # Prior model is not updated so disable gradients
+        self._disable_prior_gradients()
         self.agent = Model.load_from_file(configuration.reinforcement_learning.agent)
         self.seed = configuration.seed
         self.oracle = oracle
@@ -69,9 +70,11 @@ class ReinforcementLearningAgent:
         )
                                                     
         # TODO: Potentially implement MarginGuard
-        # self._margin_guard = MarginGuard(self)
+        #       --> self.margin_guard = MarginGuard(self)
+
         # only the Agent is updated
-        #self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)
+
 
         print('ok')
         exit()
