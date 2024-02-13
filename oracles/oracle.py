@@ -46,6 +46,9 @@ class Oracle:
             self.oracle_history[f"{oracle.name}_raw_values"] = []
             self.oracle_history[f"{oracle.name}_reward"] = []
 
+        # track how many times the same SMILES is sampled
+        self.repeated_smiles = []
+
     def __call__(
         self, 
         smiles: np.ndarray[str],
@@ -57,8 +60,8 @@ class Oracle:
             2. Aggregates the oracle feedback into a single scalar reward
             3. Penalizes the reward based on the Diversity Filter
             4. Updates the Diversity Filter
-            4. Updates the Oracle History which tracks oracle calls, rewards, and penalized rewards
-            5. Updates the Oracle Cache to store the results of previous oracle calls
+            5. Updates the Oracle History which tracks oracle calls, rewards, and penalized rewards
+            6. Updates the Oracle Cache to store the results of previous oracle calls
 
         Returns the SMILES and the penalized rewards. 
         SMILES need to be returned because they are filtered here (based on RDKit validity) and preliminary check.
@@ -134,6 +137,9 @@ class Oracle:
             if s in self.cache:
                 repeat_indices.append(idx)
                 cached_rewards.append(self.cache[s])
+
+        # track number of repeated SMILES
+        self.repeated_smiles.append(len(repeat_indices))
         
         return smiles[repeat_indices], np.array(cached_rewards), np.delete(smiles, repeat_indices)
     
@@ -192,7 +198,7 @@ class Oracle:
         
         self.oracle_history = pd.concat([self.oracle_history, df])
 
-    def oracle_budget_exceeded(self) -> bool:
+    def budget_exceeded(self) -> bool:
         """
         Check if the oracle budget has been exceeded.
         """
@@ -203,3 +209,9 @@ class Oracle:
         Write out the oracle history as a CSV.
         """
         self.oracle_history.to_csv("oracle_history.csv")
+
+    def write_out_repeat_history(self):
+        """
+        Write out the repeated SMILES history as a CSV.
+        """
+        pd.DataFrame(self.repeated_smiles).to_csv("repeated_smiles_history.csv")

@@ -8,7 +8,6 @@ from rdkit.Chem import AllChem
 from rdkit.Chem import DataStructs
 from rdkit.Chem.Scaffolds.MurckoScaffold import GetScaffoldForMol
 
-
 def canonicalize_smiles(smiles: str) -> str:
     """
     Canonicalize a SMILES string based on RDKit convention.
@@ -34,7 +33,7 @@ def randomize_smiles(self, smiles: str) -> str:
     else:
         return None
 
-def randomize_smiles_batch(smiles_batch: np.array) -> List[str]:
+def randomize_smiles_batch(smiles_batch: np.array, prior) -> np.ndarray[str]:
     """
     Randomize a batch of SMILES strings.
     """
@@ -48,7 +47,7 @@ def randomize_smiles_batch(smiles_batch: np.array) -> List[str]:
         else:
             randomized_smiles_batch.append(smiles)
 
-    return randomized_smiles_batch
+    return np.array(randomized_smiles_batch)
 
 def can_be_encoded(smiles: str) -> bool:
     """

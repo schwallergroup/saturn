@@ -59,7 +59,7 @@
     "reinforcement_learning": {
       "prior": "/home/jeguo/Desktop/ReinventCommunity/notebooks/models/random.prior.new",
       "agent": "/home/jeguo/Desktop/ReinventCommunity/notebooks/models/random.prior.new",
-      "batch_size": 32,
+      "batch_size": 16,
       "learning_rate": 0.0001,
       "margin_threshold": 50,
       "sigma": 128,
@@ -70,8 +70,7 @@
     "experience_replay": {
       "memory_size": 100,
       "sample_size": 10,
-      "smiles": [],
-      "augmented_memory_mode_collapse_guard": false
+      "smiles": []
     },
     "hallucinated_memory": {
       "execute_hallucinated_memory": true,

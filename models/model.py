@@ -59,7 +59,7 @@ class RNN(tnn.Module):
             if self._cell_type == "gru":
                 hidden_state = torch.zeros(*size)
             else:
-                hidden_state = [torch.zeros(*size), torch.zeros(*size)]
+                hidden_state = [torch.zeros(*size, device="cuda"), torch.zeros(*size, device="cuda")]
         embedded_data = self._embedding(input_vector)  # (batch,seq,embedding)
         output_vector, hidden_state_out = self._rnn(embedded_data, hidden_state)
 
@@ -185,7 +185,7 @@ class Model:
         log_probs = logits.log_softmax(dim=2)
         return self._nll_loss(log_probs.transpose(1, 2), sequences[:, 1:]).sum(dim=1)
 
-    def sample_smiles(self, num=128, batch_size=128) -> Tuple[List, np.array]:
+    def sample_smiles(self, num=32, batch_size=32) -> Tuple[List, np.array]:
         """
         Samples n SMILES from the model.
         :param num: Number of SMILES to sample.
@@ -210,20 +210,20 @@ class Model:
             del seqs, likelihoods
         return smiles_sampled, np.concatenate(likelihoods_sampled)
 
-    def sample_sequences_and_smiles(self, batch_size=128) -> Tuple[torch.Tensor, List, torch.Tensor]:
+    def sample_sequences_and_smiles(self, batch_size=32) -> Tuple[torch.Tensor, List[str], torch.Tensor]:
         seqs, likelihoods = self._sample(batch_size=batch_size)
         smiles = [self.tokenizer.untokenize(self.vocabulary.decode(seq)) for seq in seqs.cpu().numpy()]
         return seqs, smiles, likelihoods
 
-    # @torch.no_grad()
-    def _sample(self, batch_size=128) -> Tuple[torch.Tensor, torch.Tensor]:
-        start_token = torch.zeros(batch_size, dtype=torch.long)
+    def _sample(self, batch_size=32) -> Tuple[torch.Tensor, torch.Tensor]:
+        start_token = torch.zeros(batch_size, dtype=torch.long, device="cuda")
         start_token[:] = self.vocabulary["^"]
         input_vector = start_token
-        sequences = [self.vocabulary["^"] * torch.ones([batch_size, 1], dtype=torch.long)]
+        sequences = [self.vocabulary["^"] * torch.ones([batch_size, 1], dtype=torch.long, device="cuda")]
         # NOTE: The first token never gets added in the loop so the sequences are initialized with a start token
         hidden_state = None
-        nlls = torch.zeros(batch_size)
+        nlls = torch.zeros(batch_size, device="cuda")
+
         for _ in range(self.max_sequence_length - 1):
             logits, hidden_state = self.network(input_vector.unsqueeze(1), hidden_state)
             logits = logits.squeeze(1)

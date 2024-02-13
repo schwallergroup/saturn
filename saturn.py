@@ -3,6 +3,7 @@ Parent script that executes Sample Efficient Generative Molecular Design using M
 Takes as input a JSON configuration file that specifies all parameters for the generatve experiment.
 Adapted from https://github.com/MolecularAI/Reinvent/input.py.
 """
+import time
 import json
 import argparse
 #import torch
@@ -35,6 +36,7 @@ def read_json_file(path: str):
         print(f"JSON format error in file ${path}: \n ${e}")
 
 if __name__ == "__main__":
+    start_time = time.perf_counter()
     args = parser.parse_args()
     
     config = read_json_file(args.config)
@@ -42,13 +44,14 @@ if __name__ == "__main__":
 
     if running_mode == "distribution_learning":
         # TODO: execute distribution learning (either pre-training or fine-tuning)
-        # TODO: lightning trainer, track NLL, track validity and apply randomization during training
+        # TODO: lightning trainer, track NLL, track SMILES validity, and don't forget to apply randomization during training (or have the option to)
         pass
     elif running_mode == "goal_directed_generation":
         # 1. (Optionally) set the seed
         #device = "cuda" if torch.cuda.is_available() else "cpu"
         seed = config["goal_directed_generation"]["seed"]
         #set_seed_everywhere(seed, device)
+
 
         # 2. Construct the Oracle
         oracle = Oracle(OracleConfiguration(**config["oracle"]))
@@ -65,6 +68,10 @@ if __name__ == "__main__":
                 BeamEnumerationParameters(**config["goal_directed_generation"]["beam_enumeration"]),
             )
         )
-        pass
+
+        # 4. Run Goal-Directed Generation via Reinforcement Learning
+        reinforcement_learning_agent.run()
+        end_time = time.perf_counter()
+        print(f"Wall time: {end_time - start_time:.2f}s")
     else:
         raise ValueError(f"Running mode: {running_mode} is not implemented.")

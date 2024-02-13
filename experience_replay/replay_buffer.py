@@ -24,10 +24,12 @@ class ReplayBuffer:
     def __init__(
         self, 
         parameters: ExperienceReplayParameters, 
-        # TODO: keep this for Inception purposes?
+        # TODO: keep this for incepting purposes?
         scoring_function=None
         ):
         self.parameters = parameters
+        self.memory_size = parameters.memory_size
+        self.sample_size = parameters.sample_size
         # stores the top N highest reward molecules generated so far
         self.memory = pd.DataFrame(
             columns=[
@@ -37,6 +39,9 @@ class ReplayBuffer:
                 "agent_likelihood"
                 ]
             )
+        
+        # TODO: allow incepting
+        # self.smiles = parameters.smiles
 
     def add(
         self, 
@@ -56,14 +61,14 @@ class ReplayBuffer:
         # keep only the top N (by reward)
         self.purge_memory()
 
-    def sample_memory(self) -> Tuple[np.array, np.array, np.array]:
-        sample_size = min(len(self.memory), self.configuration.sample_size)
+    def sample_memory(self) -> Tuple[np.ndarray[str], np.ndarray[float], np.ndarray[float]]:
+        sample_size = min(len(self.memory), self.sample_size)
         if sample_size > 0:
             sampled = self.memory.sample(sample_size)
             smiles = sampled["smiles"].values
             reward = sampled["reward"].values
             prior_likelihood = sampled["prior_likelihood"].values
-            return smiles, reward, prior_likelihood
+            return np.array(smiles), np.array(reward), np.array(prior_likelihood)
         else:
             return [], [], []
 
@@ -89,7 +94,7 @@ class ReplayBuffer:
         # NOTE: want to keep randomized versions?
         unique_df = self.memory.drop_duplicates(subset=["smiles"])
         sorted_df = unique_df.sort_values("reward", ascending=False)
-        self.memory = sorted_df.head(self.configuration.memory_size)
+        self.memory = sorted_df.head(self.memory_size)
         self.memory = self.memory.loc[self.memory["reward"] != 0.0]
 
     def selective_memory_purge(
@@ -113,13 +118,3 @@ class ReplayBuffer:
             self.memory = purged_memory
         else:
             return
-
-    def mode_collapse_guard(self):
-        """
-        In *pure* exploitation scenarios (*not recommended*) where Selective Memory Purge is not used, the following heuristic
-        pre-emptively guards against rare cases of mode collapse at sub-optimal rewards.
-        """
-        sliced_memory = self.memory.head(int(self.configuration.memory_size*0.5))
-        if (sliced_memory["reward"].nunique() == 1) and (int(sliced_memory["reward"].iloc[0]) != 1):
-            print("---- Pre-emptively guarding against mode collapse: purging buffer -----")
-            self.memory = pd.DataFrame(columns=["smiles", "reward", "prior_likelihood", "agent_likelihood"])

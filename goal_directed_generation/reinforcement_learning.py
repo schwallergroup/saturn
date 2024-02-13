@@ -4,9 +4,11 @@ Adapted from https://github.com/MolecularAI/Reinvent with code additions for:
     2. Hallucinated Memory
     3. Beam Enumeration: https://arxiv.org/abs/2309.13957
 """
-import time
 import torch
 import numpy as np
+
+import utils.chemistry_utils as chemistry_utils
+from goal_directed_generation.utils import sample_unique_sequences
 
 from oracles.oracle import Oracle
 from goal_directed_generation.dataclass import GoalDirectedGenerationConfiguration
@@ -30,7 +32,11 @@ class ReinforcementLearningAgent:
         # Prior model is not updated so disable gradients
         self._disable_prior_gradients()
         self.agent = Model.load_from_file(configuration.reinforcement_learning.agent)
+
+        # Seed for documentation
         self.seed = configuration.seed
+
+        # Oracle
         self.oracle = oracle
 
         # RL parameters
@@ -74,178 +80,132 @@ class ReinforcementLearningAgent:
 
         # only the Agent is updated
         self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)
-
-
-        print('ok')
-        exit()
-
-        
+  
     def run(self):
-        start_time = time.time()
+        # FIXME: could be dangerous in case of infinite loop
+        while not self.oracle.budget_exceeded():
+            # 1. Sample unique SMILES from the Agent
+            seqs, smiles, sampled_agent_likelihood = sample_unique_sequences(self.agent, self.batch_size)
 
-        for step in range(self.config.n_steps):
+            # 2. (Optional) Beam Enumeration: Filter SMILES using the Beam Enumeration pool
+            if (self.execute_beam_enumeration) and (len(self.beam_enumeration.pool) != 0):
+                seqs, smiles, sampled_agent_likelihood = self.beam_enumeration.filter_batch(seqs, smiles, sampled_agent_likelihood)
 
-            if self.oracle_tracker.budget_exceeded():
-                if self.execute_beam_enumeration:
-                    self.beam_enumeration.end_actions(oracle_calls=self.oracle_tracker.oracle_calls)
-                break
-
-            seqs, smiles, agent_likelihood = self._sample_unique_sequences(self._agent, self.config.batch_size)
-            # substructure filtering
-            if (self.execute_beam_enumeration) and len(self.beam_enumeration.pool) != 0:
-                seqs, smiles, agent_likelihood = self.beam_enumeration.filter_batch(seqs, smiles, agent_likelihood)
-
-            # in case no SMILES in the sampled batch contain the Beam substructures
+            # 3. (Optional) Beam Enumeration: If all SMILES are filtered, proceed to next generation epoch
             if len(smiles) == 0:
                 self.beam_enumeration.filtered_epoch_updates()
                 if self.beam_enumeration.patience_limit_reached():
-                    print(f'----- Low probability substructures: ending run based on user-specified patience limit: {self.beam_enumeration.filter_patience_limit} NOTE: this is not an indication of the experiment failing. -----')
+                    print("Beam Enumeration: Patience limit reached. Ending.")
                     break
                 continue
 
-            # switch signs
-            agent_likelihood = -agent_likelihood
-            prior_likelihood = -self._prior.likelihood(seqs)
+            # 4. Oracle call on sampled batch
+            #    Rewards are already penalized by the Diversity Filter
+            smiles, penalized_rewards = self.oracle(smiles, self.diversity_filter)
 
-            score_summary: FinalSummary = self._scoring_function.get_final_score_for_step(smiles, step)
-            score = self._diversity_filter.update_score(score_summary, step)
-            
-            
-            self.oracle_tracker.epoch_updates(num_valid_smiles=len(score_summary.valid_idxs),
-                                                epoch=step,
-                                                reward=score,
-                                                smiles=smiles)
-            
+            # 5. (Optional) Beam Enumeration: Check whether to execute Beam Enumeration
+            #               NOTE: Beam Enumeration execution criterion is based only *sampled* batch
             if self.execute_beam_enumeration:
-                self.beam_enumeration.epoch_updates(agent=self._agent,
-                                                    num_valid_smiles=len(score_summary.valid_idxs),
-                                                    reward=score.mean(),
-                                                    oracle_calls=self.oracle_tracker.oracle_calls)
-                
+                self.beam_enumeration.epoch_updates(
+                    agent=self.agent,
+                    num_valid_smiles=len(smiles),
+                    reward=penalized_rewards.mean(),
+                    oracle_calls=self.oracle.calls
+                )
 
-            # ------------------------------------------------------------------------------------------------------------
-            # hallucinate before first instance of experience replay in case the hallucinated molecules are better than the current best in the buffer
-            # skip step 1 when buffer is empty
-            if step != 0:
-                # 1. Hallucinate new SMILES
-                hallucinated_smiles = self.hallucinator.hallucinate(buffer=self._inception.memory)
+            # 5. (Optional) Hallucinated Memory: Hallucinate new SMILES from the Replay Buffer
+            if (self.execute_hallucinated_memory) and (len(self.replay_buffer.memory) == 0):
+                hallucinated_smiles = self.hallucinator.hallucinate(self.replay_buffer.memory)
+                # 6. (Optional) Hallucinated Memory: Oracle call on hallucinated batch
+                hallucinated_smiles, hallucinated_penalized_rewards = self.oracle(hallucinated_smiles, self.diversity_filter)
+                # 7. (Optional) Update the hallucation history
+                # FIXME: track how many times the replay buffer is being populated and not just when the hallucinations are the best-so-far
+                #self.hallucinator.epoch_updates(
+                #    epoch=step,
+                #    highest_buffer_reward=highest_buffer_reward,
+                #    hallucinations=hallucinated_smiles,
+                #    hallucination_rewards=hallucinated_penalized_rewards)
+            else:
+                hallucinated_smiles, hallucinated_penalized_rewards = [], []
 
-                # 2. Score the hallucinated SMILES
-                hallucinated_score_summary = self._scoring_function.get_final_score_for_step(hallucinated_smiles, step)
-                hallucinated_score = self._diversity_filter.update_score(hallucinated_score_summary, step)
+            # 7. Concatenate sampled batch with hallucinated batch
+            smiles = np.concatenate((smiles, hallucinated_smiles), 0)
+            penalized_rewards = np.concatenate((penalized_rewards, hallucinated_penalized_rewards), 0)
 
-                # 3. Update oracle tracker to account for oracle calls from hallucinated molecules
-                self.oracle_tracker.epoch_updates(num_valid_smiles=len(hallucinated_score_summary.valid_idxs),
-                                                    epoch=step,
-                                                    reward=hallucinated_score,
-                                                    smiles=hallucinated_smiles)
+            # 8. Compute the loss
+            prior_likelihood = torch.cat([-self.prior.likelihood_smiles(smiles), -self.prior.likelihood_smiles(hallucinated_smiles)], 0)
+            agent_likelihood = torch.cat([-sampled_agent_likelihood, -self.agent.likelihood_smiles(hallucinated_smiles)], 0)
+            loss = self.compute_loss(prior_likelihood, agent_likelihood, penalized_rewards)
 
-                # 3. Update the replay buffer
-                # calculate the prior and agent likelihood of hallucinated SMILES
-                hallucinated_prior_likelihood = -self._prior.likelihood_smiles(hallucinated_smiles)
-                hallucinated_agent_likelihood = -self._agent.likelihood_smiles(hallucinated_smiles)
-                # add the hallucinated SMILES to the replay buffer (which importantly also purges the buffer to the buffer size)
-                # before updatunig the buffer, extract the current highest reward in the buffer
-                highest_buffer_reward = self._inception.memory.iloc[0]["score"]            
-                self._inception.add(smiles=hallucinated_smiles,
-                                    score=hallucinated_score,
-                                    neg_likelihood=hallucinated_prior_likelihood)
-                
-                # 4. Update the hallucation history
-                self.hallucinator.epoch_updates(epoch=step,
-                                                highest_buffer_reward=highest_buffer_reward,
-                                                hallucinations=hallucinated_smiles,
-                                                hallucination_rewards=hallucinated_score)
-                
-                
-                # concatenate sampled batch with hallucinated batch
-                smiles = np.concatenate((smiles, hallucinated_smiles), 0)
-                prior_likelihood = torch.cat((prior_likelihood, hallucinated_prior_likelihood), 0)
-                agent_likelihood = torch.cat((agent_likelihood, hallucinated_agent_likelihood), 0)
-                score = np.concatenate((score, hallucinated_score), 0)
-            # ------------------------------------------------------------------------------------------------------------
+            # 9. Update Replay Buffer
+            #    Likelihoods should be negative here
+            self.replay_buffer.add(
+                smiles=smiles, 
+                rewards=penalized_rewards, 
+                prior_likelihood=prior_likelihood,
+                agent_likelihood=agent_likelihood
+            )
 
-            augmented_likelihood = prior_likelihood + self.config.sigma * to_tensor(score)
-            loss = torch.pow((augmented_likelihood - agent_likelihood), 2)
-            # if augmented_memory is true, over-ride it here to not use it as we want to perform memory *after* sampling new SMILES in case of new "best-so-far" SMILES
-            loss, agent_likelihood = self._inception_filter(self._agent, loss, agent_likelihood, prior_likelihood, smiles, score, self._prior, override=True)
+            # 10. Add experience replay to the loss - this is done *after* updating the Replay Buffer so new best-so-far SMILES can be sampled
+            er_smiles, er_rewards, er_prior_likelihood = self.replay_buffer.sample_memory()
 
-            loss = loss.mean()
-            self._optimizer.zero_grad()
-            loss.backward()
-            self._optimizer.step()
+            # 11. Compute the loss for the experience replay SMILES
+            if len(er_smiles) > 0:
+                er_agent_likelihood = -self.agent.likelihood_smiles(er_smiles)
+                er_loss = self.compute_loss(er_prior_likelihood, er_agent_likelihood, er_rewards)
+            
+            # 12. Concatenate to get the total loss and backpropagate
+            loss = torch.cat((loss, er_loss), 0)
+            self.backpropagate(loss)
 
+            # 13. (Optional) Augmented Memory
             if self.augmented_memory:
+                # NOTE: *Highly* recommended that Selective Memory Purge is enabled
+                #       All penalized scaffolds are removed from the Replay Buffer *before* executing Augmented Memory
                 if self.selective_memory_purge:
-                    self._inception.selective_memory_purge(smiles, score)
+                    self._inception.selective_memory_purge(smiles, penalized_rewards)
                 for _ in range(self.augmentation_rounds):
-                    # get randomized SMILES
-                    randomized_smiles_list = self._chemistry.get_randomized_smiles(smiles, self._prior)
-                    # get prior likelihood of randomized SMILES
-                    prior_likelihood = -self._prior.likelihood_smiles(randomized_smiles_list)
-                    # get agent likelihood of randomized SMILES
-                    agent_likelihood = -self._agent.likelihood_smiles(randomized_smiles_list)
-                    # compute augmented likelihood with the "new" prior likelihood using randomized SMILES
-                    augmented_likelihood = prior_likelihood + self.config.sigma * to_tensor(score)
-                    # compute loss
-                    loss = torch.pow((augmented_likelihood - agent_likelihood), 2)
-                    # experience replay using randomized SMILES
-                    loss, agent_likelihood = self._inception_filter(self._agent, loss, agent_likelihood, prior_likelihood, randomized_smiles_list, score, self._prior)
-                    loss = loss.mean()
-                    self._optimizer.zero_grad()
-                    loss.backward()
-                    self._optimizer.step()
+                    # Get randomized SMILES for both the sampled and hallucinated SMILES
+                    randomized_smiles = chemistry_utils.randomize_smiles_batch(smiles, self.prior)
+                    # Compute the loss
+                    prior_likelihood = -self._prior.likelihood_smiles(randomized_smiles)
+                    agent_likelihood = -self._agent.likelihood_smiles(randomized_smiles)
+                    loss = self.compute_loss(prior_likelihood, agent_likelihood, penalized_rewards)
+                    # Augmented Memory: Key operation for sample efficiency
+                    randomized_buffer_smiles, randomized_buffer_rewards, randomized_prior_likelihood = self.replay_buffer.augmented_memory_replay()
+                    randomized_agent_likelihood = -self.agent.likelihood_smiles(randomized_buffer_smiles)
+                    augmented_memory_loss = self.compute_loss(randomized_prior_likelihood, randomized_agent_likelihood, randomized_buffer_rewards)
+                    loss = torch.cat((loss, augmented_memory_loss), 0)
+                    self.backpropagate(loss)
 
-            self._stats_and_chekpoint(score, start_time, step, smiles, score_summary,
-                                        agent_likelihood, prior_likelihood,
-                                        augmented_likelihood)
-
-        self._logger.save_final_state(self._agent, self._diversity_filter)
-        self._logger.log_out_input_configuration()
-        self._logger.log_out_inception(self._inception)
         # write out hallucination history
         self.hallucinator.write_out_history()
+
+        if self.execute_beam_enumeration:
+            self.beam_enumeration.end_actions(oracle_calls=self.oracle_tracker.oracle_calls)
+
+        self.oracle.write_out_oracle_history()
+        self.oracle.write_out_repeat_history()
+
+    def compute_loss(
+        self, 
+        prior_likelihood: torch.Tensor, 
+        agent_likelihood: torch.Tensor,
+        rewards: np.ndarray[float]
+    ) -> torch.Tensor:
+        """
+        Compute the loss for the RL agent.
+        """
+        augmented_likelihood = prior_likelihood + self.sigma * rewards
+        loss = torch.pow((augmented_likelihood - agent_likelihood), 2)
+        return loss
+
+    def backpropagate(self, loss: torch.Tensor) -> None:
+        loss = loss.mean()
+        self.optimizer.zero_grad() 
+        loss.backward()
+        self.optimizer.step()
 
     def _disable_prior_gradients(self):
         for param in self.prior.get_network_parameters():
             param.requires_grad = False
-
-    def _sample_unique_sequences(self, agent, batch_size):
-        seqs, smiles, agent_likelihood = agent.sample(batch_size)
-        unique_idxs = get_indices_of_unique_smiles(smiles)
-        seqs_unique = seqs[unique_idxs]
-        smiles_np = np.array(smiles)
-        smiles_unique = smiles_np[unique_idxs]
-        agent_likelihood_unique = agent_likelihood[unique_idxs]
-        return seqs_unique, smiles_unique, agent_likelihood_unique
-
-    def _inception_filter(self, agent, loss, agent_likelihood, prior_likelihood, smiles, score, prior, override=False):
-        if self.augmented_memory and not override:
-            if self._inception.configuration.augmented_memory_mode_collapse_guard:
-                # if the below executes, Augmented Memory is effectively paused for this epoch
-                self._inception.mode_collapse_guard()
-            exp_smiles, exp_scores, exp_prior_likelihood = self._inception.augmented_memory_replay(prior)
-        else:
-            exp_smiles, exp_scores, exp_prior_likelihood = self._inception.sample()
-        if len(exp_smiles) > 0:
-            exp_agent_likelihood = -agent.likelihood_smiles(exp_smiles)
-            exp_augmented_likelihood = exp_prior_likelihood + self.config.sigma * exp_scores
-            exp_loss = torch.pow((to_tensor(exp_augmented_likelihood) - exp_agent_likelihood), 2)
-
-            loss = torch.cat((loss, exp_loss), 0)
-            agent_likelihood = torch.cat((agent_likelihood, exp_agent_likelihood), 0)
-
-        self._inception.add(smiles, score, prior_likelihood)
-
-        return loss, agent_likelihood
-
-    def reset(self, reset_countdown=0):
-        model_type_enum = ModelTypeEnum()
-        model_regime = GenerativeModelRegimeEnum()
-        actor_config = ModelConfiguration(model_type_enum.DEFAULT, model_regime.TRAINING,
-                                          self.config.agent)
-        self._agent = GenerativeModel(actor_config)
-        self._optimizer = torch.optim.Adam(self._agent.get_network_parameters(), lr=self.config.learning_rate)
-        self._logger.log_message("Resetting Agent")
-        self._logger.log_message(f"Adjusting sigma to: {self.config.sigma}")
-        return reset_countdown
