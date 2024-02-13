@@ -16,8 +16,8 @@ from oracles.reward_shaping.function_parameters import RewardShapingFunctionPara
 class RewardShapingFunction:
 
     def __init__(self, parameters: RewardShapingFunctionParameters):
-        self.transformation_function = parameters["transformation_function"]
-        self.parameters = parameters["parameters"]
+        self.transformation_function = parameters.transformation_function
+        self.parameters = parameters.parameters
 
         assert self.transformation_function in [
             "no_transformation", 
@@ -71,7 +71,10 @@ class RewardShapingFunction:
     ) -> np.ndarray[float]:
 
         def _sigmoid(value, low, high, k) -> float:
-            return math.pow(10, (10 * k * (value - (low + high) * 0.5) / (low - high)))
+            try:
+                return math.pow(10, (10 * k * (value - (low + high) * 0.5) / (low - high)))
+            except Exception:
+                return 0.0
 
         transformed = [1 / (1 + _sigmoid(val, low, high, k)) for val in raw_property_values]
         return np.array(transformed, dtype=np.float32)
@@ -87,8 +90,8 @@ class RewardShapingFunction:
         def _reverse_sigmoid_formula(value, low, high, k) -> float:
             try:
                 return 1 / (1 + 10 ** (k * (value - (high + low) / 2) * 10 / (high - low)))
-            except:
-                return 0
+            except Exception:
+                return 0.0
 
         transformed = [_reverse_sigmoid_formula(val, low, high, k) for val in raw_property_values]
         return np.array(transformed, dtype=np.float32)
@@ -102,6 +105,8 @@ class RewardShapingFunction:
         coef_si: float,
         coef_se: float
     ) -> np.ndarray[float]:
+        
+        # FIXME: overflow error?
 
         def _double_sigmoid_formula(value, low, high, coef_div, coef_si, coef_se):
             try:
@@ -110,8 +115,8 @@ class RewardShapingFunction:
                 C = (10 ** (coef_si * (value / coef_div)) / (
                         10 ** (coef_si * (value / coef_div)) + 10 ** (coef_si * (high / coef_div))))
                 return (A / B) - C
-            except:
-                return 0
+            except Exception:
+                return 0.0
 
         transformed = [_double_sigmoid_formula(val, low, high, coef_div, coef_si, coef_se) for val in raw_property_values]
         return np.array(transformed, dtype=np.float32)

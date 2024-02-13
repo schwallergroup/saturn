@@ -8,13 +8,14 @@ from rdkit.Chem import Mol
 import numpy as np
 from oracles.dataclass import OracleComponentParameters
 from oracles.reward_shaping.reward_shaping_function import RewardShapingFunction
+from oracles.reward_shaping.function_parameters import RewardShapingFunctionParameters
 
 
 class OracleComponent(ABC):
     def __init__(self, parameters: OracleComponentParameters):
         self.parameters = parameters
         self.reward_shaping_function = RewardShapingFunction(
-            parameters.reward_shaping_function_parameters
+            RewardShapingFunctionParameters(**parameters.reward_shaping_function_parameters)
         )
         self.name = parameters.name
         self.weight = parameters.weight
