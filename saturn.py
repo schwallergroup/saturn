@@ -5,6 +5,8 @@ Adapted from https://github.com/MolecularAI/Reinvent/input.py.
 """
 import json
 import argparse
+#import torch
+#from utils.utils import set_seed_everywhere
 
 from oracles.oracle import Oracle
 from oracles.dataclass import OracleConfiguration
@@ -43,13 +45,19 @@ if __name__ == "__main__":
         # TODO: lightning trainer, track NLL, track validity and apply randomization during training
         pass
     elif running_mode == "goal_directed_generation":
-        # 1. Construct the Oracle
+        # 1. (Optionally) set the seed
+        #device = "cuda" if torch.cuda.is_available() else "cpu"
+        seed = config["goal_directed_generation"]["seed"]
+        #set_seed_everywhere(seed, device)
+
+        # 2. Construct the Oracle
         oracle = Oracle(OracleConfiguration(**config["oracle"]))
-        # 2. Construct the Reinforcement Learning Agent
+
+        # 3. Construct the Reinforcement Learning Agent
         reinforcement_learning_agent = ReinforcementLearningAgent(
             oracle=oracle,
             configuration=GoalDirectedGenerationConfiguration(
-                config["goal_directed_generation"]["seed"],
+                seed,
                 ReinforcementLearningParameters(**config["goal_directed_generation"]["reinforcement_learning"]),
                 ExperienceReplayParameters(**config["goal_directed_generation"]["experience_replay"]),
                 DiversityFilterParameters(**config["goal_directed_generation"]["diversity_filter"]),

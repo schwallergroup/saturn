@@ -29,7 +29,7 @@ class ReinforcementLearningAgent:
         #self.prior = Model.load_from_file(parameters["reinforcement_learning"]["prior"])
         #self._disable_prior_gradients()
         #self.agent = Model.load_from_file(parameters["reinforcement_learning"]["agent"])
-
+        self.seed = configuration.seed
         self.oracle = oracle
 
         # RL parameters
