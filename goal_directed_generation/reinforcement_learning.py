@@ -195,6 +195,7 @@ class ReinforcementLearningAgent:
     ) -> torch.Tensor:
         """
         Compute the loss for the RL agent.
+        Based on REINVENT's original loss function: https://jcheminf.biomedcentral.com/articles/10.1186/s13321-017-0235-x
         """
         augmented_likelihood = prior_likelihood + self.sigma * rewards
         loss = torch.pow((augmented_likelihood - agent_likelihood), 2)
