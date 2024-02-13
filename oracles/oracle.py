@@ -22,6 +22,8 @@ class Oracle:
         
         # construct the oracle function which can be composed of >1 individual oracles (multi-parameter optimization)
         self.oracle = self.construct_oracle(oracle_configuration.components)
+        # preliminary oracles can be executed as a first pass to filter out poor candidates
+        self.preliminary_oracles = [oracle for oracle in self.oracle if oracle.preliminary_check]
         self.oracle_weights = [oracle.weight for oracle in self.oracle]
         self.aggregator = RewardAggregator(oracle_configuration.aggregator)
 
@@ -152,14 +154,13 @@ class Oracle:
         """
         # FIXME: set a threshold for each component. If not using Step transformation, rewards are not necessarily 0
         THRESHOLD = 0.05
-        preliminary_check_oracles = [oracle for oracle in self.oracle if oracle.preliminary_check]
 
-        if len(preliminary_check_oracles) != 0:
+        if len(self.preliminary_oracles) != 0:
             filtered_indices = []
             for mol in mols:
-                for idx, oracle in enumerate(preliminary_check_oracles):
+                for idx, oracle in enumerate(self.preliminary_oracles):
                     _, rewards = oracle.calculate_reward(mol)
-                    if (rewards > THRESHOLD) and (idx == len(preliminary_check_oracles) - 1):
+                    if (rewards > THRESHOLD) and (idx == len(self.preliminary_oracles) - 1):
                         filtered_indices.append(idx)
 
             return smiles[filtered_indices], mols[filtered_indices]

@@ -61,6 +61,7 @@ class RNN(nn.Module):
         """
         Performs a forward pass on the model. 
         Note: you pass the **whole** sequence.
+        
         :param input_vector: Input tensor (batch_size, sequence_size).
         :param hidden_state: Hidden state tensor.
         """
