@@ -23,7 +23,7 @@ class RNN(nn.Module):
     :param dropout: dropout rate. Would be applied to the outputs of each LSTM cell except the last one.
     :param layer_normalization: whether to apply layer normalization to the RNN output.
 
-    GRU cells not implemented as LSTM cells have generally better performance here: 
+    GRU cells are not implemented as LSTM cells have generally better performance for the SMILES generation task as explored here: 
     https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0393-0
     """
 
