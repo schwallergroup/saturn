@@ -140,8 +140,11 @@ class Oracle:
 
         # track number of repeated SMILES
         self.repeated_smiles.append(len(repeat_indices))
-        
-        return smiles[repeat_indices], np.array(cached_rewards), np.delete(smiles, repeat_indices)
+
+        if len(repeat_indices) != 0:
+            return smiles[repeat_indices], np.array(cached_rewards), np.delete(smiles, repeat_indices)
+        else:
+            return np.array([]), np.array([]), smiles
     
     def update_oracle_cache(self, smiles: np.ndarray[str], rewards: np.ndarray[float]) -> None:
         """
