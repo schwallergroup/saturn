@@ -82,12 +82,12 @@ class ReplayBuffer:
         if len(self.memory) != 0:
             smiles = self.memory["smiles"].values
             # randomize the smiles
-            randomized_smiles = chemistry_utils.get_randomized_smiles(smiles, prior)
-            reward = self.memory["reward"].values
-            prior_likelihood = -prior.likelihood_smiles(randomized_smiles).cpu()
-            return randomized_smiles, reward, prior_likelihood
+            randomized_smiles = chemistry_utils.randomize_smiles_batch(smiles, prior)
+            rewards = self.memory["reward"].values
+            prior_likelihoods = -prior.likelihood_smiles(randomized_smiles).cpu()
+            return randomized_smiles, rewards, to_tensor(np.array(prior_likelihoods))
         else:
-            return [], [], []
+            return [], [], torch.tensor([])
         
     def purge_memory(self):
         """

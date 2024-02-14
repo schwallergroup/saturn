@@ -87,6 +87,7 @@ class ReinforcementLearningAgent:
         # FIXME: could be dangerous in case of infinite loop
         while not self.oracle.budget_exceeded():
             # TODO: periodically print progress
+            print(self.oracle.calls)
 
             # 1. Sample unique SMILES from the Agent
             seqs, smiles, _ = sample_unique_sequences(self.agent, self.batch_size)
@@ -170,15 +171,15 @@ class ReinforcementLearningAgent:
                     # Get randomized SMILES for both the sampled and hallucinated SMILES
                     randomized_smiles = chemistry_utils.randomize_smiles_batch(smiles, self.prior)
                     # Compute the loss
-                    prior_likelihood = -self._prior.likelihood_smiles(randomized_smiles)
-                    agent_likelihood = -self._agent.likelihood_smiles(randomized_smiles)
-                    loss = self.compute_loss(prior_likelihood, agent_likelihood, penalized_rewards)
+                    loss, _, _ = self.compute_loss(randomized_smiles, penalized_rewards)
                     # Augmented Memory: Key operation for sample efficiency
-                    randomized_buffer_smiles, randomized_buffer_rewards, randomized_prior_likelihood = self.replay_buffer.augmented_memory_replay()
-                    randomized_agent_likelihood = -self.agent.likelihood_smiles(randomized_buffer_smiles)
-                    augmented_memory_loss = self.compute_loss(randomized_prior_likelihood, randomized_agent_likelihood, randomized_buffer_rewards)
+                    randomized_buffer_smiles, randomized_buffer_rewards, _ = self.replay_buffer.augmented_memory_replay(self.prior)
+                    augmented_memory_loss, _, _ = self.compute_loss(randomized_buffer_smiles, randomized_buffer_rewards)
                     loss = torch.cat((loss, augmented_memory_loss), 0)
                     self.backpropagate(loss)
+
+                    # TODO: add randomized smiles back to replay buffer???? Previous code based adds the sampled batch again
+
 
         # write out hallucination history
         self.hallucinator.write_out_history()

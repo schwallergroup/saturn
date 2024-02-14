@@ -20,7 +20,7 @@ def canonicalize_smiles_batch(smiles_batch: np.array) -> List[str]:
     """
     return [canonicalize_smiles(smiles) for smiles in smiles_batch]
 
-def randomize_smiles(self, smiles: str) -> str:
+def randomize_smiles(smiles: str) -> str:
     """
     Shuffle atom numbering to generate a randomized SMILES string.
     """
@@ -37,30 +37,21 @@ def randomize_smiles_batch(smiles_batch: np.array, prior) -> np.ndarray[str]:
     """
     Randomize a batch of SMILES strings.
     """
-    randomized_smiles_batch = []
-    for smiles in smiles_batch:
-        randomized_smiles = randomize_smiles(smiles)
-        # only add the randomized SMILES if it can be encoded
-        if randomized_smiles and can_be_encoded(randomized_smiles):
-            randomized_smiles_batch.append(randomized_smiles)
-        # otherwise, keep the original SMILES
-        else:
-            randomized_smiles_batch.append(smiles)
+    randomized_smiles_batch = np.vectorize(randomize_smiles)(smiles_batch)
+    return np.vectorize(can_be_encoded)(smiles_batch, randomized_smiles_batch, prior)
 
-    return np.array(randomized_smiles_batch)
-
-def can_be_encoded(smiles: str) -> bool:
+def can_be_encoded(original_smiles: str, randomized_smiles: str, prior) -> str:
     """
     Check if a SMILES string can be encoded by the Vocabulary.
     """
     try:
         # there may be tokens in the randomized SMILES that are not in the Vocabulary
         # check if the randomized SMILES can be encoded
-        _ = _ST.tokenize(smiles)
-        _ = prior.get_vocabulary().encode(tokens)
-        return True
+        tokens = prior.tokenizer.tokenize(randomized_smiles)
+        seq = prior.vocabulary.encode(tokens)
+        return randomized_smiles
     except KeyError:
-        return False
+        return original_smiles
     
 def get_bemis_murcko_scaffold(smiles: str) -> str:
     """
