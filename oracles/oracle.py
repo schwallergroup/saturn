@@ -102,7 +102,7 @@ class Oracle:
 
         # 9. Update the Oracle History
         self.update_oracle_history(
-            smiles=smiles,
+            smiles=new_smiles,
             rewards=aggregated_rewards,
             penalized_rewards=penalized_rewards,
             oracle_components_df=oracle_components_df
