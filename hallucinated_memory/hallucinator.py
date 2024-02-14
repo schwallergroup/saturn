@@ -9,7 +9,7 @@ from rdkit.DataStructs import TanimotoSimilarity, BulkTanimotoSimilarity
 
 
 class Hallucinator(ABC):
-    """Base class for hallucination strategies"""
+    """Base class for hallucination strategies."""
 
     @abstractmethod
     def hallucinate(self, buffer: pd.DataFrame) -> np.array:
@@ -19,8 +19,8 @@ class Hallucinator(ABC):
         self, 
         oracle_calls: int,
         highest_buffer_reward: float,
-        hallucinations: list, 
-        hallucination_rewards: list
+        hallucinations: np.ndarray[str], 
+        hallucination_rewards: np.ndarray[float]
     ) -> None:
         """
         Track the hallucination history of the parent sequence:
@@ -39,7 +39,7 @@ class Hallucinator(ABC):
                 "hallucination_rewards": [hallucination_rewards],
                 "hallucination_better_than_top_buffer": [np.any(hallucination_rewards > highest_buffer_reward)],
                 "num_hallucinations_added_to_buffer": [len(hallucinations)]
-            }g
+            }
         )
         self.hallucination_history = pd.concat([self.hallucination_history, df], ignore_index=True)
 

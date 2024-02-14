@@ -125,11 +125,12 @@ class ReinforcementLearningAgent:
                 hallucinated_smiles, hallucinated_penalized_rewards = self.oracle(hallucinated_smiles, self.diversity_filter)
                 # 7. Update the hallucination history
                 # FIXME: track how many times the replay buffer is being populated and not just when the hallucinations are the best-so-far
-                #self.hallucinator.epoch_updates(
-                #    epoch=step,
-                #    highest_buffer_reward=highest_buffer_reward,
-                #    hallucinations=hallucinated_smiles,
-                #    hallucination_rewards=hallucinated_penalized_rewards)
+                self.hallucinator.epoch_updates(
+                    oracle_calls=self.oracle.calls,
+                    highest_buffer_reward=self.replay_buffer.memory["reward"].max(),
+                    hallucinations=hallucinated_smiles,
+                    hallucination_rewards=hallucinated_penalized_rewards
+                )
             else:
                 hallucinated_smiles, hallucinated_penalized_rewards = [], []
 
