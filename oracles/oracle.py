@@ -48,7 +48,7 @@ class Oracle:
             self.oracle_history[f"{oracle.name}_reward"] = []
 
         # track how many times the same SMILES is sampled
-        self.repeated_smiles = []
+        self.num_repeated_smiles = []
 
     def __call__(
         self, 
@@ -128,7 +128,7 @@ class Oracle:
     
     def rewards_from_oracle_cache(self, smiles: np.ndarray[str]) -> Tuple[np.ndarray[str], np.ndarray[float], np.ndarray[str]]:
         """
-        Checks if there are any Cached rewards in a sampled batch of SMILES. If Oracle repeats are permitted, return.
+        Checks if there are any Cached rewards in a sampled batch of SMILES. If Oracle repeats are permitted, directly return.
         """
         if not self.allow_oracle_repeats:
             # canonicalize the SMILES before checking Cache
@@ -141,7 +141,7 @@ class Oracle:
                     cached_rewards.append(self.cache[s])
 
             # track number of repeated SMILES
-            self.repeated_smiles.append(len(repeat_indices))
+            self.num_repeated_smiles.append(len(repeat_indices))
 
             if len(repeat_indices) != 0:
                 return smiles[repeat_indices], np.array(cached_rewards), np.delete(smiles, repeat_indices)
@@ -203,7 +203,7 @@ class Oracle:
                 "penalized_reward": penalized_rewards, 
             })
         df = pd.concat([df, oracle_components_df], axis=1)  
-        
+
         self.oracle_history = pd.concat([self.oracle_history, df])
 
     def budget_exceeded(self) -> bool:
