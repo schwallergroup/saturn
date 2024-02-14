@@ -118,12 +118,12 @@ class ReinforcementLearningAgent:
                     oracle_calls=self.oracle.calls
                 )
 
-            # 5. Hallucinated Memory: Hallucinate new SMILES from the Replay Buffer
+            # 6. Hallucinated Memory: Hallucinate new SMILES from the Replay Buffer
             if (self.execute_hallucinated_memory) and (len(self.replay_buffer.memory) == self.replay_buffer.memory_size):
                 hallucinated_smiles = self.hallucinator.hallucinate(self.replay_buffer.memory)
-                # 6. Hallucinated Memory: Oracle call on hallucinated batch
+                # 7. Hallucinated Memory: Oracle call on hallucinated batch
                 hallucinated_smiles, hallucinated_penalized_rewards = self.oracle(hallucinated_smiles, self.diversity_filter)
-                # 7. Update the hallucination history
+                # 8. Update the hallucination history
                 # FIXME: track how many times the replay buffer is being populated and not just when the hallucinations are the best-so-far
                 self.hallucinator.epoch_updates(
                     oracle_calls=self.oracle.calls,
@@ -134,16 +134,16 @@ class ReinforcementLearningAgent:
             else:
                 hallucinated_smiles, hallucinated_penalized_rewards = [], []
 
-            # 7. Concatenate sampled batch with hallucinated batch
+            # 9. Concatenate sampled batch with hallucinated batch
             smiles = np.concatenate((smiles, hallucinated_smiles), 0)
             penalized_rewards = np.concatenate((penalized_rewards, hallucinated_penalized_rewards), 0)
 
-            # 8. Compute the loss
-            #    smiles contains the concatenated sampled and hallucinated SMILES
+            # 10. Compute the loss
+            #     smiles contains the concatenated sampled and hallucinated SMILES
             loss, prior_likelihoods, agent_likelihoods = self.compute_loss(smiles, penalized_rewards)
 
-            # 9. Update Replay Buffer
-            #    Likelihoods should be negative here
+            # 11. Update Replay Buffer
+            #     Likelihoods should be negative here
             self.replay_buffer.add(
                 smiles=smiles, 
                 rewards=penalized_rewards, 
@@ -151,18 +151,18 @@ class ReinforcementLearningAgent:
                 agent_likelihoods=agent_likelihoods
             )
 
-            # 10. Add experience replay to the loss
+            # 12. Add experience replay to the loss
             #     NOTE: this is done *after* updating the Replay Buffer so new best-so-far sampled *and* hallucinated SMILES can be sampled
             er_smiles, er_rewards, _ = self.replay_buffer.sample_memory()
 
-            # 11. Compute the loss for the experience replay SMILES
+            # 13. Compute the loss for the experience replay SMILES
             er_loss, _, _ = self.compute_loss(er_smiles, er_rewards)
             
-            # 12. Concatenate to get the total loss and backpropagate
+            # 14. Concatenate losses to get the total loss and backpropagate
             loss = torch.cat((loss, er_loss), 0)
             self.backpropagate(loss)
 
-            # 13. Augmented Memory
+            # 15. Augmented Memory
             if self.augmented_memory:
                 # NOTE: *Highly* recommended that Selective Memory Purge is enabled
                 #       All penalized scaffolds are removed from the Replay Buffer *before* executing Augmented Memory
