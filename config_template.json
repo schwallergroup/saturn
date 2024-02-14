@@ -6,7 +6,7 @@
     "result_folder": "results"
   },
   "oracle": {
-    "budget": 3000,
+    "budget": 1000,
     "allow_oracle_repeats": false,
     "aggregator": "product",
     "components": [

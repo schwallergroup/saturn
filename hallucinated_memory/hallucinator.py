@@ -18,7 +18,7 @@ class Hallucinator(ABC):
     def epoch_updates(
         self, 
         oracle_calls: int,
-        highest_buffer_reward: float,
+        buffer_rewards: pd.Series,
         hallucinations: np.ndarray[str], 
         hallucination_rewards: np.ndarray[float]
     ) -> None:
@@ -31,6 +31,7 @@ class Hallucinator(ABC):
             5. Whether a hallucination has a higher reward than the top buffer SMILES
             6. Number of hallucinations that were added to the buffer
         """
+        highest_buffer_reward = buffer_rewards.max()
         df = pd.DataFrame(
             {
                 "oracle_calls": [oracle_calls],
@@ -38,37 +39,10 @@ class Hallucinator(ABC):
                 "hallucinations": [hallucinations],
                 "hallucination_rewards": [hallucination_rewards],
                 "hallucination_better_than_top_buffer": [np.any(hallucination_rewards > highest_buffer_reward)],
-                "num_hallucinations_added_to_buffer": [len(hallucinations)]
+                "num_hallucinations_added_to_buffer": self.num_buffer_replacements(hallucination_rewards, buffer_rewards)
             }
         )
         self.hallucination_history = pd.concat([self.hallucination_history, df], ignore_index=True)
-
-    def write_out_history(self):
-        self.hallucination_history.to_csv("hallucination_history.csv")
-
-    def can_be_encoded(
-        self,
-        mol: Mol, 
-        tokenizer, 
-        vocabulary
-    ) -> bool:
-        """
-        Checks whether a hallucinated molecule satisfies:
-            1. It is a RDKit-parsable molecule
-            2. It can be sanitized by RDKit
-            3. It can be tokenized and encoded based on the model's vocabulary
-        """
-        if mol is not None:
-            try:
-                sanitized_mol = Chem.SanitizeMol(mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL)
-                tokens = tokenizer.tokenize(Chem.MolToSmiles(mol, canonical=True))
-                # ensure tokens can be encoded
-                encoded = [vocabulary.encode(token) for token in tokens]
-                return True
-            except Exception:
-                return False
-        else:
-            return False
         
     def select_hallucinations(
         self,
@@ -109,4 +83,52 @@ class Hallucinator(ABC):
             
         else:
             raise NotImplementedError(f"Selection criterion: {self.selection_criterion} not implemented.")
+
+    def num_buffer_replacements(
+        self, 
+        hallucination_rewards: np.ndarray[float],
+        buffer_rewards: pd.Series
+    ) -> int:
+        """
+        Returns the number of times a batch of hallucinations have corresponding rewards better than the SMILES in the Replay Buffer.
+        """
+        # TODO: optimize the implementation - brute force for now
+        count = 0
+        buffer_rewards = list(buffer_rewards)
+
+        for reward in hallucination_rewards:
+            for idx, buffer_reward in enumerate(buffer_rewards):
+                if reward > buffer_reward:
+                    count += 1
+                    buffer_rewards.insert(idx, reward)
+                    buffer_rewards.pop()
+                    break
+
+        return count
     
+    def can_be_encoded(
+        self,
+        mol: Mol, 
+        tokenizer, 
+        vocabulary
+    ) -> bool:
+        """
+        Checks whether a hallucinated molecule satisfies:
+            1. It is a RDKit-parsable molecule
+            2. It can be sanitized by RDKit
+            3. It can be tokenized and encoded based on the model's vocabulary
+        """
+        if mol is not None:
+            try:
+                sanitized_mol = Chem.SanitizeMol(mol, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL)
+                tokens = tokenizer.tokenize(Chem.MolToSmiles(mol, canonical=True))
+                # ensure tokens can be encoded
+                encoded = [vocabulary.encode(token) for token in tokens]
+                return True
+            except Exception:
+                return False
+        else:
+            return False
+    
+    def write_out_history(self):
+        self.hallucination_history.to_csv("hallucination_history.csv")

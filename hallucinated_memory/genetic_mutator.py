@@ -50,6 +50,7 @@ class GeneticMutator(Hallucinator):
 
         while (len(hallucinated_set) != self.num_hallucinations) and (tries < 1000):
             # generate child
+            # TODO: can add a mutation rate class attribute
             child = reproduce(parents, parents_rewards, 0.1)
             if self.can_be_encoded(child, self.tokenizer, self.vocabulary):
                 # add canonicalized SMILES to guarantee uniqueness

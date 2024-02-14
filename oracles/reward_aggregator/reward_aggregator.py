@@ -5,7 +5,6 @@ Implements the following reward aggregators:
     2. Product
 Both can assign different weights to individual OracleComponents
 """
-
 import numpy as np
 
 class RewardAggregator:

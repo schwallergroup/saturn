@@ -127,7 +127,7 @@ class ReinforcementLearningAgent:
                 # FIXME: track how many times the replay buffer is being populated and not just when the hallucinations are the best-so-far
                 self.hallucinator.epoch_updates(
                     oracle_calls=self.oracle.calls,
-                    highest_buffer_reward=self.replay_buffer.memory["reward"].max(),
+                    buffer_rewards=self.replay_buffer.memory["reward"],
                     hallucinations=hallucinated_smiles,
                     hallucination_rewards=hallucinated_penalized_rewards
                 )
