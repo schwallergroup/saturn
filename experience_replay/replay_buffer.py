@@ -2,10 +2,12 @@
 Some code is based on the implementation from https://github.com/MolecularAI/Reinvent.
 """
 from typing import Tuple, List
+import torch
 import numpy as np
 import pandas as pd
 from copy import deepcopy
 from utils import chemistry_utils
+from utils.utils import to_tensor
 
 from experience_replay.dataclass import ExperienceReplayParameters
 
@@ -46,31 +48,31 @@ class ReplayBuffer:
     def add(
         self, 
         smiles: np.array, 
-        reward: np.array, 
-        prior_likelihood: np.array, 
-        agent_likelihood: np.array
+        rewards: np.array, 
+        prior_likelihoods: np.array, 
+        agent_likelihoods: np.array
         ) -> None:
         # NOTE: likelihood should be already negative
         df = pd.DataFrame({
             "smiles": smiles, 
-            "reward": reward, 
-            "prior_likelihood": prior_likelihood.detach().cpu().numpy(),
-            "agent_likelihood": agent_likelihood.detach().cpu().numpy()}
+            "reward": rewards, 
+            "prior_likelihood": prior_likelihoods.detach().cpu().numpy(),
+            "agent_likelihood": agent_likelihoods.detach().cpu().numpy()}
             )
         self.memory = pd.concat([self.memory, df])
         # keep only the top N (by reward)
         self.purge_memory()
 
-    def sample_memory(self) -> Tuple[np.ndarray[str], np.ndarray[float], np.ndarray[float]]:
+    def sample_memory(self) -> Tuple[np.ndarray[str], np.ndarray[float], torch.Tensor]:
         sample_size = min(len(self.memory), self.sample_size)
         if sample_size > 0:
             sampled = self.memory.sample(sample_size)
             smiles = sampled["smiles"].values
-            reward = sampled["reward"].values
-            prior_likelihood = sampled["prior_likelihood"].values
-            return np.array(smiles), np.array(reward), np.array(prior_likelihood)
+            rewards = sampled["reward"].values
+            prior_likelihoods = sampled["prior_likelihood"].values
+            return np.array(smiles), np.array(rewards), to_tensor(np.array(prior_likelihoods))
         else:
-            return [], [], []
+            return [], [], torch.tensor([])
 
     def augmented_memory_replay(self, prior) -> Tuple[List[str], np.array, np.array]:
         """
@@ -90,6 +92,7 @@ class ReplayBuffer:
     def purge_memory(self):
         """
         Removes duplicate SMILES in the memory and keeps the top N by reward.
+        Keep only non-zero rewards SMILES.
         """
         # NOTE: want to keep randomized versions?
         unique_df = self.memory.drop_duplicates(subset=["smiles"])
@@ -103,9 +106,15 @@ class ReplayBuffer:
             reward: np.array
         ) -> None:
         """
-        Augmented Memory's key operation to prevent mode collapse and promite diversity:
+        Augmented Memory's key operation to prevent mode collapse and promote diversity:
         Purges the memory of SMILES that have penalized rewards (0.0) *before* executing Augmented Memory updates.
-        Intuitively, this operation prevents penalized SMILES from directing the chemical space exploration.
+        Intuitively, this operation prevents penalized SMILES from directing the Agent's chemical space navigation.
+
+        # NOTE: Consider a MPO objective task using a product aggregator. If one of the OracleComponent's reward is 0, 
+        #       then the aggregated reward may be 0. But other OracleComponents may have a non-zero reward. We do not
+        #       want to purge the memory of these scaffolds. This is already handled because 0 reward SMILES are not
+        #       added to the memory in the first place. Selective Memory Purge *only* removes scaffolds that are 
+        #       penalized by the Diversity Filter.
         """
         zero_reward_indices = np.where(reward == 0.)[0]
         if len(zero_reward_indices) > 0:
@@ -117,4 +126,5 @@ class ReplayBuffer:
             purged_memory.drop("scaffolds", axis=1, inplace=True)
             self.memory = purged_memory
         else:
+            # if no scaffolds are penalized, do nothing
             return

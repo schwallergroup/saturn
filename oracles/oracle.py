@@ -200,7 +200,7 @@ class Oracle:
                 "oracle_calls": np.full_like(smiles, self.calls),
                 "smiles": smiles,
                 "reward": rewards, 
-                "penalized_reward": penalized_rewards, 
+                "penalized_reward": penalized_rewards 
             })
         df = pd.concat([df, oracle_components_df], axis=1)  
 

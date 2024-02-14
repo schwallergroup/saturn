@@ -198,7 +198,7 @@ class BeamEnumeration:
 
         return scaffolds
     
-    def epoch_updates(self, agent: GenerativeModelBase, num_valid_smiles: int, reward: float, oracle_calls: int):
+    def epoch_updates(self, agent: GenerativeModelBase, num_valid_smiles: int, mean_reward: float, oracle_calls: int):
         """
         this method performs 4 updates on every epoch:
         1. Updates self-conditioning filter history (track number of SMILES kept after filtering on pooled substructures)
@@ -209,7 +209,7 @@ class BeamEnumeration:
         # track self-conditioned filtering
         self.filter_history.append(num_valid_smiles)
         # check whether to execute Beam Enumeration
-        if self.reward_tracker.is_beam_epoch(reward):
+        if self.reward_tracker.is_beam_epoch(mean_reward):
             self.pool_update(agent)
         # check whether to write-out the pooled substructures
         if (oracle_calls > self.pool_saving_frequency) and (oracle_calls // self.pool_saving_frequency > self.last_save_multiple):

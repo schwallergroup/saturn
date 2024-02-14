@@ -166,7 +166,7 @@ class Model:
         def collate_fn(encoded_seqs):
             """Function to take a list of encoded sequences and turn them into a batch"""
             max_length = max([seq.size(0) for seq in encoded_seqs])
-            collated_arr = torch.zeros(len(encoded_seqs), max_length, dtype=torch.long)  # padded with zeroes
+            collated_arr = torch.zeros(len(encoded_seqs), max_length, dtype=torch.long, device="cuda")  # padded with zeroes
             for i, seq in enumerate(encoded_seqs):
                 collated_arr[i, :seq.size(0)] = seq
             return collated_arr

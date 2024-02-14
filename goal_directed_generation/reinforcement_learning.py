@@ -4,11 +4,13 @@ Adapted from https://github.com/MolecularAI/Reinvent with code additions for:
     2. Hallucinated Memory
     3. Beam Enumeration: https://arxiv.org/abs/2309.13957
 """
+from typing import Tuple
 import torch
 import numpy as np
 
 import utils.chemistry_utils as chemistry_utils
 from goal_directed_generation.utils import sample_unique_sequences
+from utils.utils import to_tensor
 
 from oracles.oracle import Oracle
 from goal_directed_generation.dataclass import GoalDirectedGenerationConfiguration
@@ -87,7 +89,7 @@ class ReinforcementLearningAgent:
             # TODO: periodically print progress
 
             # 1. Sample unique SMILES from the Agent
-            seqs, smiles, sampled_agent_likelihood = sample_unique_sequences(self.agent, self.batch_size)
+            seqs, smiles, _ = sample_unique_sequences(self.agent, self.batch_size)
 
             # 2. Beam Enumeration: Filter SMILES using the Beam Enumeration pool
             if (self.execute_beam_enumeration) and (len(self.beam_enumeration.pool) != 0):
@@ -97,7 +99,7 @@ class ReinforcementLearningAgent:
             if len(smiles) == 0:
                 self.beam_enumeration.filtered_epoch_updates()
                 if self.beam_enumeration.patience_limit_reached():
-                    print("Beam Enumeration: Patience limit reached. Ending.")
+                    print("Beam Enumeration: Patience limit reached. Ending run (not indicative of experiment failing).")
                     break
                 continue
 
@@ -111,12 +113,12 @@ class ReinforcementLearningAgent:
                 self.beam_enumeration.epoch_updates(
                     agent=self.agent,
                     num_valid_smiles=len(smiles),
-                    reward=penalized_rewards.mean(),
+                    mean_reward=penalized_rewards.mean(),
                     oracle_calls=self.oracle.calls
                 )
 
             # 5. Hallucinated Memory: Hallucinate new SMILES from the Replay Buffer
-            if (self.execute_hallucinated_memory) and (len(self.replay_buffer.memory) == 0):
+            if (self.execute_hallucinated_memory) and (len(self.replay_buffer.memory) == self.replay_buffer.memory_size):
                 hallucinated_smiles = self.hallucinator.hallucinate(self.replay_buffer.memory)
                 # 6. Hallucinated Memory: Oracle call on hallucinated batch
                 hallucinated_smiles, hallucinated_penalized_rewards = self.oracle(hallucinated_smiles, self.diversity_filter)
@@ -135,26 +137,24 @@ class ReinforcementLearningAgent:
             penalized_rewards = np.concatenate((penalized_rewards, hallucinated_penalized_rewards), 0)
 
             # 8. Compute the loss
-            prior_likelihood = torch.cat([-self.prior.likelihood_smiles(smiles), -self.prior.likelihood_smiles(hallucinated_smiles)], 0)
-            agent_likelihood = torch.cat([-sampled_agent_likelihood, -self.agent.likelihood_smiles(hallucinated_smiles)], 0)
-            loss = self.compute_loss(prior_likelihood, agent_likelihood, penalized_rewards)
+            #    smiles contains the concatenated sampled and hallucinated SMILES
+            loss, prior_likelihoods, agent_likelihoods = self.compute_loss(smiles, penalized_rewards)
 
             # 9. Update Replay Buffer
             #    Likelihoods should be negative here
             self.replay_buffer.add(
                 smiles=smiles, 
                 rewards=penalized_rewards, 
-                prior_likelihood=prior_likelihood,
-                agent_likelihood=agent_likelihood
+                prior_likelihoods=prior_likelihoods,
+                agent_likelihoods=agent_likelihoods
             )
 
-            # 10. Add experience replay to the loss - this is done *after* updating the Replay Buffer so new best-so-far SMILES can be sampled
-            er_smiles, er_rewards, er_prior_likelihood = self.replay_buffer.sample_memory()
+            # 10. Add experience replay to the loss
+            #     NOTE: this is done *after* updating the Replay Buffer so new best-so-far sampled *and* hallucinated SMILES can be sampled
+            er_smiles, er_rewards, _ = self.replay_buffer.sample_memory()
 
             # 11. Compute the loss for the experience replay SMILES
-            if len(er_smiles) > 0:
-                er_agent_likelihood = -self.agent.likelihood_smiles(er_smiles)
-                er_loss = self.compute_loss(er_prior_likelihood, er_agent_likelihood, er_rewards)
+            er_loss, _, _ = self.compute_loss(er_smiles, er_rewards)
             
             # 12. Concatenate to get the total loss and backpropagate
             loss = torch.cat((loss, er_loss), 0)
@@ -191,24 +191,30 @@ class ReinforcementLearningAgent:
 
     def compute_loss(
         self, 
-        prior_likelihood: torch.Tensor, 
-        agent_likelihood: torch.Tensor,
+        smiles: np.ndarray[str],
         rewards: np.ndarray[float]
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Compute the loss for the RL agent.
         Based on REINVENT's original loss function: https://jcheminf.biomedcentral.com/articles/10.1186/s13321-017-0235-x
         """
-        augmented_likelihood = prior_likelihood + self.sigma * rewards
-        loss = torch.pow((augmented_likelihood - agent_likelihood), 2)
-        return loss
+        if len(smiles) != 0:
+            prior_likelihoods = -self.prior.likelihood_smiles(smiles)
+            agent_likelihoods = -self.agent.likelihood_smiles(smiles)
+            augmented_likelihoods = prior_likelihoods + self.sigma * to_tensor(rewards)
+            loss = torch.pow((augmented_likelihoods - agent_likelihoods), 2)
+            return loss, prior_likelihoods, agent_likelihoods
+        else:
+            return torch.tensor([]), torch.tensor([]), torch.tensor([])
 
     def backpropagate(self, loss: torch.Tensor) -> None:
+        """Agent update via backpropagation."""
         loss = loss.mean()
         self.optimizer.zero_grad() 
         loss.backward()
         self.optimizer.step()
 
     def _disable_prior_gradients(self):
+        """Disable gradients for the Prior as it is not updated."""
         for param in self.prior.get_network_parameters():
             param.requires_grad = False

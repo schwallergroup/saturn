@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 
 def get_indices_of_unique_smiles(smiles: np.ndarray[str]) -> np.ndarray[int]:
