@@ -7,7 +7,7 @@ Implements the following reward shaping functions:
     4. Reverse Sigmoid
     5. Double Sigmoid
 """
-
+import warnings
 import numpy as np
 import math
 
@@ -105,17 +105,18 @@ class RewardShapingFunction:
         coef_si: float,
         coef_se: float
     ) -> np.ndarray[float]:
-        
-        # FIXME: overflow error?
 
         def _double_sigmoid_formula(value, low, high, coef_div, coef_si, coef_se):
             try:
-                A = 10 ** (coef_se * (value / coef_div))
-                B = (10 ** (coef_se * (value / coef_div)) + 10 ** (coef_se * (low / coef_div)))
-                C = (10 ** (coef_si * (value / coef_div)) / (
-                        10 ** (coef_si * (value / coef_div)) + 10 ** (coef_si * (high / coef_div))))
-                return (A / B) - C
-            except Exception:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error", RuntimeWarning)
+                    A = 10 ** (coef_se * (value / coef_div))
+                    B = (10 ** (coef_se * (value / coef_div)) + 10 ** (coef_se * (low / coef_div)))
+                    C = (10 ** (coef_si * (value / coef_div)) / (
+                            10 ** (coef_si * (value / coef_div)) + 10 ** (coef_si * (high / coef_div))))
+                    return (A / B) - C
+            except RuntimeWarning:
+                # in case of numerical overflow
                 return 0.0
 
         transformed = [_double_sigmoid_formula(val, low, high, coef_div, coef_si, coef_se) for val in raw_property_values]

@@ -84,6 +84,8 @@ class ReinforcementLearningAgent:
     def run(self):
         # FIXME: could be dangerous in case of infinite loop
         while not self.oracle.budget_exceeded():
+            # TODO: periodically print progress
+
             # 1. Sample unique SMILES from the Agent
             seqs, smiles, sampled_agent_likelihood = sample_unique_sequences(self.agent, self.batch_size)
 
