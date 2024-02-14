@@ -36,6 +36,7 @@ def read_json_file(path: str):
         print(f"JSON format error in file ${path}: \n ${e}")
 
 if __name__ == "__main__":
+    # TODO: self.logger to log messages instead of printing --> have a logging dir and output everything there
     start_time = time.perf_counter()
     args = parser.parse_args()
     

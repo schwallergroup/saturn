@@ -6,7 +6,7 @@
     "result_folder": "results"
   },
   "oracle": {
-    "budget": 1000,
+    "budget": 10000,
     "allow_oracle_repeats": false,
     "aggregator": "product",
     "components": [
@@ -60,18 +60,23 @@
     "reinforcement_learning": {
       "prior": "/home/jeguo/Desktop/ReinventCommunity/notebooks/models/random.prior.new",
       "agent": "/home/jeguo/Desktop/ReinventCommunity/notebooks/models/random.prior.new",
-      "batch_size": 32,
+      "batch_size": 16,
       "learning_rate": 0.0001,
       "margin_threshold": 50,
       "sigma": 128.0,
       "augmented_memory": true,
-      "augmentation_rounds": 2,
+      "augmentation_rounds": 5,
       "selective_memory_purge": true
     },
     "experience_replay": {
       "memory_size": 100,
       "sample_size": 10,
       "smiles": []
+    },
+    "diversity_filter": {
+      "name": "IdenticalMurckoScaffold",
+      "bucket_size": 10,
+      "min_similarity": 0.4
     },
     "hallucinated_memory": {
       "execute_hallucinated_memory": false,
@@ -91,11 +96,6 @@
       "patience": 5,
       "token_sampling_method": "topk",
       "filter_patience_limit": 100000
-    },
-    "diversity_filter": {
-      "name": "IdenticalMurckoScaffold",
-      "bucket_size": 10,
-      "min_similarity": 0.4
     }
   },
   "distribution_learning": {

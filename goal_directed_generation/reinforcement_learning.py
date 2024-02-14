@@ -218,7 +218,7 @@ class ReinforcementLearningAgent:
             1. Oracle History
             2. Beam Enumeration History
             3. Hallucination History
-            4. Repeat History
+            4. Number of Oracle repeats
         """
         self.oracle.write_out_oracle_history()
         self.oracle.write_out_repeat_history()
