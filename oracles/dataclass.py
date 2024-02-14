@@ -19,4 +19,5 @@ class OracleComponentParameters:
 class OracleConfiguration:
     components: List[OracleComponentParameters]
     budget: int
+    allow_oracle_repeats: bool = False
     aggregator: str = "product"

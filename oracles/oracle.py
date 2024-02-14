@@ -29,6 +29,7 @@ class Oracle:
 
         # track oracle budget
         self.budget = oracle_configuration.budget
+        self.allow_oracle_repeats = oracle_configuration.allow_oracle_repeats
         self.calls = 0
 
         # cache dictionary to store the results of previous oracle calls
@@ -98,7 +99,7 @@ class Oracle:
 
         # 8. Update the Diversity Filter
         diversity_filter.update(new_smiles)
-
+        print(self.oracle_history)
         # 9. Update the Oracle History
         self.update_oracle_history(
             smiles=smiles,
@@ -127,22 +128,26 @@ class Oracle:
     
     def rewards_from_oracle_cache(self, smiles: np.ndarray[str]) -> Tuple[np.ndarray[str], np.ndarray[float], np.ndarray[str]]:
         """
-        Checks if there are any Cached rewards in a sampled batch of SMILES.
+        Checks if there are any Cached rewards in a sampled batch of SMILES. If Oracle repeats are permitted, return.
         """
-        # canonicalize the SMILES before checking Cache
-        canonical_smiles = canonicalize_smiles_batch(smiles)
-        repeat_indices = []
-        cached_rewards = []
-        for idx, s in enumerate(canonical_smiles):
-            if s in self.cache:
-                repeat_indices.append(idx)
-                cached_rewards.append(self.cache[s])
+        if not self.allow_oracle_repeats:
+            # canonicalize the SMILES before checking Cache
+            canonical_smiles = canonicalize_smiles_batch(smiles)
+            repeat_indices = []
+            cached_rewards = []
+            for idx, s in enumerate(canonical_smiles):
+                if s in self.cache:
+                    repeat_indices.append(idx)
+                    cached_rewards.append(self.cache[s])
 
-        # track number of repeated SMILES
-        self.repeated_smiles.append(len(repeat_indices))
+            # track number of repeated SMILES
+            self.repeated_smiles.append(len(repeat_indices))
 
-        if len(repeat_indices) != 0:
-            return smiles[repeat_indices], np.array(cached_rewards), np.delete(smiles, repeat_indices)
+            if len(repeat_indices) != 0:
+                return smiles[repeat_indices], np.array(cached_rewards), np.delete(smiles, repeat_indices)
+            else:
+                return np.array([]), np.array([]), smiles
+        
         else:
             return np.array([]), np.array([]), smiles
     
@@ -180,8 +185,8 @@ class Oracle:
     def update_oracle_history(
         self, 
         smiles: np.ndarray[str],
-        reward: np.ndarray[float],
-        penalized_reward: np.ndarray[float],
+        rewards: np.ndarray[float],
+        penalized_rewards: np.ndarray[float],
         oracle_components_df: pd.DataFrame
     ) -> None:
         """
@@ -194,9 +199,10 @@ class Oracle:
         df = pd.DataFrame({
                 "oracle_calls": np.full_like(smiles, self.calls),
                 "smiles": smiles,
-                "reward": reward, 
-                "penalized_reward": penalized_reward, 
+                "reward": rewards, 
+                "penalized_reward": penalized_rewards, 
             })
+        
         df = pd.concat([df, oracle_components_df], axis=1)
         
         self.oracle_history = pd.concat([self.oracle_history, df])
