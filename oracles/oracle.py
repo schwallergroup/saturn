@@ -69,7 +69,7 @@ class Oracle:
         Likelihoods of the SMILES are calculated in the Reinforcement Learning module.
         """
         # 1. Only keep the valid SMILES (RDKit parsable into Mols)
-        smiles = [s for s in smiles if Chem.MolFromSmiles(s) is not None]
+        smiles = np.array([s for s in smiles if Chem.MolFromSmiles(s) is not None])
         
         # 2. Rewards can be obtained directly for SMILES in the Oracle Cache 
         repeat_smiles, cached_rewards, new_smiles = self.rewards_from_oracle_cache(smiles)
@@ -99,11 +99,11 @@ class Oracle:
 
         # 8. Update the Diversity Filter
         diversity_filter.update(new_smiles)
-        print(self.oracle_history)
+
         # 9. Update the Oracle History
         self.update_oracle_history(
             smiles=smiles,
-            rewards=rewards,
+            rewards=aggregated_rewards,
             penalized_rewards=penalized_rewards,
             oracle_components_df=oracle_components_df
         )
@@ -202,8 +202,7 @@ class Oracle:
                 "reward": rewards, 
                 "penalized_reward": penalized_rewards, 
             })
-        
-        df = pd.concat([df, oracle_components_df], axis=1)
+        df = pd.concat([df, oracle_components_df], axis=1)  
         
         self.oracle_history = pd.concat([self.oracle_history, df])
 
