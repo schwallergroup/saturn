@@ -2,23 +2,20 @@
 Apply a genetic algorithm to a SMILES string to generate new SMILES strings.
 Uses Graph GA's algorithm: https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc05372c
 """
-
 from hallucinated_memory.hallucinator import Hallucinator
 import pandas as pd
 import numpy as np
 from rdkit import Chem
 from hallucinated_memory.graphga_utils import crossover, mutate
-from reinvent_models.model_factory.generative_model_base import GenerativeModelBase
-
 
 
 class GeneticMutator(Hallucinator):
     def __init__(
             self,
-            prior: GenerativeModelBase,
-            num_hallucinations: int=100,
-            num_selected: int=10,
-            selection_criterion: str="random"
+            prior,
+            num_hallucinations: int = 100,
+            num_selected: int = 10,
+            selection_criterion: str = "random"
             ):
         self.vocabulary = prior.vocabulary
         self.tokenizer = prior.tokenizer
@@ -34,16 +31,14 @@ class GeneticMutator(Hallucinator):
         # store the hallucination history
         self.hallucination_history = pd.DataFrame({})
 
-        # TODO: be able to fix seed for reproducibility?
-
-    def hallucinate(self, buffer: pd.DataFrame) -> np.array:
+    def hallucinate(self, buffer: pd.DataFrame) -> np.ndarray[str]:
         # hallucinate a set of unique SMILES
         # TODO: canonicalize?
         hallucinated_set = set()
 
         # consider the buffer the population
         parents = [Chem.MolFromSmiles(s) for s in buffer["smiles"]]
-        parents_rewards = buffer["score"].values
+        parents_rewards = buffer["reward"].values
 
         # to avoid infinite loop, set a maximum number of iterations
         tries = 0

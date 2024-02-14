@@ -12,7 +12,7 @@ class Hallucinator(ABC):
 
     @abstractmethod
     def hallucinate(self, buffer: pd.DataFrame) -> np.array:
-        raise NotImplementedError
+        raise NotImplementedError("Hallucinator must implement hallucinate method.")
     
     def epoch_updates(
         self, 

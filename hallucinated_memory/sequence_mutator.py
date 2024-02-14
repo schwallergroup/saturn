@@ -41,7 +41,7 @@ class SequenceMutator(Hallucinator):
         # store the hallucination history
         self.hallucination_history = pd.DataFrame({})
         
-    def hallucinate(self, buffer: pd.DataFrame) -> np.array:
+    def hallucinate(self, buffer: pd.DataFrame) -> np.ndarray[str]:
         # denote the parent the highest reward molecule in the buffer
         parent = list(buffer["smiles"].iloc[0])
 
