@@ -180,16 +180,7 @@ class ReinforcementLearningAgent:
                     self.backpropagate(loss)
 
                     # TODO: add randomized smiles back to replay buffer???? Previous code based adds the sampled batch again
-
-
-        # write out hallucination history
-        self.hallucinator.write_out_history()
-
-        if self.execute_beam_enumeration:
-            self.beam_enumeration.end_actions(oracle_calls=self.oracle_tracker.oracle_calls)
-
-        self.oracle.write_out_oracle_history()
-        self.oracle.write_out_repeat_history()
+        self.write_out_results()
 
     def compute_loss(
         self, 
@@ -220,3 +211,20 @@ class ReinforcementLearningAgent:
         """Disable gradients for the Prior as it is not updated."""
         for param in self.prior.get_network_parameters():
             param.requires_grad = False
+
+    def write_out_results(self):
+        """
+        Writes out the following results:
+            1. Oracle History
+            2. Beam Enumeration History
+            3. Hallucination History
+            4. Repeat History
+        """
+        self.oracle.write_out_oracle_history()
+        self.oracle.write_out_repeat_history()
+
+        if self.execute_beam_enumeration:
+            self.beam_enumeration.end_actions(oracle_calls=self.oracle_tracker.oracle_calls)
+
+        if self.execute_hallucinated_memory:
+            self.hallucinator.write_out_hallucination_history()

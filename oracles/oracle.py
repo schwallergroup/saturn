@@ -222,4 +222,4 @@ class Oracle:
         """
         Write out the repeated SMILES history as a CSV.
         """
-        pd.DataFrame(self.repeated_smiles).to_csv("repeated_smiles_history.csv")
+        pd.DataFrame(self.num_repeated_smiles).to_csv("repeated_smiles_history.csv")

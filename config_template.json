@@ -74,7 +74,7 @@
       "smiles": []
     },
     "hallucinated_memory": {
-      "execute_hallucinated_memory": true,
+      "execute_hallucinated_memory": false,
       "hallucination_method": "ga",
       "num_hallucinations": 100,
       "num_selected": 10,
