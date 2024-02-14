@@ -1,23 +1,24 @@
 """
 Token-level mutation of SMILES strings.
+Similar to the STONED algorithm: https://pubs.rsc.org/en/content/articlelanding/2021/sc/d1sc00231g
 """
-
+from typing import List
 from hallucinated_memory.hallucinator import Hallucinator
 import pandas as pd
 import numpy as np
 from rdkit import Chem
 from copy import deepcopy
+from utils.chemistry_utils import canonicalize_smiles
 
 
 class SequenceMutator(Hallucinator):
-    def __init__(self,
-                 prior,
-                 num_hallucinations=100,
-                 # TODO: num_hallucinations != num_selected because of potential duplicates
-                 #       and also because of the selection criterion (in case it's not random)
-                 num_selected=10,
-                 selection_criterion: str="random"):
-        
+    def __init__(
+        self,
+        prior,
+        num_hallucinations: int = 100,
+        num_selected: int = 10,
+        selection_criterion: str = "random"
+    ):
         self.vocabulary = prior.vocabulary
         self.tokenizer = prior.tokenizer
         self.tokens = self.vocabulary.tokens()
@@ -42,6 +43,9 @@ class SequenceMutator(Hallucinator):
         self.hallucination_history = pd.DataFrame({})
         
     def hallucinate(self, buffer: pd.DataFrame) -> np.ndarray[str]:
+        """
+        Hallucinate a set of unique SMILES strings similar to the STONED algorithm.
+        """
         # denote the parent the highest reward molecule in the buffer
         parent = list(buffer["smiles"].iloc[0])
 
@@ -58,7 +62,8 @@ class SequenceMutator(Hallucinator):
 
             # hallucinate
             hallucinated_smiles = self.get_hallucinated_smiles(parent, action, num_actions)
-            hallucinated_set.add(hallucinated_smiles)
+            # add canonicalized SMILES to guarantee uniqueness
+            hallucinated_set.add(canonicalize_smiles(hallucinated_smiles))
 
         if self.selection_criterion == "random":
             # FIXME: at the moment, 100 hallucinations are generated, but only 10 are returned
@@ -66,7 +71,15 @@ class SequenceMutator(Hallucinator):
         else:
             raise NotImplementedError("Only random selection is currently implemented.")
 
-    def get_hallucinated_smiles(self, parent: list, action: str, num_actions: int) -> str:
+    def get_hallucinated_smiles(
+        self, 
+        parent: List[str],
+        action: str, 
+        num_actions: int
+    ) -> str:
+        """
+        Returns a hallucinated SMILES based on the parent SMILES and the mutation action.
+        """
         tries = 0
         while tries < 1000:
             if action == "mutate":
@@ -85,7 +98,14 @@ class SequenceMutator(Hallucinator):
         # if all 1000 tries produced invalid molecules, return the parent
         return "".join(parent)
 
-    def mutate(self, parent: list, num_actions: int) -> str:
+    def mutate(
+        self, 
+        parent: List[str], 
+        num_actions: int
+    ) -> str:
+        """
+        Swap a random token in the parent SMILES string with a random token from the Vocabulary.
+        """
         # keep track of which position is mutated so all mutation locations are unique
         mutated_indices = set()
         while len(mutated_indices) != num_actions:
@@ -96,7 +116,14 @@ class SequenceMutator(Hallucinator):
 
         return "".join(parent)
 
-    def insert(self, parent: list, num_actions: int) -> str:
+    def insert(
+        self, 
+        parent: List[str],
+        num_actions: int
+    ) -> str:
+        """
+        Insert a random token from the Vocabulary into a random position in the parent SMILES string.
+        """
         for _ in range(num_actions):
             insert_index = np.random.choice(list(range(len(parent))))
             parent.insert(insert_index, np.random.choice(self.tokens))
@@ -104,7 +131,13 @@ class SequenceMutator(Hallucinator):
         return "".join(parent)
 
     @staticmethod
-    def delete(parent: list, num_actions: int) -> str:
+    def delete(
+        parent: List[str],
+        num_actions: int
+    ) -> str:
+        """
+        Delete a random token from the parent SMILES string.
+        """
         for _ in range(num_actions):
             delete_index = np.random.choice(list(range(len(parent))))
             del parent[delete_index]

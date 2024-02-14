@@ -2,21 +2,25 @@
 Apply a genetic algorithm to a SMILES string to generate new SMILES strings.
 Uses Graph GA's algorithm: https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc05372c
 """
+from typing import List
 from hallucinated_memory.hallucinator import Hallucinator
 import pandas as pd
 import numpy as np
 from rdkit import Chem
+from rdkit.Chem import Mol
 from hallucinated_memory.graphga_utils import crossover, mutate
+
+from utils.chemistry_utils import canonicalize_smiles
 
 
 class GeneticMutator(Hallucinator):
     def __init__(
-            self,
-            prior,
-            num_hallucinations: int = 100,
-            num_selected: int = 10,
-            selection_criterion: str = "random"
-            ):
+        self,
+        prior,
+        num_hallucinations: int = 100,
+        num_selected: int = 10,
+        selection_criterion: str = "random"
+        ):
         self.vocabulary = prior.vocabulary
         self.tokenizer = prior.tokenizer
         self.tokens = self.vocabulary.tokens()
@@ -32,8 +36,9 @@ class GeneticMutator(Hallucinator):
         self.hallucination_history = pd.DataFrame({})
 
     def hallucinate(self, buffer: pd.DataFrame) -> np.ndarray[str]:
-        # hallucinate a set of unique SMILES
-        # TODO: canonicalize?
+        """
+        Hallucinate a set of unique SMILES strings via GraphGA's algorithm.
+        """
         hallucinated_set = set()
 
         # consider the buffer the population
@@ -45,31 +50,46 @@ class GeneticMutator(Hallucinator):
 
         while (len(hallucinated_set) != self.num_hallucinations) and (tries < 1000):
             # generate child
-            child = reproduce(parents, parents_rewards, mutation_rate=0.1)
+            child = reproduce(parents, parents_rewards, 0.1)
             if self.can_be_encoded(child, self.tokenizer, self.vocabulary):
-                hallucinated_set.add(Chem.MolToSmiles(child))
+                # add canonicalized SMILES to guarantee uniqueness
+                hallucinated_set.add(Chem.MolToSmiles(child, canonical=True))
             tries += 1
 
         if len(hallucinated_set) != self.num_hallucinations:
             print(f"WARNING: generated {len(hallucinated_set)}/{self.num_hallucinations} valid hallucinations in 1000 attempts")
 
-        return self.select_hallucinations(parent=parents,
-                                          hallucinations=[Chem.MolFromSmiles(s) for s in hallucinated_set],
-                                          hallucinations_smiles=hallucinated_set)
-
-
-def choose_parents(parents, parents_rewards):
-    # sample 2 parents with probability proportional to their rewards
-    # based on GEAM: https://anonymous.4open.science/r/GEAM-45EF/utils_ga/ga.py
-    # sum(sampling_probs) ≈ 1.0
+        return self.select_hallucinations(
+                    parent=parents,
+                    hallucinations=[Chem.MolFromSmiles(s) for s in hallucinated_set],
+                    hallucinations_smiles=hallucinated_set
+                )
+    
+@staticmethod
+def choose_parents(
+    parents: List[Mol], 
+    parents_rewards: np.ndarray[float]
+) -> np.ndarray[Mol]:
+    """
+    Sample 2 parents with probability proportional to their rewards.
+    Based on implementation from GEAM: https://anonymous.4open.science/r/GEAM-45EF/utils_ga/ga.py
+    """
     sampling_probs = [reward / sum(parents_rewards) for reward in parents_rewards]
     parents = np.random.choice(parents, p=sampling_probs, size=2)
     return parents
 
-
-def reproduce(parents, parents_rewards, mutation_rate):
+@staticmethod
+def reproduce(
+    parents: List[Mol], 
+    parents_rewards: np.ndarray[float], 
+    mutation_rate: float
+) -> Mol:
+    """
+    Select 2 parents, crossover, and mutate to generate a child.
+    """
     parent_1, parent_2 = choose_parents(parents, parents_rewards)
     child = crossover.crossover(parent_1, parent_2)
     if child is not None:
         child = mutate.mutate(child, mutation_rate)
+
     return child

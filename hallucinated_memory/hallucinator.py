@@ -3,6 +3,7 @@ from typing import Union, List, Set
 import pandas as pd
 import numpy as np
 from rdkit import Chem
+from rdkit.Chem import Mol
 from rdkit.Chem.AllChem import GetMorganFingerprintAsBitVect
 from rdkit.DataStructs import TanimotoSimilarity, BulkTanimotoSimilarity
 
@@ -16,26 +17,29 @@ class Hallucinator(ABC):
     
     def epoch_updates(
         self, 
-        epoch: int,
+        oracle_calls: int,
         highest_buffer_reward: float,
         hallucinations: list, 
         hallucination_rewards: list
-        ) -> None:
+    ) -> None:
         """
         Track the hallucination history of the parent sequence:
-        1. Epoch
-        2. Current highest buffer reward
-        3. Hallucinated SMILES
-        4. Hallucinated rewards
-        This enables analysis into how many hallucinations are better than the current highest rewarding molecule, at a given epoch
+            1. Oracle calls so far
+            2. Highest buffer reward (before hallucinating)
+            3. Hallucinated SMILES
+            4. Hallucinated rewards
+            5. Whether a hallucination has a higher reward than the top buffer SMILES
+            6. Number of hallucinations that were added to the buffer
         """
         df = pd.DataFrame(
             {
-                "epoch": [epoch],
-                "highest_buffer_reward_before_hallucinating": [highest_buffer_reward],
+                "oracle_calls": [oracle_calls],
+                "top_buffer_reward_before_hallucinating": [highest_buffer_reward],
                 "hallucinations": [hallucinations],
-                "hallucination_rewards": [hallucination_rewards]
-            }
+                "hallucination_rewards": [hallucination_rewards],
+                "hallucination_better_than_top_buffer": [np.any(hallucination_rewards > highest_buffer_reward)],
+                "num_hallucinations_added_to_buffer": [len(hallucinations)]
+            }g
         )
         self.hallucination_history = pd.concat([self.hallucination_history, df], ignore_index=True)
 
@@ -43,11 +47,11 @@ class Hallucinator(ABC):
         self.hallucination_history.to_csv("hallucination_history.csv")
 
     def can_be_encoded(
-            self,
-            mol: Chem.Mol, 
-            tokenizer, 
-            vocabulary
-            ) -> bool:
+        self,
+        mol: Mol, 
+        tokenizer, 
+        vocabulary
+    ) -> bool:
         """
         Checks whether a hallucinated molecule satisfies:
             1. It is a RDKit-parsable molecule
@@ -67,14 +71,15 @@ class Hallucinator(ABC):
             return False
         
     def select_hallucinations(
-            self,
-            parent: Union[Chem.Mol, List[Chem.Mol]], 
-            hallucinations: List[Chem.Mol],
-            hallucinations_smiles: Set[str]) -> np.array:
+        self,
+        parent: Union[Mol, List[Mol]], 
+        hallucinations: List[Mol],
+        hallucinations_smiles: Set[str]
+    ) -> np.ndarray[str]:
         """
-        Selects a subset of hallucinations to return based on the selection criterion.
+        Selects a sub-set of hallucinations to return based on the selection criterion.
         1. Random: random selection
-        2. Tanimoto Distance: select the most *dissimilar* hallucinations to the parent sequence.
+        2. Tanimoto Distance: select the most *dissimilar* hallucinations to the parent sequence by Tanimoto Similarity.
            Hypothesis: Mitigates mode collapse and increases Augmentation tolerability threshold
                        * But are the rewards worse?
         """
