@@ -14,6 +14,11 @@ from oracles.utils import construct_oracle_component
 
 
 class Oracle:
+    """
+    The Oracle function to optimize for in the generative experiment.
+    Can be composed of multiple OracleComponents, each of which handles a specific property.
+    Aggregating the rewards from each OracleComponent returns a scalar reward (return in RL terminology) for Agent update.
+    """
     def __init__(
         self, 
         oracle_configuration: OracleConfiguration

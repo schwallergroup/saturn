@@ -12,6 +12,10 @@ from oracles.reward_shaping.function_parameters import RewardShapingFunctionPara
 
 
 class OracleComponent(ABC):
+    """
+    Base class for all OracleComponents. 
+    OracleComponents are used to calculate the properties of a set of molecules.
+    """
     def __init__(self, parameters: OracleComponentParameters):
         self.parameters = parameters
         self.reward_shaping_function = RewardShapingFunction(

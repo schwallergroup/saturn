@@ -109,7 +109,7 @@ class ReinforcementLearningAgent:
             smiles, penalized_rewards = self.oracle(smiles, self.diversity_filter)
 
             # 5. Beam Enumeration: Check whether to execute Beam Enumeration
-            #    NOTE: Beam Enumeration execution criterion is based only on *sampled* batch
+            #    NOTE: Beam Enumeration execution criterion is based only on the *sampled* batch
             if self.execute_beam_enumeration:
                 self.beam_enumeration.epoch_updates(
                     agent=self.agent,
