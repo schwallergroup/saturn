@@ -6,7 +6,7 @@
     "result_folder": "results"
   },
   "oracle": {
-    "budget": 10000,
+    "budget": 1000,
     "allow_oracle_repeats": false,
     "aggregator": "product",
     "components": [
@@ -65,7 +65,7 @@
       "margin_threshold": 50,
       "sigma": 128.0,
       "augmented_memory": true,
-      "augmentation_rounds": 5,
+      "augmentation_rounds": 10,
       "selective_memory_purge": true
     },
     "experience_replay": {

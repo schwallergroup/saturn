@@ -94,9 +94,9 @@ class ReinforcementLearningAgent:
 
             # 2. Beam Enumeration: Filter SMILES using the Beam Enumeration pool
             if (self.execute_beam_enumeration) and (len(self.beam_enumeration.pool) != 0):
-                seqs, smiles, sampled_agent_likelihood = self.beam_enumeration.filter_batch(seqs, smiles, sampled_agent_likelihood)
+                seqs, smiles = self.beam_enumeration.filter_batch(seqs, smiles)
 
-            # 3. Beam Enumeration: If all SMILES are filtered, proceed to next generation epoch
+            # 3. Beam Enumeration: If all SMILES are filtered, proceed to generate a new batch
             if len(smiles) == 0:
                 self.beam_enumeration.filtered_epoch_updates()
                 if self.beam_enumeration.patience_limit_reached():
@@ -109,7 +109,7 @@ class ReinforcementLearningAgent:
             smiles, penalized_rewards = self.oracle(smiles, self.diversity_filter)
 
             # 5. Beam Enumeration: Check whether to execute Beam Enumeration
-            #    NOTE: Beam Enumeration execution criterion is based only *sampled* batch
+            #    NOTE: Beam Enumeration execution criterion is based only on *sampled* batch
             if self.execute_beam_enumeration:
                 self.beam_enumeration.epoch_updates(
                     agent=self.agent,
@@ -124,7 +124,6 @@ class ReinforcementLearningAgent:
                 # 7. Hallucinated Memory: Oracle call on hallucinated batch
                 hallucinated_smiles, hallucinated_penalized_rewards = self.oracle(hallucinated_smiles, self.diversity_filter)
                 # 8. Update the hallucination history
-                # FIXME: track how many times the replay buffer is being populated and not just when the hallucinations are the best-so-far
                 self.hallucinator.epoch_updates(
                     oracle_calls=self.oracle.calls,
                     buffer_rewards=self.replay_buffer.memory["reward"],
@@ -224,7 +223,7 @@ class ReinforcementLearningAgent:
         self.oracle.write_out_repeat_history()
 
         if self.execute_beam_enumeration:
-            self.beam_enumeration.end_actions(oracle_calls=self.oracle_tracker.oracle_calls)
+            self.beam_enumeration.end_actions(self.oracle.calls)
 
         if self.execute_hallucinated_memory:
             self.hallucinator.write_out_hallucination_history()

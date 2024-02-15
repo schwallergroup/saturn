@@ -1,13 +1,14 @@
 # -------------------------------
 # Beam Enumeration implementation
 # -------------------------------
-
+from typing import Tuple, List, Set
 import torch
 import pandas as pd
 import numpy as np
 import json
 
 from rdkit import Chem
+from rdkit.Chem import Mol
 from rdkit.Chem.Scaffolds import MurckoScaffold
 
 from beam_enumeration.reward_tracker import RewardTracker
@@ -15,28 +16,35 @@ from reinvent_models.model_factory.generative_model_base import GenerativeModelB
 
 class BeamEnumeration:
     def __init__(self,
-                 k: int,
-                 beam_steps: int,
-                 substructure_type: str,
-                 substructure_min_size: int,
-                 pool_size: int,
-                 pool_saving_frequency: int,
-                 patience: int,
-                 token_sampling_method: str,
-                 filter_patience_limit: int):
+        k: int = 2,
+        beam_steps: int = 18,
+        substructure_type: str = "structure",
+        substructure_min_size: int = 15,
+        pool_size: int = 4,
+        pool_saving_frequency: int = 500,
+        patience: int = 5,
+        token_sampling_method: str = "topk",
+        filter_patience_limit: int = 100000
+        ):
+        assert substructure_type in ["structure", "scaffold"], "substructure_type must be either 'structure' or 'scaffold'"
+        assert token_sampling_method in ["topk", "sample"], "token_sampling_method must be either 'topk' or 'sample'"
+
         self.k = k
         self.beam_steps = beam_steps
         self.substructure_type = substructure_type
         self.substructure_min_size = substructure_min_size
         self.pool_size = pool_size
+
         # used to track frequency of Beam Enumeration substructure saving
         self.last_save_multiple = 0
         self.pool_saving_frequency = pool_saving_frequency
+
         # denotes how tokens are sampled - either top k or sampling from the distribution
         self.token_sampling_method = token_sampling_method
         
         # track reward trajectory
         self.reward_tracker = RewardTracker(patience=patience)
+
         # keep track of *all* scaffolds/substructures
         self.entire_pool = {}
         # keep track of the most probable scaffolds/substructures
@@ -53,7 +61,10 @@ class BeamEnumeration:
 
     @torch.no_grad()
     def exhaustive_beam_expansion(self, agent):
-        """this method performs beam expansion to enumerate the set of highest probability (on average) sub-sequences. Total number of sub-sequences is k^beam_steps."""
+        """
+        This method performs beam expansion to enumerate the set of highest probability (on average) sub-sequences.
+        Total number of sub-sequences is k^beam_steps.
+        """
 
         # start with k number of "start" sequences
         start_token = torch.zeros(self.k, dtype=torch.long)
@@ -110,9 +121,13 @@ class BeamEnumeration:
 
         return smiles
 
-    def filter_batch(self, seqs, smiles, agent_likelihood):
+    def filter_batch(
+        self, 
+        seqs: torch.Tensor,
+        smiles: np.ndarray[str]
+        ) -> Tuple[torch.Tensor, np.ndarray[str]]:
         """
-        this method takes a generated batch of SMILES and returns only those
+        This method takes a generated batch of SMILES and returns only those
         that contain the most probable substructures as stored in *pool*.
         """
         indices = []
@@ -124,25 +139,25 @@ class BeamEnumeration:
                         indices.append(idx)
                         break
 
-        return seqs[indices], smiles[indices], agent_likelihood[indices]
+        return seqs[indices], smiles[indices]
 
     def pool_update(self, agent):
-        """this method performs Beam Enumeration and extracts and stores the most frequent substructures in *self.pool*."""
-        print('----- Performing Beam Enumeration -----')
-        subsequences = self.exhaustive_beam_expansion(agent)
-        pool = self.get_top_substructures(subsequences)
+        """
+        This method executes Beam Enumeration and extracts and stores the most frequent substructures in self.pool.
+        """
+        print("----- Performing Beam Enumeration -----")
+        smiles_subsequences = self.exhaustive_beam_expansion(agent)
+        self.pool = self.get_top_substructures(smiles_subsequences)
 
-        # store the RDKit Mol objects
-        self.pool = [Chem.MolFromSmiles(s) for s in pool]
-
-    def get_top_substructures(self, subsequences: list) -> list:
-        # clear pool
-        self.pool = {}
-        for seq in subsequences:
+    def get_top_substructures(self, smiles_subsequences: List[str]) -> List[Mol]:
+        """
+        This method extracts the most frequent substructures from the enumerated SMILES subsequences.
+        """
+        for seq in smiles_subsequences:
             # check whether to extract substructure itself or substructure scaffold
-            if self.substructure_type == 'structure':
+            if self.substructure_type == "structure":
                 structures = self.substructure_extractor(seq)
-            else:
+            elif self.substructure_type == "scaffold":
                 structures = self.scaffold_extractor(seq)
             # not every subsequence has valid structures
             if len(structures) > 0:
@@ -160,12 +175,15 @@ class BeamEnumeration:
         sorted_pool = dict(sorted(self.pool.items(), key=lambda x: x[1], reverse=True))
         # store all substructures with their corresponding frequency
         self.entire_pool = sorted_pool
-        # get the most frequent substructures
+        # store the most frequent substructures
         sliced_pool = list(sorted_pool.keys())[:self.pool_size]
 
-        return sliced_pool
+        return [Chem.MolFromSmiles(s) for s in sliced_pool]
 
-    def substructure_extractor(self, subsequence: str) -> set:
+    def substructure_extractor(self, subsequence: str) -> Set[str]:
+        """
+        Extracts substructures from a SMILES subsequence.
+        """
         # use a Set for tracking to avoid repeated counting of the same substructure
         substructures = set()
         for idx in range(len(subsequence) - 2):
@@ -173,12 +191,15 @@ class BeamEnumeration:
             if mol is not None:
                 canonical_substructure = Chem.MolToSmiles(mol, canonical=True)
                 canonical_chars = set(canonical_substructure)
-                if len(canonical_chars.intersection(self.heavy_atoms)) > 0:
+                if self.contains_heavy_atoms:
                     substructures.add(canonical_substructure)
 
         return substructures
 
-    def scaffold_extractor(self, subsequence: str) -> set:
+    def scaffold_extractor(self, subsequence: str) -> Set[str]:
+        """
+        Extracts Bemis-Murcko scaffolds from a SMILES subsequence.
+        """
         # use a Set for tracking to avoid repeated counting of the same scaffold
         scaffolds = set()
         for idx in range(len(subsequence) - 2):
@@ -190,19 +211,25 @@ class BeamEnumeration:
                 except Exception:
                     # scaffold extraction may raise RDKit valency error - skip these for now
                     continue
-                # get canonical
                 canonical_scaffold = Chem.MolToSmiles(scaffold, canonical=True)
                 canonical_chars = set(canonical_scaffold)
-                if len(canonical_chars.intersection(self.heavy_atoms)) > 0:
+                if self.contains_heavy_atoms(canonical_chars):
                     scaffolds.add(canonical_scaffold)
 
         return scaffolds
     
+    def contains_heavy_atoms(self, substructure_chars: Set[str]) -> bool:
+        """
+        Checks whether a substructure contains heavy atoms.
+        Substructures are only considered if they contain heavy atoms.
+        """
+        return len(substructure_chars.intersection(self.heavy_atoms)) > 0
+    
     def epoch_updates(self, agent: GenerativeModelBase, num_valid_smiles: int, mean_reward: float, oracle_calls: int):
         """
-        this method performs 4 updates on every epoch:
+        This method performs 4 updates on every epoch:
         1. Updates self-conditioning filter history (track number of SMILES kept after filtering on pooled substructures)
-        2. Checks whether to execute Beam Enumeration - if yes, do so
+        2. Check whether to execute Beam Enumeration - if yes, do so
         3. Check whether to write-out pooled substructures
         4. Resets the filter patience counter
         """
@@ -217,39 +244,43 @@ class BeamEnumeration:
             self.last_save_multiple = oracle_calls // self.pool_saving_frequency
         
         self.filter_patience = 0
+
+    def filtered_epoch_updates(self):
+        """
+        This method performs 2 updates and executes when *none* of the sampled batch contains the Beam substructures (they are all discarded):
+        1. Increments Filter Patience
+        2. Appends 0 to Filter History
+        """
+        self.filter_patience += 1
+        self.filter_history.append(0)
+
+    def patience_limit_reached(self) -> bool:
+        """
+        Checks whether the filter patience limit has been reached.
+        (consecutive generation epoch with all molecules discarded due to not containing the pooled substructure).
+        """
+        return self.filter_patience == self.filter_patience_limit
     
-    def end_actions(self, oracle_calls):
-        print(f'Executed Beam Enumeration {self.reward_tracker.beam_executions} times')
-        print('Saving final pooled substructures')
+    def end_actions(self, oracle_calls: int) -> None:
+        print(f"Executed Beam Enumeration {self.reward_tracker.beam_executions} times")
+        print("Saving final pooled substructures.")
         self.write_out_pool(oracle_calls)
         # also write out entire pool
         self.write_out_entire_pool()
         # write out Beam Enumeration self-conditioning history
         self.write_out_filtering()
 
-    def filtered_epoch_updates(self):
-        """
-        this method performs 2 updates and executes when *none* of the sampled batch contains the Beam substructures (they are all discarded):
-        1. Increments filter_patience
-        2. Appends 0 to filter_history
-        """
-        self.filter_patience += 1
-        self.filter_history.append(0)
-
-    def patience_limit_reached(self):
-        return self.filter_patience == self.filter_patience_limit
-
-    def write_out_pool(self, oracle_calls):
+    def write_out_pool(self, oracle_calls: int) -> None:
         write_pool = [Chem.MolToSmiles(mol) for mol in self.pool]
-        with open(f'substructures_{oracle_calls}.smi', 'w+') as f:
+        with open(f"substructures_{oracle_calls}.smi", "w+") as f:
             for s in write_pool:
                 f.write(f'{s}\n')
 
-    def write_out_entire_pool(self):
-        with open(f'entire_pool.json', 'w+') as f:
+    def write_out_entire_pool(self) -> None:
+        with open(f"entire_pool.json", "w") as f:
             json.dump(self.entire_pool, f, indent=2)
 
-    def write_out_filtering(self):
-        with open(f'filter_history.txt', 'w+') as f:
+    def write_out_filtering(self) -> None:
+        with open(f"filter_history.txt", "w") as f:
             for num in self.filter_history:
                 f.write(f'{num}\n')
