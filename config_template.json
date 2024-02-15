@@ -1,7 +1,5 @@
 {
   "logging": {
-    "logging_frequency": 1000,
-    "recipient": "local",
     "logging_path": "logging.log",
     "result_folder": "results"
   },
@@ -56,7 +54,6 @@
     ]
   },
   "goal_directed_generation": {
-    "seed": 3,
     "reinforcement_learning": {
       "prior": "/home/jeguo/Desktop/ReinventCommunity/notebooks/models/random.prior.new",
       "agent": "/home/jeguo/Desktop/ReinventCommunity/notebooks/models/random.prior.new",
@@ -100,8 +97,13 @@
   },
   "distribution_learning": {
     "parameters": {
-      "PLACEHOLDER": "TO FILL"
+      "training_steps": 20,
+      "batch_size": 2048,
+      "learning_rate": 0.0001,
+      "training_dataset": "ChEMBL.smi",
+      "validation_dataset": "ZINC.smi"
     }
   },
-  "running_mode": "goal_directed_generation"
+  "running_mode": "goal_directed_generation",
+  "seed": 3
 }

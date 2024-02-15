@@ -12,6 +12,11 @@ import argparse
 from oracles.oracle import Oracle
 from oracles.dataclass import OracleConfiguration
 
+# Distribution Learning
+from distribution_learning.distribution_learning import DistributionLearningTrainer
+from distribution_learning.dataclass import DistributionLearningConfiguration
+
+# Goal-Directed Generation
 from goal_directed_generation.reinforcement_learning import ReinforcementLearningAgent
 from goal_directed_generation.dataclass import ReinforcementLearningParameters, GoalDirectedGenerationConfiguration
 from experience_replay.dataclass import ExperienceReplayParameters
@@ -43,21 +48,25 @@ if __name__ == "__main__":
     config = read_json_file(args.config)
     running_mode = config["running_mode"].lower()
 
+    # (Optionally) set the seed
+    #device = "cuda" if torch.cuda.is_available() else "cpu"
+    seed = config["seed"]
+    #set_seed_everywhere(seed, device)
+
+    # TODO: logging should have results path that is *shared* for distribution learning and goal-directed generation
     if running_mode == "distribution_learning":
+        distribution_learning_trainer = DistributionLearningTrainer(
+            DistributionLearningConfiguration(**config["distribution_learning"])
+        )
+        distribution_learning_trainer.train()
         # TODO: execute distribution learning (either pre-training or fine-tuning)
         # TODO: lightning trainer, track NLL, track SMILES validity, and don't forget to apply randomization during training (or have the option to)
         pass
     elif running_mode == "goal_directed_generation":
-        # 1. (Optionally) set the seed
-        #device = "cuda" if torch.cuda.is_available() else "cpu"
-        seed = config["goal_directed_generation"]["seed"]
-        #set_seed_everywhere(seed, device)
-
-
-        # 2. Construct the Oracle
+        # 1. Construct the Oracle
         oracle = Oracle(OracleConfiguration(**config["oracle"]))
 
-        # 3. Construct the Reinforcement Learning Agent
+        # 2. Construct the Reinforcement Learning Agent
         reinforcement_learning_agent = ReinforcementLearningAgent(
             oracle=oracle,
             configuration=GoalDirectedGenerationConfiguration(
@@ -70,9 +79,10 @@ if __name__ == "__main__":
             )
         )
 
-        # 4. Run Goal-Directed Generation via Reinforcement Learning
+        # 3. Run Goal-Directed Generation via Reinforcement Learning
         reinforcement_learning_agent.run()
-        end_time = time.perf_counter()
-        print(f"Wall time: {end_time - start_time:.2f}s")
     else:
         raise ValueError(f"Running mode: {running_mode} is not implemented.")
+    
+    end_time = time.perf_counter()
+    print(f"Wall time: {end_time - start_time:.2f}s")

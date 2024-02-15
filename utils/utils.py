@@ -3,9 +3,7 @@ import random
 import numpy as np
 
 def set_seed_everywhere(seed: int, device: str):
-    """
-    Set the seed for reproducibility.
-    """
+    """Set the seed for reproducibility."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
