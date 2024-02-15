@@ -1,4 +1,7 @@
 class RewardTracker:
+    """
+    This class is used to track the mean reward to decide whether to execute Beam Enumeration or not, at a given generation epoch.
+    """
     def __init__(self,
                  patience: int):
         self.patience = patience
