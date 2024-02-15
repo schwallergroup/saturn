@@ -6,10 +6,10 @@ class RewardTracker:
         self.consecutive_improvements = 0
         self.beam_executions = 0
 
-    def is_beam_epoch(self, mean_reward: float):
+    def is_beam_epoch(self, mean_reward: float) -> bool:
         """
-        this method returns a boolean whether to execute Beam Enumeration or not.
-        The condition is if the reward increases for patience number of successive epochs to mitigate stochastic improvement.
+        This method returns a boolean whether to execute Beam Enumeration or not.
+        The condition is if the mean reward increases for patience number of successive epochs (to mitigate stochastic improvement).
         """
         # initialization
         if self.best_reward is None:
