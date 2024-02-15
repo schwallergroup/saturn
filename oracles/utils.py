@@ -27,6 +27,9 @@ from oracles.structural.smarts_alerts import SMARTSAlert
 # synthesizability
 from oracles.synthesizability.sa_score import SAScore
 
+# docking
+from oracles.docking.dockstream import DockStream
+
 # xTB electronic properties
 from oracles.xtb.chemical_potential import ChemicalPotential
 from oracles.xtb.dipole import Dipole
@@ -80,6 +83,9 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
     # synthesizability
     elif name == "sa_score":
         return SAScore(oracle_component_parameters)
+    # docking
+    elif name == "dockstream":
+        return DockStream(oracle_component_parameters)
     # xTB electronic properties
     elif name == "chemical_potential":
         return ChemicalPotential(oracle_component_parameters)
@@ -103,7 +109,6 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return NucleophilicityIndex(oracle_component_parameters)
     elif name == "nucleophilicity":
         return Nucleophilicity(oracle_component_parameters)
-    # TODO: docking
     # TODO: pharmacophore and shape match --> ShapeLinker
     # TODO: MD --> GROMACS
     else:
