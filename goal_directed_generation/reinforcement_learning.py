@@ -51,12 +51,10 @@ class ReinforcementLearningAgent:
         self.selective_memory_purge = configuration.reinforcement_learning.selective_memory_purge
 
         # Replay Buffer
-        self.replay_buffer = ReplayBuffer(
-            parameters=configuration.experience_replay,
-            oracle=self.oracle             
-        )
+        self.replay_buffer = ReplayBuffer(parameters=configuration.experience_replay)
+        
         # Seed the Replay Buffer (if applicable)
-        self.oracle = self.replay_buffer.seed_buffer(self.oracle)
+        self.oracle = self.replay_buffer.prepopulate_buffer(self.oracle)
 
         # Diversity Filter
         self.diversity_filter = DiversityFilter(configuration.diversity_filter)

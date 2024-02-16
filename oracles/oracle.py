@@ -120,7 +120,7 @@ class Oracle:
         
     def construct_oracle(self, oracle_components: List[OracleComponentParameters]) -> List[OracleComponent]:
         """
-        Construct the oracle function.
+        Construct the oracle function which can be composed of multiple inidividual oracle components.
         """
         oracle = []
         for component in oracle_components:
@@ -162,9 +162,12 @@ class Oracle:
         # canonicalize the SMILES before adding to Cache
         canonical_smiles = canonicalize_smiles_batch(smiles)
         for s, r in zip(canonical_smiles, rewards):
+            # if the same SMILES is sampled, the reward is overwritten for two reasons:
+            #   1. Potential stocasticity in the oracle feedback
+            #   2. Penalized rewards (by the Diversity Filter) should be reflected so the Agent is steered away from these scaffolds
             self.cache[s] = r
     
-    def execute_preliminary_check(self, smiles: np.ndarray[str], mols: np.ndarray[Mol]) -> np.ndarray[Mol]:
+    def execute_preliminary_check(self, smiles: np.ndarray[str], mols: np.ndarray[Mol]) -> Tuple[np.ndarray[str], np.ndarray[Mol]]:
         """
         Executes a preliminary check (if applicable). Each oracle component has a preliminary_check flag that can be set to True.
         Components set to True will be executed first to check that the molecule satisfies that component based on a reward threshold.

@@ -28,9 +28,7 @@ class ReplayBuffer:
     """
     def __init__(
         self, 
-        parameters: ExperienceReplayParameters, 
-        # TODO: keep this for incepting purposes?
-        oracle: Oracle
+        parameters: ExperienceReplayParameters
         ):
         self.parameters = parameters
         self.memory_size = parameters.memory_size
@@ -44,7 +42,6 @@ class ReplayBuffer:
                 "agent_likelihood"
                 ]
             )
-        self.seed_buffer(parameters.smiles, oracle)
 
     def add(
         self,
@@ -130,8 +127,7 @@ class ReplayBuffer:
             # if no scaffolds are penalized, do nothing
             return
         
-    @staticmethod
-    def seed_replay_buffer(smiles: List[str], oracle: Oracle) -> Oracle:
+    def prepopulate_buffer(self, oracle: Oracle) -> Oracle:
         """
         Seeds the replay buffer with a set of SMILES.
         Useful if there are known high-reward molecules to pre-populate the Replay Buffer with.
@@ -144,8 +140,9 @@ class ReplayBuffer:
               solutions. Therefore, while seeding will quick-start the Agent's learning, there
               are implications on the diversity of the solutions found.
         """
-        if len(smiles) > 0:
-            mols = [Chem.MolFromSmiles(s) for s in smiles]
+        if len(self.parameters.smiles) > 0:
+            canonical_smiles = chemistry_utils.canonicalize_smiles_batch(self.parameters.smiles)
+            mols = [Chem.MolFromSmiles(s) for s in canonical_smiles]
             mols = [mol for mol in mols if mol is not None]
 
             oracle_components_df = pd.DataFrame()
@@ -159,11 +156,12 @@ class ReplayBuffer:
             aggregated_rewards = oracle.aggregator(rewards, oracle.oracle_weights)
 
             oracle.update_oracle_history(
-                smiles=smiles,
+                smiles=self.parameters.smiles,
                 rewards=aggregated_rewards,
                 penalized_rewards=aggregated_rewards,
                 oracle_components_df=oracle_components_df
             )
-            oracle.update_oracle_cache(smiles, rewards)
+            # update the Oracle Cache with the canonical SMILES
+            oracle.update_oracle_cache(canonical_smiles, rewards)
 
         return oracle
