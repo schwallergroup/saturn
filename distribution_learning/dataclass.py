@@ -8,3 +8,4 @@ class DistributionLearningConfiguration:
     learning_rate: float
     training_dataset: str
     validation_dataset: str
+    train_with_randomization: bool = True
