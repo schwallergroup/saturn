@@ -48,6 +48,7 @@ if __name__ == "__main__":
     config = read_json_file(args.config)
     running_mode = config["running_mode"].lower()
 
+    # FIXME: train with seed too
     # (Optionally) set the seed
     #device = "cuda" if torch.cuda.is_available() else "cpu"
     seed = config["seed"]
