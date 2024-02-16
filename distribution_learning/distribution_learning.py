@@ -28,6 +28,7 @@ class DistributionLearningTrainer:
         self.batch_size = configuration.batch_size
         self.training_dataset = configuration.training_dataset
         self.validation_dataset = configuration.validation_dataset
+        self.train_with_randomization = configuration.train_with_randomization
 
         # only the Agent is updated
         self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)
@@ -35,6 +36,9 @@ class DistributionLearningTrainer:
     def train(self):
         for epoch in self.training_steps:
             # TODO: train
+            if self.train_with_randomization:
+                # TODO: randomize training batch
+                pass
             pass
 
 
