@@ -118,7 +118,6 @@ class Oracle:
                            
         return np.concatenate([repeat_smiles, new_smiles]), np.concatenate([cached_rewards, penalized_rewards])
         
-        
     def construct_oracle(self, oracle_components: List[OracleComponentParameters]) -> List[OracleComponent]:
         """
         Construct the oracle function.
