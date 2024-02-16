@@ -16,12 +16,15 @@ class DistributionLearningTrainer:
     """
     Distribution Learning by Maximum Likelihood Estimation (MLE) and using Teacher Forcing.
     Training objective is to maximize the likelihood of reproducing the SMILES dataset.
+
+    Used to pre-train the Prior or for fine-tuning (transfer learning) the Agent.
     """
     def __init__(
         self, 
         configuration: DistributionLearningConfiguration
     ):
         # TODO: "create" empty model with vocabulary
+        # TODO: this "empty" model parameter should also allow for an already pre-trained Agent to be loaded so transfer learning can be applied
         self.seed = configuration.seed
         self.learning_rate = configuration.learning_rate
         self.training_steps = configuration.training_steps

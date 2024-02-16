@@ -6,11 +6,14 @@ import torch
 import numpy as np
 import pandas as pd
 from copy import deepcopy
+from rdkit import Chem
 from utils import chemistry_utils
 from utils.utils import to_tensor
 
 from experience_replay.dataclass import ExperienceReplayParameters
 
+# Oracle is called if seeding molecules into the Replay Buffer at the start of the generative experiment
+from oracles.oracle import Oracle
 
 
 class ReplayBuffer:
@@ -27,7 +30,7 @@ class ReplayBuffer:
         self, 
         parameters: ExperienceReplayParameters, 
         # TODO: keep this for incepting purposes?
-        scoring_function=None
+        oracle: Oracle
         ):
         self.parameters = parameters
         self.memory_size = parameters.memory_size
@@ -41,12 +44,10 @@ class ReplayBuffer:
                 "agent_likelihood"
                 ]
             )
-        
-        # TODO: allow incepting
-        # self.smiles = parameters.smiles
+        self.seed_buffer(parameters.smiles, oracle)
 
     def add(
-        self, 
+        self,
         smiles: np.array, 
         rewards: np.array, 
         prior_likelihoods: np.array, 
@@ -128,3 +129,41 @@ class ReplayBuffer:
         else:
             # if no scaffolds are penalized, do nothing
             return
+        
+    @staticmethod
+    def seed_replay_buffer(smiles: List[str], oracle: Oracle) -> Oracle:
+        """
+        Seeds the replay buffer with a set of SMILES.
+        Useful if there are known high-reward molecules to pre-populate the Replay Buffer with.
+
+        Oracle is returned here because seeding updates the Oracle's history with the seeded SMILES.
+
+        NOTE: With more SMILES to seed with, the generative experiment will become more like
+              transfer learning rather than reinforcement learning (at the start). Continuing
+              the run will more and more leverage reinforcement learning to find other diverse
+              solutions. Therefore, while seeding will quick-start the Agent's learning, there
+              are implications on the diversity of the solutions found.
+        """
+        if len(smiles) > 0:
+            mols = [Chem.MolFromSmiles(s) for s in smiles]
+            mols = [mol for mol in mols if mol is not None]
+
+            oracle_components_df = pd.DataFrame()
+            rewards = np.empty((len(oracle), len(mols)))
+            for idx, oracle in enumerate(oracle):
+                raw_property_values, component_rewards = oracle.calculate_reward(mols, oracle_calls=0)
+                oracle_components_df[f"{oracle.name}_raw_values"] = raw_property_values
+                oracle_components_df[f"{oracle.name}_reward"] = component_rewards
+                rewards[idx] = component_rewards
+
+            aggregated_rewards = oracle.aggregator(rewards, oracle.oracle_weights)
+
+            oracle.update_oracle_history(
+                smiles=smiles,
+                rewards=aggregated_rewards,
+                penalized_rewards=aggregated_rewards,
+                oracle_components_df=oracle_components_df
+            )
+            oracle.update_oracle_cache(smiles, rewards)
+
+        return oracle

@@ -10,6 +10,9 @@ from oracles.dataclass import OracleComponentParameters
 from oracles.reward_shaping.reward_shaping_function import RewardShapingFunction
 from oracles.reward_shaping.function_parameters import RewardShapingFunctionParameters
 
+# physics-based oracle (e.g., docking) output extra information (e.g., docking poses)
+# flag these so that the number of oracle calls can be used for prefixing the output files
+PHYSICS_ORACLES = ["dockstream", "rocs", "shapelinker", "gromacs", "orca"]
 
 class OracleComponent(ABC):
     """
@@ -33,13 +36,15 @@ class OracleComponent(ABC):
         """
         raise NotImplementedError("__call__ method is not implemented")
 
-    def calculate_reward(self, mols: np.ndarray[Mol]) -> Tuple[np.ndarray[float], np.ndarray[float]]:
+    def calculate_reward(self, mols: np.ndarray[Mol], oracle_calls: int) -> Tuple[np.ndarray[float], np.ndarray[float]]:
         """
         All OracleComponents execute __call__ and then apply the reward shaping function to get normalized rewards [0, 1]. 
         Errors are assigned a reward of 0.0.
+
+        Oracle calls is only used for the physics-based oracles which use it as a prefix for the output files.
         """
         # calculate the raw property values
-        raw_property_values = self(mols)
+        raw_property_values = self(mols, oracle_calls) if self.name in PHYSICS_ORACLES else self(mols) 
         # apply reward shaping
         # FIXME: in case raw_property_values of 0.0 are good, then there will be a problem when reward shaping
         rewards = self.reward_shaping_function(raw_property_values)

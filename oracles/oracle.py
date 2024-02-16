@@ -91,7 +91,7 @@ class Oracle:
         oracle_components_df = pd.DataFrame()
         rewards = np.empty((len(self.oracle), len(new_mols)))
         for idx, oracle in enumerate(self.oracle):
-            raw_property_values, component_rewards = oracle.calculate_reward(new_mols)
+            raw_property_values, component_rewards = oracle.calculate_reward(new_mols, self.calls)
             oracle_components_df[f"{oracle.name}_raw_values"] = raw_property_values
             oracle_components_df[f"{oracle.name}_reward"] = component_rewards
             rewards[idx] = component_rewards
@@ -197,6 +197,8 @@ class Oracle:
         This method performs the following on every generation epoch:
         1. Increments the number of oracle calls so far
         2. Updates the Oracle History that tracks the generative sampling as a function of oracle calls
+
+        # NOTE: the Oracle History tracks every single SMILES generated, not just the unique set
         """
         self.calls += len(smiles)
         # track generated SMILES + reward as a function of oracle calls
@@ -211,19 +213,13 @@ class Oracle:
         self.oracle_history = pd.concat([self.oracle_history, df])
 
     def budget_exceeded(self) -> bool:
-        """
-        Check if the oracle budget has been exceeded.
-        """
+        """Check if the oracle budget has been exceeded."""
         return self.calls >= self.budget
 
     def write_out_oracle_history(self):
-        """
-        Write out the oracle history as a CSV.
-        """
+        """Write out the oracle history as a CSV."""
         self.oracle_history.to_csv("oracle_history.csv")
 
     def write_out_repeat_history(self):
-        """
-        Write out the repeated SMILES history as a CSV.
-        """
+        """Write out the repeated SMILES history as a CSV."""
         pd.DataFrame(self.num_repeated_smiles).to_csv("repeated_smiles_history.csv")
