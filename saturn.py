@@ -57,7 +57,9 @@ if __name__ == "__main__":
     # TODO: logging should have results path that is *shared* for distribution learning and goal-directed generation
     if running_mode == "distribution_learning":
         distribution_learning_trainer = DistributionLearningTrainer(
-            DistributionLearningConfiguration(**config["distribution_learning"])
+            DistributionLearningConfiguration(
+                seed,
+                **config["distribution_learning"]["parameters"])
         )
         distribution_learning_trainer.train()
         # TODO: execute distribution learning (either pre-training or fine-tuning)

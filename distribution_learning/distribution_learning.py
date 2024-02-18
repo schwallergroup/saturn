@@ -10,6 +10,7 @@ from utils.utils import to_tensor
 
 from distribution_learning.dataclass import DistributionLearningConfiguration
 from models.model import Model
+from distribution_learning.dataset.smiles_dataset import SMILESDataset
 
 
 class DistributionLearningTrainer:
@@ -29,9 +30,14 @@ class DistributionLearningTrainer:
         self.learning_rate = configuration.learning_rate
         self.training_steps = configuration.training_steps
         self.batch_size = configuration.batch_size
-        self.training_dataset = configuration.training_dataset
-        self.validation_dataset = configuration.validation_dataset
         self.train_with_randomization = configuration.train_with_randomization
+
+        self.dataset = SMILESDataset(
+            training_dataset_path=configuration.training_dataset_path,
+            validation_dataset_path=configuration.validation_dataset_path,
+            vocabulary=123,
+            tokenizer=123
+        )
 
         # only the Agent is updated
         self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)

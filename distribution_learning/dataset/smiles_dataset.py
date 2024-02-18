@@ -11,7 +11,7 @@ class SMILESDataset(Dataset):
     """
     Dataset class for SMILES strings.
     In principle, any string-based representation of molecules can be 
-    used, as long the tokenizer and vocabulary are adapted accordingly.
+    used, as long as the Tokenizer and Vocabulary are adapted accordingly.
     """
     def __init__(
         self, 
