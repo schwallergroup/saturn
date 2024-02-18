@@ -37,55 +37,48 @@ class ReplayBuffer:
         self.memory = pd.DataFrame(
             columns=[
                 "smiles", 
-                "reward", 
-                "prior_likelihood",
-                "agent_likelihood"
+                "reward"
                 ]
             )
 
     def add(
         self,
         smiles: np.array, 
-        rewards: np.array, 
-        prior_likelihoods: np.array, 
-        agent_likelihoods: np.array
+        rewards: np.array
         ) -> None:
         # NOTE: likelihood should be already negative
         df = pd.DataFrame({
             "smiles": smiles, 
-            "reward": rewards, 
-            "prior_likelihood": prior_likelihoods.detach().cpu().numpy(),
-            "agent_likelihood": agent_likelihoods.detach().cpu().numpy()}
-            )
+            "reward": rewards
+            }
+        )
         self.memory = pd.concat([self.memory, df])
         # keep only the top N (by reward)
         self.purge_memory()
 
-    def sample_memory(self) -> Tuple[np.ndarray[str], np.ndarray[float], torch.Tensor]:
+    def sample_memory(self) -> Tuple[np.ndarray[str], np.ndarray[float]]:
         sample_size = min(len(self.memory), self.sample_size)
         if sample_size > 0:
             sampled = self.memory.sample(sample_size)
             smiles = sampled["smiles"].values
             rewards = sampled["reward"].values
-            prior_likelihoods = sampled["prior_likelihood"].values
-            return np.array(smiles), np.array(rewards), to_tensor(np.array(prior_likelihoods))
+            return np.array(smiles), np.array(rewards)
         else:
-            return [], [], torch.tensor([])
+            return [], []
 
-    def augmented_memory_replay(self, prior) -> Tuple[List[str], np.array, np.array]:
+    def augmented_memory_replay(self, prior) -> Tuple[List[str], np.array]:
         """
         Augmented Memory's key operation for sample efficiency:
-        Randomizes all SMILES in the memory and returns the randomized SMILES, reward, and prior likelihood.
+        Randomizes all SMILES in the memory and returns the randomized SMILES and their corresponding rewards.
         """
         if len(self.memory) != 0:
             smiles = self.memory["smiles"].values
             # randomize the smiles
             randomized_smiles = chemistry_utils.randomize_smiles_batch(smiles, prior)
             rewards = self.memory["reward"].values
-            prior_likelihoods = -prior.likelihood_smiles(randomized_smiles).cpu()
-            return randomized_smiles, rewards, to_tensor(np.array(prior_likelihoods))
+            return randomized_smiles, rewards
         else:
-            return [], [], torch.tensor([])
+            return [], []
         
     def purge_memory(self):
         """

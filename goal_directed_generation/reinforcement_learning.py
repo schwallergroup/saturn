@@ -142,23 +142,20 @@ class ReinforcementLearningAgent:
 
             # 10. Compute the loss
             #     smiles contains the concatenated sampled and hallucinated SMILES
-            loss, prior_likelihoods, agent_likelihoods = self.compute_loss(smiles, penalized_rewards)
+            loss = self.compute_loss(smiles, penalized_rewards)
 
             # 11. Update Replay Buffer
-            #     Likelihoods should be negative here
             self.replay_buffer.add(
                 smiles=smiles, 
-                rewards=penalized_rewards, 
-                prior_likelihoods=prior_likelihoods,
-                agent_likelihoods=agent_likelihoods
+                rewards=penalized_rewards
             )
 
             # 12. Add experience replay to the loss
             #     NOTE: this is done *after* updating the Replay Buffer so new best-so-far sampled *and* hallucinated SMILES can be sampled
-            er_smiles, er_rewards, _ = self.replay_buffer.sample_memory()
+            er_smiles, er_rewards = self.replay_buffer.sample_memory()
 
             # 13. Compute the loss for the experience replay SMILES
-            er_loss, _, _ = self.compute_loss(er_smiles, er_rewards)
+            er_loss = self.compute_loss(er_smiles, er_rewards)
             
             # 14. Concatenate losses to get the total loss and backpropagate
             loss = torch.cat((loss, er_loss), 0)
@@ -174,10 +171,10 @@ class ReinforcementLearningAgent:
                     # Get randomized SMILES for both the sampled and hallucinated SMILES
                     randomized_smiles = chemistry_utils.randomize_smiles_batch(smiles, self.prior)
                     # Compute the loss
-                    loss, _, _ = self.compute_loss(randomized_smiles, penalized_rewards)
+                    loss = self.compute_loss(randomized_smiles, penalized_rewards)
                     # Augmented Memory: Key operation for sample efficiency
-                    randomized_buffer_smiles, randomized_buffer_rewards, _ = self.replay_buffer.augmented_memory_replay(self.prior)
-                    augmented_memory_loss, _, _ = self.compute_loss(randomized_buffer_smiles, randomized_buffer_rewards)
+                    randomized_buffer_smiles, randomized_buffer_rewards = self.replay_buffer.augmented_memory_replay(self.prior)
+                    augmented_memory_loss = self.compute_loss(randomized_buffer_smiles, randomized_buffer_rewards)
                     loss = torch.cat((loss, augmented_memory_loss), 0)
                     self.backpropagate(loss)
 
@@ -188,7 +185,7 @@ class ReinforcementLearningAgent:
         self, 
         smiles: np.ndarray[str],
         rewards: np.ndarray[float]
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> torch.Tensor:
         """
         Compute the loss for the RL agent.
         Based on REINVENT's original loss function: https://jcheminf.biomedcentral.com/articles/10.1186/s13321-017-0235-x
@@ -198,9 +195,9 @@ class ReinforcementLearningAgent:
             agent_likelihoods = -self.agent.likelihood_smiles(smiles)
             augmented_likelihoods = prior_likelihoods + self.sigma * to_tensor(rewards)
             loss = torch.pow((augmented_likelihoods - agent_likelihoods), 2)
-            return loss, prior_likelihoods, agent_likelihoods
+            return loss
         else:
-            return torch.tensor([]), torch.tensor([]), torch.tensor([])
+            return torch.tensor([])
 
     def backpropagate(self, loss: torch.Tensor) -> None:
         """Agent update via backpropagation."""
