@@ -9,16 +9,17 @@ import utils.chemistry_utils as chemistry_utils
 from utils.utils import to_tensor
 
 from distribution_learning.dataclass import DistributionLearningConfiguration
-from models.model import Model
 from distribution_learning.dataset.smiles_dataset import SMILESDataset
 
 
 class DistributionLearningTrainer:
     """
     Distribution Learning by Maximum Likelihood Estimation (MLE) and using Teacher Forcing.
-    Training objective is to maximize the likelihood of reproducing the SMILES dataset.
+    Training objective is to maximize the likelihood of reproducing the dataset.
 
-    Used to pre-train the Prior or for fine-tuning (transfer learning) the Agent.
+    Used to either:
+        1. Pre-train a Prior 
+        2. Fine-tune (same as transfer learning) an Agent
     """
     def __init__(
         self, 
@@ -33,10 +34,10 @@ class DistributionLearningTrainer:
         self.train_with_randomization = configuration.train_with_randomization
 
         self.dataset = SMILESDataset(
+            agent = configuration.agent,
             training_dataset_path=configuration.training_dataset_path,
             validation_dataset_path=configuration.validation_dataset_path,
-            vocabulary=123,
-            tokenizer=123
+            transfer_learning=configuration.transfer_learning
         )
 
         # only the Agent is updated

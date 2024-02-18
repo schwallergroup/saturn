@@ -4,7 +4,8 @@ Adapted from https://github.com/MolecularAI/reinvent-models/blob/main/reinvent_m
 import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
-from models.vocabulary import Vocabulary, SMILESTokenizer
+from models.model import Model
+from models.vocabulary import Vocabulary, SMILESTokenizer, create_vocabulary
 
 
 class SMILESDataset(Dataset):
@@ -15,21 +16,24 @@ class SMILESDataset(Dataset):
     """
     def __init__(
         self, 
+        agent: str,
         training_dataset_path: str, 
         validation_dataset_path: str,
-        vocabulary: Vocabulary,
-        tokenizer: SMILESTokenizer
+        transfer_learning: bool = False,
     ):
         self.training_dataset = self.read_data_file(training_dataset_path)  # np.ndarray[str]
         self.validation_dataset = self.read_data_file(validation_dataset_path)  # np.ndarray[str]
-        self.vocabulary = vocabulary
-        self.tokenizer = tokenizer
+
+        # initialize the Vocabulary and Tokenizer based on whether pre-training or fine-tuning is to be performed
+        self.agent = agent
+        self.transfer_learning = transfer_learning
+        self.setup_vocabulary_and_tokenizer()
 
     def __getitem__(self, idx: int) -> torch.Tensor:
         smiles = self.training_dataset[idx]
         tokens = self.tokenizer.tokenize(smiles)
         encoded = self.vocabulary.encode(tokens)
-        return torch.tensor(encoded, dtype=torch.long)  # pylint: disable=E1102
+        return torch.tensor(encoded, dtype=torch.long)
 
     def __len__(self) -> int:
         return len(self.training_dataset)
@@ -39,15 +43,28 @@ class SMILESDataset(Dataset):
         with open(path, "r") as file:
             return np.array(file.read().splitlines())
         
+    def setup_vocabulary_and_tokenizer(self):
+        """
+        Initializes the Vocabulary and Tokenizer based on whether pre-training or fine-tuning is to be performed.
+        """
+        if self.transfer_learning:
+            # load model
+            self.agent = Model.load_from_file(self.agent)
+            self.vocabulary = self.agent.vocabulary
+            self.tokenizer = self.agent.tokenizer
+        else:
+            # construct the Vocabulary and Tokenizer from the training data
+            self.vocabulary = create_vocabulary(self.training_dataset)
+            self.tokenizer = SMILESTokenizer()
+        
     @staticmethod
-    def collate_fn(encoded_seqs):
-        """Converts a list of encoded sequences into a padded tensor"""
+    def collate_fn(encoded_seqs: torch.Tensor) -> torch.Tensor:
+        """Converts a list of encoded sequences into a padded tensor."""
         max_length = max([seq.size(0) for seq in encoded_seqs])
         collated_arr = torch.zeros(len(encoded_seqs), max_length, dtype=torch.long)  # padded with zeroes
-        for i, seq in enumerate(encoded_seqs):
-            collated_arr[i, :seq.size(0)] = seq
+        for idx, seq in enumerate(encoded_seqs):
+            collated_arr[idx, :seq.size(0)] = seq
         return collated_arr
-
 
 def calculate_nlls_from_model(model, smiles, batch_size=128):
     """
