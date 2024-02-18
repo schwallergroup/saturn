@@ -24,10 +24,14 @@ class SMILESDataset(Dataset):
         self.training_dataset = self.read_data_file(training_dataset_path)  # np.ndarray[str]
         self.validation_dataset = self.read_data_file(validation_dataset_path)  # np.ndarray[str]
 
-        # initialize the Vocabulary and Tokenizer based on whether pre-training or fine-tuning is to be performed
+        # initialize the Tokenizer and Vocabulary based on whether pre-training or fine-tuning is to be performed
         self.agent = agent
         self.transfer_learning = transfer_learning
         self.setup_vocabulary_and_tokenizer()
+
+        print(self.vocabulary)
+        print(self.tokenizer)
+        exit()
 
     def __getitem__(self, idx: int) -> torch.Tensor:
         smiles = self.training_dataset[idx]
@@ -45,17 +49,20 @@ class SMILESDataset(Dataset):
         
     def setup_vocabulary_and_tokenizer(self):
         """
-        Initializes the Vocabulary and Tokenizer based on whether pre-training or fine-tuning is to be performed.
+        Initializes the Tokenizer and Vocabulary based on whether pre-training or fine-tuning is to be performed.
         """
         if self.transfer_learning:
             # load model
             self.agent = Model.load_from_file(self.agent)
-            self.vocabulary = self.agent.vocabulary
             self.tokenizer = self.agent.tokenizer
+            self.vocabulary = self.agent.vocabulary
         else:
             # construct the Vocabulary and Tokenizer from the training data
-            self.vocabulary = create_vocabulary(self.training_dataset)
             self.tokenizer = SMILESTokenizer()
+            self.vocabulary = create_vocabulary(
+                smiles=self.training_dataset,
+                tokenizer=self.tokenizer
+            )
         
     @staticmethod
     def collate_fn(encoded_seqs: torch.Tensor) -> torch.Tensor:

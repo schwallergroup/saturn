@@ -120,10 +120,10 @@ class SMILESTokenizer:
         return smi
 
 
-def create_vocabulary(smiles_list: List[str], tokenizer):
+def create_vocabulary(smiles: np.ndarray[str], tokenizer):
     """Creates a Vocabulary given a dataset of SMILES."""
     tokens = set()
-    for smi in smiles_list:
+    for smi in smiles:
         tokens.update(tokenizer.tokenize(smi, with_begin_and_end=False))
 
     vocabulary = Vocabulary()
