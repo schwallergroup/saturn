@@ -57,7 +57,7 @@ class SMILESDataset(Dataset):
             self.tokenizer = self.agent.tokenizer
             self.vocabulary = self.agent.vocabulary
         else:
-            # construct the Vocabulary and Tokenizer from the training data
+            # construct the Tokenizer and Vocabulary from the training data
             self.tokenizer = SMILESTokenizer()
             self.vocabulary = create_vocabulary(
                 smiles=self.training_dataset,
