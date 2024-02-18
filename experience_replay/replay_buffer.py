@@ -148,6 +148,12 @@ class ReplayBuffer:
 
             aggregated_rewards = oracle.aggregator(rewards, oracle.oracle_weights)
 
+            # add the SMILES to the Replay Buffer
+            self.add(
+                smiles=self.parameters.smiles,  # add the original SMILES
+                rewards=aggregated_rewards
+            )
+
             oracle.update_oracle_history(
                 smiles=self.parameters.smiles,
                 rewards=aggregated_rewards,
