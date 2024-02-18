@@ -43,8 +43,8 @@ class ReplayBuffer:
 
     def add(
         self,
-        smiles: np.array, 
-        rewards: np.array
+        smiles: np.ndarray[str], 
+        rewards: np.ndarray[float]
         ) -> None:
         # NOTE: likelihood should be already negative
         df = pd.DataFrame({
@@ -93,8 +93,8 @@ class ReplayBuffer:
 
     def selective_memory_purge(
             self, 
-            smiles: np.array, 
-            reward: np.array
+            smiles: np.ndarray[str], 
+            rewards: np.ndarray[float]
         ) -> None:
         """
         Augmented Memory's key operation to prevent mode collapse and promote diversity:
@@ -107,7 +107,7 @@ class ReplayBuffer:
         #       added to the memory in the first place. Selective Memory Purge *only* removes scaffolds that are 
         #       penalized by the Diversity Filter.
         """
-        zero_reward_indices = np.where(reward == 0.)[0]
+        zero_reward_indices = np.where(rewards == 0.)[0]
         if len(zero_reward_indices) > 0:
             smiles_to_purge = smiles[zero_reward_indices]
             scaffolds_to_purge = [chemistry_utils.get_bemis_murcko_scaffold(smiles) for smiles in smiles_to_purge]
