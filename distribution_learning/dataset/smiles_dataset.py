@@ -5,7 +5,9 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from models.model import Model
-from models.vocabulary import Vocabulary, SMILESTokenizer, create_vocabulary
+from models.vocabulary import SMILESTokenizer, create_vocabularyl
+
+from utils.chemistry_utils import randomize_smiles
 
 
 class SMILESDataset(Dataset):
@@ -17,12 +19,14 @@ class SMILESDataset(Dataset):
     def __init__(
         self, 
         agent: str,
-        training_dataset_path: str, 
-        validation_dataset_path: str,
+        dataset_path: str, 
+        batch_size: int = 256,
         transfer_learning: bool = False,
+        randomize: bool = True
     ):
-        self.training_dataset = self.read_data_file(training_dataset_path)  # np.ndarray[str]
-        self.validation_dataset = self.read_data_file(validation_dataset_path)  # np.ndarray[str]
+        self.dataset = self.read_data_file(dataset_path)  # np.ndarray[str]
+        self.batch_size = batch_size
+        self.randomize = randomize
 
         # initialize the Tokenizer and Vocabulary based on whether pre-training or fine-tuning is to be performed
         self.agent = agent
@@ -30,13 +34,16 @@ class SMILESDataset(Dataset):
         self.setup_vocabulary_and_tokenizer()
 
     def __getitem__(self, idx: int) -> torch.Tensor:
-        smiles = self.training_dataset[idx]
+        smiles = self.dataset[idx]
+        # randomize SMILES string if specified 
+        # can enhance chemical space coverage of the model: https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0393-0
+        smiles = randomize_smiles(smiles) if self.randomize else smiles
         tokens = self.tokenizer.tokenize(smiles)
         encoded = self.vocabulary.encode(tokens)
         return torch.tensor(encoded, dtype=torch.long)
 
     def __len__(self) -> int:
-        return len(self.training_dataset)
+        return len(self.dataset)
     
     def read_data_file(self, path: str) -> np.ndarray[str]:
         """Reads a file with SMILES strings and returns a np.array of the SMILES."""
