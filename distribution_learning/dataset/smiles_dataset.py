@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from models.model import Model
-from models.vocabulary import SMILESTokenizer, create_vocabularyl
+from models.vocabulary import SMILESTokenizer, create_vocabulary
 
 from utils.chemistry_utils import randomize_smiles
 
@@ -63,7 +63,7 @@ class SMILESDataset(Dataset):
             # construct the Tokenizer and Vocabulary from the training data
             self.tokenizer = SMILESTokenizer()
             self.vocabulary = create_vocabulary(
-                smiles=self.training_dataset,
+                smiles=self.dataset,
                 tokenizer=self.tokenizer
             )
         

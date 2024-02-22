@@ -49,14 +49,23 @@ class DistributionLearningTrainer:
         )
 
         self.agent = Model.load_from_file(configuration.agent)
+
+        # reset all agent weights
+        from models.rnn import RNN
+        self.agent.network = RNN(vocabulary_size=len(self.train_dataset.vocabulary))
+        self.agent.network.embedding = self.agent.network.embedding.to("cuda")
+        self.agent.network.rnn = self.agent.network.rnn.to("cuda")
+        self.agent.network.linear = self.agent.network.linear.to("cuda")
+
         self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)
   
     def run(self):
-        for epoch in self.training_steps:
+        for epoch in range(1, self.training_steps + 1, 1):
             # NOTE: Each epoch loops through the entire dataset
             train_dataloader, val_dataloader = self.setup_dataloaders()
             for _, batch in tqdm(enumerate(train_dataloader)):
                 # 1. Compute the Negative Log-Likelihood (NLL) from Teacher Forcing
+                batch = batch.to("cuda")
                 loss = self.agent.likelihood(batch)
                 # 2. Backpropagate
                 self.backpropagate(loss)

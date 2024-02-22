@@ -61,7 +61,7 @@ if __name__ == "__main__":
                 seed,
                 **config["distribution_learning"]["parameters"])
         )
-        distribution_learning_trainer.train()
+        distribution_learning_trainer.run()
         # TODO: execute distribution learning (either pre-training or fine-tuning)
         # TODO: lightning trainer, track NLL, track SMILES validity, and don't forget to apply randomization during training (or have the option to)
         pass

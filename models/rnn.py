@@ -73,7 +73,7 @@ class RNN(nn.Module):
         batch_size, seq_size = input_vector.size()
         if hidden_state is None:
             size = (self.num_layers, batch_size, self.hidden_dim)
-            hidden_state = [torch.zeros(*size), torch.zeros(*size)]
+            hidden_state = [torch.zeros(*size, device="cuda"), torch.zeros(*size, device="cuda")]
         
         # get embeddings
         embedded_data = self.embedding(input_vector)  # (batch, sequence_length, embedding_dim)
