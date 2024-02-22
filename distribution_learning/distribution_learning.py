@@ -25,8 +25,6 @@ class DistributionLearningTrainer:
         self, 
         configuration: DistributionLearningConfiguration
     ):
-        # TODO: "create" empty model with vocabulary
-        # TODO: this "empty" model parameter should also allow for an already pre-trained Agent to be loaded so transfer learning can be applied
         self.seed = configuration.seed
         self.learning_rate = configuration.learning_rate
         self.training_steps = configuration.training_steps
@@ -46,6 +44,7 @@ class DistributionLearningTrainer:
     def train(self):
         for epoch in self.training_steps:
             # TODO: train
+            # get batch
             if self.train_with_randomization:
                 # TODO: randomize training batch
                 pass

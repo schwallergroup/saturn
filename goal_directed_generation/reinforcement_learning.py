@@ -4,7 +4,6 @@ Adapted from https://github.com/MolecularAI/Reinvent with code additions for:
     2. Hallucinated Memory
     3. Beam Enumeration: https://arxiv.org/abs/2309.13957
 """
-from typing import Tuple
 import torch
 import numpy as np
 
@@ -89,7 +88,8 @@ class ReinforcementLearningAgent:
     def run(self):
         # FIXME: could be dangerous in case of infinite loop
         while not self.oracle.budget_exceeded():
-            # TODO: periodically print progress
+            # TODO: periodically print progress --> 
+            # FIXME: use logger
             print(self.oracle.calls)
 
             # 1. Sample unique SMILES from the Agent

@@ -29,10 +29,6 @@ class SMILESDataset(Dataset):
         self.transfer_learning = transfer_learning
         self.setup_vocabulary_and_tokenizer()
 
-        print(self.vocabulary)
-        print(self.tokenizer)
-        exit()
-
     def __getitem__(self, idx: int) -> torch.Tensor:
         smiles = self.training_dataset[idx]
         tokens = self.tokenizer.tokenize(smiles)
