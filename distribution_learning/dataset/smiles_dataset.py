@@ -2,7 +2,7 @@
 Adapted from https://github.com/MolecularAI/reinvent-models/blob/main/reinvent_models/reinvent_core/models/dataset.py.
 """
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 import numpy as np
 from models.model import Model
 from models.vocabulary import SMILESTokenizer, create_vocabulary
@@ -75,20 +75,3 @@ class SMILESDataset(Dataset):
         for idx, seq in enumerate(encoded_seqs):
             collated_arr[idx, :seq.size(0)] = seq
         return collated_arr
-
-def calculate_nlls_from_model(model, smiles, batch_size=128):
-    """
-    Calculates NLL for a set of SMILES strings.
-    :param model: Model object.
-    :param smiles: List or iterator with all SMILES strings.
-    :return : It returns an iterator with every batch.
-    """
-    dataset = Dataset(smiles, model.vocabulary, model.tokenizer)
-    _dataloader = DataLoader(dataset, batch_size=batch_size, collate_fn=Dataset.collate_fn)
-
-    def _iterator(dataloader):
-        for batch in dataloader:
-            nlls = model.likelihood(batch.long())
-            yield nlls.data.cpu().numpy()
-
-    return _iterator(_dataloader), len(_dataloader)
