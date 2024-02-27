@@ -16,14 +16,14 @@ class RNN(nn.Module):
         2. LSTM cells - takes embedding and returns hidden/cell states and output
         3. Linear layer - maps RNN output back to the size of the vocabulary
         
-    :param vocabulary_size: number of tokens in the vocabulary.
-    :param embedding_dim: dim of the embedding layer
-    :param hidden_dim: dim of each of the LSTM cells.
-    :param num_layers: number of LSTM cells.
-    :param dropout: dropout rate. Would be applied to the outputs of each LSTM cell except the last one.
-    :param layer_normalization: whether to apply layer normalization to the RNN output.
+    :param vocabulary_size: number of tokens in the vocabulary
+    :param embedding_dim: dimension of the embedding layer
+    :param hidden_dim: dimension of each of the LSTM cells
+    :param num_layers: number of LSTM cells
+    :param dropout: dropout rate. Would be applied to the outputs of each LSTM cell except the last one
+    :param layer_normalization: whether to apply layer normalization to the RNN output
 
-    GRU cells are not implemented as LSTM cells have generally better performance for the SMILES generation task as explored here: 
+    GRU cells are not implemented, as LSTM cells have generally better performance for the SMILES generation task as explored here: 
     https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0393-0
     """
 
@@ -62,7 +62,7 @@ class RNN(nn.Module):
         self, 
         input_vector: torch.Tensor, 
         hidden_state=None
-        ) -> Tuple[torch.Tensor, torch.Tensor]:  # pylint: disable=W0221
+    ) -> Tuple[torch.Tensor, torch.Tensor]:  # pylint: disable=W0221
         """
         Performs a forward pass on the model. 
         Note: you pass the **whole** sequence.
@@ -76,10 +76,10 @@ class RNN(nn.Module):
             hidden_state = [torch.zeros(*size, device="cuda"), torch.zeros(*size, device="cuda")]
         
         # get embeddings
-        embedded_data = self.embedding(input_vector)  # (batch, sequence_length, embedding_dim)
+        embedded_vector = self.embedding(input_vector)  # (batch, sequence_length, embedding_dim)
 
         # pass through LSTM cells
-        output, hidden_state_out = self.rnn(embedded_data, hidden_state)
+        output, hidden_state_out = self.rnn(embedded_vector, hidden_state)
         
         # apply layer normalization (if specified)
         if self.layer_normalization:

@@ -63,14 +63,22 @@ class DistributionLearningTrainer:
         for epoch in range(1, self.training_steps + 1, 1):
             # NOTE: Each epoch loops through the entire dataset
             train_dataloader, val_dataloader = self.setup_dataloaders()
+            losses = []
             for _, batch in tqdm(enumerate(train_dataloader)):
                 # 1. Compute the Negative Log-Likelihood (NLL) from Teacher Forcing
                 batch = batch.to("cuda")
                 loss = self.agent.likelihood(batch)
+                losses.append(loss.mean().item())
                 # 2. Backpropagate
                 self.backpropagate(loss)
 
-    def backpropagate(self, loss: torch.Tensor) -> None:
+            # TODO: Compute success by sampling 10k SMILES and checking validity and distribution overlap (how to measure this?)
+            print(f"Epoch {epoch} | NLL: {np.mean(losses)}")
+
+    def backpropagate(
+        self, 
+        loss: torch.Tensor
+    ) -> None:
         """Agent update via backpropagation."""
         loss = loss.mean()
         self.optimizer.zero_grad() 

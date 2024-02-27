@@ -9,7 +9,7 @@ import numpy as np
 
 # import model architectures
 from models.rnn import RNN
-from models.decoder_transformer import DecoderTransformer
+from models.transformer_decoder import TransformerDecoder
 
 # import vocabulary
 from models.vocabulary import Vocabulary, SMILESTokenizer
@@ -22,6 +22,7 @@ class Model:
     The network attribute is the SMILES generator model and can be the following architectures:
         1. LSTM RNN
         2. Decoder-only Transformer (based on GPT-2)
+        3. # TODO: MAMBA
 
     The key methods are:
         1. Sampling SMILES
@@ -37,10 +38,10 @@ class Model:
         no_cuda: bool = False
     ):
         """
-        Implements an RNN.
+        Initializes the SMILES generative model.
         :param vocabulary: Vocabulary to use.
         :param tokenizer: Tokenizer to use.
-        :param network_params: Dictionary with all parameters required to correctly initialize the RNN class.
+        :param network_params: Dictionary with all parameters required to correctly initialize the specific architecture class.
         :param max_sequence_length: The max size of SMILES sequence that can be generated.
         """
         self.vocabulary = vocabulary
