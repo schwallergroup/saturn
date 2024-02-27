@@ -57,10 +57,10 @@ class DistributionLearningTrainer:
             self.agent = Generator.load_from_file(configuration.agent)
         else:
             self.agent = Generator(
-                model_type=configuration.agent.model_type,
+                model_type=configuration.model_type,
                 vocabulary=self.train_dataset.vocabulary,
                 tokenizer=self.train_dataset.tokenizer,
-                network_params=configuration.agent.get_params()
+                network_params=None
             )
 
         self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)

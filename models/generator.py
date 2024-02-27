@@ -49,6 +49,7 @@ class Generator:
         self.vocabulary = vocabulary
         self.tokenizer = tokenizer
         self.max_sequence_length = max_sequence_length
+
         self.network = self._initialize_network(network_params)
         self.nll_loss = nn.NLLLoss(reduction="none")
 
