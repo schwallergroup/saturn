@@ -64,6 +64,9 @@ class DistributionLearningTrainer:
             )
 
         self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)
+
+        print('initialized')
+        exit()
   
     def run(self):
         for epoch in range(1, self.training_steps + 1, 1):

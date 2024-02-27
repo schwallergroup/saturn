@@ -54,6 +54,7 @@ class Generator:
         self.nll_loss = nn.NLLLoss(reduction="none")
 
     def set_mode(self, mode: str):
+        # FIXME: not currently used
         if mode == "training":
             self.network.train()
         elif mode == "inference":
@@ -130,8 +131,8 @@ class Generator:
 
     def sample_smiles(
         self, 
-        num: int = 128, 
-        batch_size: int =128
+        num: int = 32, 
+        batch_size: int = 32
     ) -> Tuple[List[str], np.ndarray[float]]:
         """
         Samples n SMILES from the model.
@@ -163,7 +164,7 @@ class Generator:
         return seqs, smiles, likelihoods
 
     # @torch.no_grad()
-    def _sample(self, batch_size=128) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _sample(self, batch_size=32) -> Tuple[torch.Tensor, torch.Tensor]:
         start_token = torch.zeros(batch_size, dtype=torch.long)
         start_token[:] = self.vocabulary["^"]
         input_vector = start_token
@@ -187,6 +188,9 @@ class Generator:
 
     def get_network_parameters(self):
         return self.network.parameters()
+    
+    def get_num_params(self):
+        return sum(p.numel() for p in self.network.parameters() if p.requires_grad)
 
     def _initialize_network(self, network_params: Union[dict, None]) -> Union[RNN, TransformerDecoder]:
         """

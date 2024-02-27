@@ -13,14 +13,18 @@ class TransformerDecoder(nn.Module):
     :param num_layers: number of Decoder blocks
     :param num_heads: number of heads for Multi-Head Attention (MHA)
     :param dropout: dropout rate
+
+    Default parameters yield a 6,376,049 parameter model. 
+    Using REINVENT's loss function, this model size has been shown to work here:
+    https://openreview.net/pdf?id=1B6YKnHYBb
     """
     def __init__(
         self, 
         vocabulary_size: int, 
         embedding_dim: int = 256, 
-        hidden_dim: int = 512, 
-        num_layers: int = 3, 
-        num_heads: int = 12, 
+        hidden_dim: int = 1024, 
+        num_layers: int = 8, 
+        num_heads: int = 16, 
         dropout: float = 0.0
     ):
         super(TransformerDecoder, self).__init__()
