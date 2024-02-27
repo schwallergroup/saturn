@@ -2,7 +2,7 @@
 # TODO: replace model.py with this file later when the code is ready - will need to re-train all models
 Based on the implementation from https://github.com/MolecularAI/reinvent-models
 """
-from typing import Tuple, List
+from typing import Tuple, List, Union
 import torch
 import torch.nn as nn
 import numpy as np
@@ -49,18 +49,7 @@ class Generator:
         self.vocabulary = vocabulary
         self.tokenizer = tokenizer
         self.max_sequence_length = max_sequence_length
-
-        if not isinstance(network_params, dict):
-            network_params = {}
-
-        if model_type == "rnn":
-            self.network = RNN(len(self.vocabulary), **network_params)
-        elif model_type == "decoder":
-            self.network = TransformerDecoder(len(self.vocabulary), **network_params)
-
-        if torch.cuda.is_available():
-            self.network.cuda()
-    
+        self.network = self._initialize_network(network_params)
         self.nll_loss = nn.NLLLoss(reduction="none")
 
     def set_mode(self, mode: str):
@@ -197,3 +186,24 @@ class Generator:
 
     def get_network_parameters(self):
         return self.network.parameters()
+
+    def _initialize_network(self, network_params: Union[dict, None]) -> Union[RNN, TransformerDecoder]:
+        """
+        Initializes the network based on the model type.
+        """
+        if not isinstance(network_params, dict):
+            network_params = {}
+
+        if self.model_type == "rnn":
+            network = RNN(len(self.vocabulary), **network_params)
+        elif self.model_type == "decoder":
+            network = TransformerDecoder(len(self.vocabulary), **network_params)
+        elif self.model_type == "mamba":
+            raise NotImplementedError("MAMBA model is not yet implemented.")
+        else:
+            raise ValueError(f"Invalid model type {self.model_type}")
+        
+        if torch.cuda.is_available():
+            network.cuda()
+
+        return network

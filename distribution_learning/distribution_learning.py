@@ -17,7 +17,7 @@ from distribution_learning.dataset.smiles_dataset import SMILESDataset
 class DistributionLearningTrainer:
     """
     Distribution Learning by Maximum Likelihood Estimation (MLE) and using Teacher Forcing.
-    Training objective is to maximize the likelihood of reproducing the dataset.
+    Training objective is to maximize the likelihood of reproducing the SMILES dataset.
 
     Used to either:
         1. Pre-train a Prior 
@@ -85,7 +85,7 @@ class DistributionLearningTrainer:
         self, 
         loss: torch.Tensor
     ) -> None:
-        """Agent update via backpropagation."""
+        """Policy update via backpropagation."""
         loss = loss.mean()
         self.optimizer.zero_grad() 
         loss.backward()
