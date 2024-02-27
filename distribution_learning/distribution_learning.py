@@ -9,6 +9,7 @@ from tqdm import tqdm
 from utils.utils import to_tensor
 
 from models.model import Model
+from models.generator import Generator
 from distribution_learning.dataclass import DistributionLearningConfiguration
 from distribution_learning.dataset.smiles_dataset import SMILESDataset
 
@@ -26,10 +27,12 @@ class DistributionLearningTrainer:
         self, 
         configuration: DistributionLearningConfiguration
     ):
+        # Training parameters
         self.seed = configuration.seed
         self.learning_rate = configuration.learning_rate
         self.training_steps = configuration.training_steps
         self.batch_size = configuration.batch_size
+        self.transfer_learning = configuration.transfer_learning
         self.train_with_randomization = configuration.train_with_randomization
 
         self.train_dataset = SMILESDataset(
@@ -48,14 +51,17 @@ class DistributionLearningTrainer:
             randomize=configuration.train_with_randomization
         )
 
-        self.agent = Model.load_from_file(configuration.agent)
-
-        # reset all agent weights
-        from models.rnn import RNN
-        self.agent.network = RNN(vocabulary_size=len(self.train_dataset.vocabulary))
-        self.agent.network.embedding = self.agent.network.embedding.to("cuda")
-        self.agent.network.rnn = self.agent.network.rnn.to("cuda")
-        self.agent.network.linear = self.agent.network.linear.to("cuda")
+        # Initialize model
+        if self.transfer_learning:
+            # Load the pre-trained model
+            self.agent = Generator.load_from_file(configuration.agent)
+        else:
+            self.agent = Generator(
+                model_type=configuration.agent.model_type,
+                vocabulary=self.train_dataset.vocabulary,
+                tokenizer=self.train_dataset.tokenizer,
+                network_params=configuration.agent.get_params()
+            )
 
         self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)
   

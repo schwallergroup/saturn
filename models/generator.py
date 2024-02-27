@@ -15,7 +15,7 @@ from models.transformer_decoder import TransformerDecoder
 from models.vocabulary import Vocabulary, SMILESTokenizer
 
 
-class Model:
+class Generator:
     """
     Parent class for all models. 
 
@@ -31,19 +31,21 @@ class Model:
 
     def __init__(
         self, 
+        model_type: str,
         vocabulary: Vocabulary, 
         tokenizer: SMILESTokenizer, 
         network_params=None, 
-        max_sequence_length: int = 256,
-        no_cuda: bool = False
+        max_sequence_length: int = 256
     ):
         """
         Initializes the SMILES generative model.
+        :param model_type: Architecture of the SMILES generator
         :param vocabulary: Vocabulary to use.
         :param tokenizer: Tokenizer to use.
         :param network_params: Dictionary with all parameters required to correctly initialize the specific architecture class.
         :param max_sequence_length: The max size of SMILES sequence that can be generated.
         """
+        self.model_type = model_type
         self.vocabulary = vocabulary
         self.tokenizer = tokenizer
         self.max_sequence_length = max_sequence_length
@@ -51,10 +53,12 @@ class Model:
         if not isinstance(network_params, dict):
             network_params = {}
 
-        # TODO: add support for the Decoder-only Transformer
-        self.network = RNN(len(self.vocabulary), **network_params)
+        if model_type == "rnn":
+            self.network = RNN(len(self.vocabulary), **network_params)
+        elif model_type == "decoder":
+            self.network = TransformerDecoder(len(self.vocabulary), **network_params)
 
-        if torch.cuda.is_available() and not no_cuda:
+        if torch.cuda.is_available():
             self.network.cuda()
     
         self.nll_loss = nn.NLLLoss(reduction="none")
@@ -80,7 +84,7 @@ class Model:
             save_dict = torch.load(file_path, map_location=lambda storage, loc: storage)
 
         network_params = save_dict.get("network_params", {})
-        model = Model(
+        model = Generator(
             vocabulary=save_dict["vocabulary"],
             tokenizer=save_dict.get("tokenizer", SMILESTokenizer()),
             network_params=network_params,
@@ -97,6 +101,7 @@ class Model:
         Saves the model to save_path.
         """
         save_dict = {
+            "model_type": self.model_type,
             "vocabulary": self.vocabulary,
             "tokenizer": self.tokenizer,
             "max_sequence_length": self.max_sequence_length,
