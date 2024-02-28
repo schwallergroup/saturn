@@ -47,7 +47,7 @@ class Oracle:
             "reward": [],
             "penalized_reward": []
         })
-        # add each oracle component's raw value and reward to the oracle history DataFrame
+        # add oracle components' raw value and reward to the oracle history DataFrame
         for oracle in self.oracle:
             self.oracle_history[f"{oracle.name}_raw_values"] = []
             self.oracle_history[f"{oracle.name}_reward"] = []
@@ -124,7 +124,7 @@ class Oracle:
         """
         oracle = []
         for component in oracle_components:
-            # construct the OracleComponent
+            # Construct the OracleComponent
             oracle_component = construct_oracle_component(OracleComponentParameters(**component))
             oracle.append(oracle_component)
 
@@ -135,7 +135,7 @@ class Oracle:
         Checks if there are any Cached rewards in a sampled batch of SMILES. If Oracle repeats are permitted, directly return.
         """
         if not self.allow_oracle_repeats:
-            # canonicalize the SMILES before checking Cache
+            # Canonicalize the SMILES before checking Cache
             canonical_smiles = canonicalize_smiles_batch(smiles)
             repeat_indices = []
             cached_rewards = []
@@ -159,7 +159,7 @@ class Oracle:
         """
         Updates the Oracle Cache to store the results of previous oracle calls.
         """
-        # canonicalize the SMILES before adding to Cache
+        # Canonicalize the SMILES before adding to Cache
         canonical_smiles = canonicalize_smiles_batch(smiles)
         for s, r in zip(canonical_smiles, rewards):
             # if the same SMILES is sampled, the reward is overwritten for two reasons:
@@ -173,7 +173,7 @@ class Oracle:
         Components set to True will be executed first to check that the molecule satisfies that component based on a reward threshold.
         If the molecule does not satisfy the threshold, it is removed from the sampled batch.
         """
-        # FIXME: set a threshold for each component. If not using Step transformation, rewards are not necessarily 0
+        # FIXME: Set a threshold for each component. If not using Step transformation, rewards are not necessarily 0
         THRESHOLD = 0.05
 
         if len(self.preliminary_oracles) != 0:
@@ -204,7 +204,7 @@ class Oracle:
         # NOTE: the Oracle History tracks every single SMILES generated, not just the unique set
         """
         self.calls += len(smiles)
-        # track generated SMILES + reward as a function of oracle calls
+        # Track generated SMILES + reward as a function of oracle calls
         df = pd.DataFrame({
                 "oracle_calls": np.full_like(smiles, self.calls),
                 "smiles": smiles,

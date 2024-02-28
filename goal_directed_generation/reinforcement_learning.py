@@ -79,7 +79,7 @@ class ReinforcementLearningAgent:
             filter_patience_limit=configuration.beam_enumeration.filter_patience_limit
         )
                                                     
-        # TODO: Potentially implement MarginGuard
+        # TODO: Potentially implement MarginGuard --> no need to reset Agent weights
         #       --> self.margin_guard = MarginGuard(self)
 
         # only the Agent is updated

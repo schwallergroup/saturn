@@ -22,21 +22,22 @@ class SMILESDataset(Dataset):
         dataset_path: str, 
         batch_size: int = 256,
         transfer_learning: bool = False,
-        randomize: bool = True
+        randomize: bool = True,
+        max_sequence_length: int = 256
     ):
-        self.dataset = self.read_data_file(dataset_path)  # np.ndarray[str]
+        self.dataset_path = dataset_path
+        self.max_sequence_length = max_sequence_length
         self.batch_size = batch_size
         self.randomize = randomize
 
-        # initialize the Tokenizer and Vocabulary based on whether pre-training or fine-tuning is to be performed
         self.agent = agent
         self.transfer_learning = transfer_learning
-        self.setup_vocabulary_and_tokenizer()
+        self.setup()
 
     def __getitem__(self, idx: int) -> torch.Tensor:
         smiles = self.dataset[idx]
-        # randomize SMILES string if specified 
-        # can enhance chemical space coverage of the model: https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0393-0
+        # Randomize SMILES string if specified 
+        # Can enhance chemical space coverage of the model: https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0393-0
         smiles = randomize_smiles(smiles) if self.randomize else smiles
         tokens = self.tokenizer.tokenize(smiles)
         encoded = self.vocabulary.encode(tokens)
@@ -45,23 +46,32 @@ class SMILESDataset(Dataset):
     def __len__(self) -> int:
         return len(self.dataset)
     
-    def read_data_file(self, path: str) -> np.ndarray[str]:
-        """Reads a file with SMILES strings and returns a np.array of the SMILES."""
-        with open(path, "r") as file:
-            return np.array(file.read().splitlines())
-        
-    def setup_vocabulary_and_tokenizer(self):
+    def read_data_file(self) -> np.ndarray[str]:
         """
-        Initializes the Tokenizer and Vocabulary based on whether pre-training or fine-tuning is to be performed.
+        Reads a file with SMILES strings and returns a np.array of the SMILES.
+        Removes SMILES exceeded sequence length of 256.
+        """
+        with open(self.dataset_path, "r") as file:
+            return np.array([smiles for smiles in file.read().splitlines() if len(self.tokenizer.tokenize(smiles)) <= self.max_sequence_length])
+
+    def setup(self):
+        """
+        Performs 3 tasks:
+            1. Intializes the Tokenizer
+            2. Initializes the Vocabulary
+            3. Reads the dataset file and filters based on max_sequence_length
+
+        If transfer_learning is True, the Agent is loaded and the Tokenizer and Vocabulary are extracted.
         """
         if self.transfer_learning:
-            # load model
+            # Load model and extract the Tokenizer and Vocabulary
             self.agent = Model.load_from_file(self.agent)
             self.tokenizer = self.agent.tokenizer
+            self.dataset = self.read_data_file()
             self.vocabulary = self.agent.vocabulary
         else:
-            # construct the Tokenizer and Vocabulary from the training data
             self.tokenizer = SMILESTokenizer()
+            self.dataset = self.read_data_file()
             self.vocabulary = create_vocabulary(
                 smiles=self.dataset,
                 tokenizer=self.tokenizer

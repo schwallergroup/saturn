@@ -43,7 +43,7 @@ class RewardShapingFunction:
             elif self.transformation_function == "double_sigmoid":
                 return self.double_sigmoid_transformation(raw_property_values, **self.parameters)
         except Exception:
-            # in case not all required parameters are specified
+            # In case not all required parameters are specified
             raise ValueError(f"Oracle: {self.oracle_name} is using {self.transformation_function} reward shaping function but not all parameters have been specified.")
 
 
@@ -116,7 +116,7 @@ class RewardShapingFunction:
                             10 ** (coef_si * (value / coef_div)) + 10 ** (coef_si * (high / coef_div))))
                     return (A / B) - C
             except RuntimeWarning:
-                # in case of numerical overflow
+                # In case of numerical overflow
                 return 0.0
 
         transformed = [_double_sigmoid_formula(val, low, high, coef_div, coef_si, coef_se) for val in raw_property_values]

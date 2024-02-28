@@ -3,6 +3,6 @@ from typing import Dict
 
 @dataclass
 class RewardShapingFunctionParameters:
-    # defaults to no transformation
+    # Defaults to no transformation
     transformation_function: str = "no_transformation"
     parameters: Dict[str, float] = field(default_factory=dict)

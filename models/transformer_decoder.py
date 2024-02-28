@@ -28,6 +28,13 @@ class TransformerDecoder(nn.Module):
         dropout: float = 0.0
     ):
         super(TransformerDecoder, self).__init__()
+        self.vocabulary_size = vocabulary_size
+        self.embedding_dim = embedding_dim
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.num_heads = num_heads
+        self.dropout = dropout
+
         self.embedding = nn.Embedding(vocabulary_size, embedding_dim)
         self.positional_encoding = PositionalEncoding(embedding_dim)
         self.decoder_blocks = nn.ModuleList([
@@ -45,16 +52,21 @@ class TransformerDecoder(nn.Module):
         input_vector: torch.Tensor, 
         src_mask=None
     ) -> torch.Tensor:
-        batch_size, seq_size = input_vector.size()
-        # get embeddings
+        batch_size, sequence_length = input_vector.size()
+
+        # 1. Vocabulary indices to Embedding
         x = self.embedding(input_vector)  # (batch, sequence_length, embedding_dim)
         x = self.positional_encoding(x)  # (batch, sequence_length, embedding_dim)
-        # pass through Decoder blocks
+
+        # 2. Pass through Decoder blocks
         for decoder_block in self.decoder_blocks:
-            x = decoder_block(x, src_mask)
-        # map back to vocabulary size
-        x = x.reshape(-1, self.embedding_dim)
-        return self.linear(x).view(batch_size, seq_size, -1)
+            x = decoder_block(x, src_mask)  # (batch, sequence_length, embedding_dim)
+
+        # 3. Map back to Vocabulary size
+        x = x.reshape(-1, self.embedding_dim)  # (batch * sequence_length, embedding_dim)
+        x = self.linear(x).view(batch_size, sequence_length, -1)
+
+        return x
 
     def get_params(self):
         """
@@ -81,11 +93,11 @@ class PositionalEncoding(nn.Module):
         div_term = torch.exp(torch.arange(0, embedding_dim, 2).float() * (-torch.log(torch.tensor(10000.0)) / embedding_dim))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0).transpose(0, 1)
-        self.register_buffer("pe", pe)
+        self.register_buffer("pe", pe.unsqueeze(0))
         
     def forward(self, x):
-        x = x + self.pe[:x.size(0), :]
+        # Add Positional Encoding to the Embedding
+        return x + self.pe[:, :x.size(1), :]
 
 class DecoderLayer(nn.Module):
     def __init__(
@@ -111,8 +123,15 @@ class DecoderLayer(nn.Module):
         if src_mask is not None:
             attention_mask = src_mask.unsqueeze(0)
 
-        x, _ = self.self_attention(x, x, x, attn_mask=attention_mask)  # returns (output, attention_weights)
+        x, _ = self.self_attention(
+            query=x, 
+            key=x, 
+            value=x, 
+            attn_mask=attention_mask
+        )  # returns (output, attention_weights)
+
         x = self.layer_norm_1(x + self.dropout(x))
         x = self.feed_forward(x)
         x = self.layer_norm_2(x + self.dropout(x))
-        return x
+
+        return x  # (batch, sequence_length, embedding_dim)

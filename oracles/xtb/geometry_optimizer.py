@@ -16,12 +16,12 @@ class GeometryOptimizer:
         Returns the path to the temp directory containing the optimized geometry.
         """
         smiles = Chem.MolToSmiles(mol)
-        # make temp folder to generate and store optimized geometries
+        # Make temp folder to generate and store optimized geometries
         temp_dir = tempfile.mkdtemp()
-        # generate un-optimized geometry with OpenBabel
+        # Generate un-optimized geometry with OpenBabel
         openbabel_path = os.path.join(temp_dir, "openbabel.xyz")
         subprocess.run(["obabel", f"-:{smiles}", "--gen3d", "-O", openbabel_path])
-        # call xTB to optimize geometry
+        # Call xTB to optimize geometry
         subprocess.call(["xtb", openbabel_path, "--opt", "[extreme]", "--namespace", f"{temp_dir}/temp"])
 
         return temp_dir, os.path.join(temp_dir, "temp.xtbopt.xyz")

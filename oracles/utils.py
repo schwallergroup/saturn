@@ -110,6 +110,7 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
     elif name == "nucleophilicity":
         return Nucleophilicity(oracle_component_parameters)
     # TODO: pharmacophore and shape match --> ShapeLinker
+    # TODO: MMPBSA --> AMBER
     # TODO: MD --> GROMACS
     else:
         raise NotImplementedError(f"Oracle: {name} is not implemented.")

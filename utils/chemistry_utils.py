@@ -45,8 +45,8 @@ def can_be_encoded(original_smiles: str, randomized_smiles: str, prior) -> str:
     Check if a SMILES string can be encoded by the Vocabulary.
     """
     try:
-        # there may be tokens in the randomized SMILES that are not in the Vocabulary
-        # check if the randomized SMILES can be encoded
+        # There may be tokens in the randomized SMILES that are not in the Vocabulary
+        # Check if the randomized SMILES can be encoded
         tokens = prior.tokenizer.tokenize(randomized_smiles)
         seq = prior.vocabulary.encode(tokens)
         return randomized_smiles

@@ -2,7 +2,6 @@
 Some code is based on the implementation from https://github.com/MolecularAI/Reinvent.
 """
 from typing import Tuple, List
-import torch
 import numpy as np
 import pandas as pd
 from copy import deepcopy
@@ -33,7 +32,7 @@ class ReplayBuffer:
         self.parameters = parameters
         self.memory_size = parameters.memory_size
         self.sample_size = parameters.sample_size
-        # stores the top N highest reward molecules generated so far
+        # Stores the top N highest reward molecules generated so far
         self.memory = pd.DataFrame(
             columns=[
                 "smiles", 
@@ -46,14 +45,14 @@ class ReplayBuffer:
         smiles: np.ndarray[str], 
         rewards: np.ndarray[float]
         ) -> None:
-        # NOTE: likelihood should be already negative
+        # NOTE: Likelihood should be already negative
         df = pd.DataFrame({
             "smiles": smiles, 
             "reward": rewards
             }
         )
         self.memory = pd.concat([self.memory, df])
-        # keep only the top N (by reward)
+        # Keep only the top N (by reward)
         self.purge_memory()
 
     def sample_memory(self) -> Tuple[np.ndarray[str], np.ndarray[float]]:
@@ -85,7 +84,7 @@ class ReplayBuffer:
         Removes duplicate SMILES in the memory and keeps the top N by reward.
         Keep only non-zero rewards SMILES.
         """
-        # NOTE: want to keep randomized versions?
+        # NOTE: Want to keep randomized versions?
         unique_df = self.memory.drop_duplicates(subset=["smiles"])
         sorted_df = unique_df.sort_values("reward", ascending=False)
         self.memory = sorted_df.head(self.memory_size)
@@ -117,7 +116,7 @@ class ReplayBuffer:
             purged_memory.drop("scaffolds", axis=1, inplace=True)
             self.memory = purged_memory
         else:
-            # if no scaffolds are penalized, do nothing
+            # If no scaffolds are penalized, do nothing
             return
         
     def prepopulate_buffer(self, oracle: Oracle) -> Oracle:
@@ -148,7 +147,7 @@ class ReplayBuffer:
 
             aggregated_rewards = oracle.aggregator(rewards, oracle.oracle_weights)
 
-            # add the SMILES to the Replay Buffer
+            # Add the SMILES to the Replay Buffer
             self.add(
                 smiles=self.parameters.smiles,  # add the original SMILES
                 rewards=aggregated_rewards
@@ -160,7 +159,7 @@ class ReplayBuffer:
                 penalized_rewards=aggregated_rewards,
                 oracle_components_df=oracle_components_df
             )
-            # update the Oracle Cache with the canonical SMILES
+            # Update the Oracle Cache with the canonical SMILES
             oracle.update_oracle_cache(canonical_smiles, rewards)
 
         return oracle

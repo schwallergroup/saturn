@@ -55,7 +55,7 @@ class RNN(nn.Module):
             hidden_size=self.hidden_dim,
             num_layers=num_layers,
             dropout=dropout, 
-            batch_first=True  # input and output tensors are (batch, sequence_length, feature)
+            batch_first=True  # Input and output tensors are (batch, sequence_length, feature)
         )
         self.linear = nn.Linear(hidden_dim, vocabulary_size)
 
@@ -71,24 +71,24 @@ class RNN(nn.Module):
         :param input_vector: Input tensor (batch_size, sequence_size).
         :param hidden_state: Hidden state tensor.
         """
-        batch_size, seq_size = input_vector.size()
+        batch_size, sequence_length = input_vector.size()
         if hidden_state is None:
             size = (self.num_layers, batch_size, self.hidden_dim)
             hidden_state = [torch.zeros(*size, device="cuda"), torch.zeros(*size, device="cuda")]
         
-        # get embeddings
+        # 1. Vocabulary indices to Embedding
         embedded_vector = self.embedding(input_vector)  # (batch, sequence_length, embedding_dim)
 
-        # pass through LSTM cells
+        # 2. Pass through LSTM cells
         output, hidden_state_out = self.rnn(embedded_vector, hidden_state)
         
-        # apply layer normalization (if specified)
+        # 3. Apply layer normalization (if specified)
         if self.layer_normalization:
             output = F.layer_norm(output, output.size()[1:])
 
-        # map LSTM output back to vocabulary size
-        output = output.reshape(-1, self.hidden_dim)
-        output = self.linear(output).view(batch_size, seq_size, -1)
+        # 4. Map LSTM output back to Vocabulary size
+        output = output.reshape(-1, self.hidden_dim)  # (batch * sequence_length, hidden_dim)
+        output = self.linear(output).view(batch_size, sequence_length, -1)
 
         return output, hidden_state_out
 

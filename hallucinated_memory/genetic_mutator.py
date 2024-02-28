@@ -25,14 +25,14 @@ class GeneticMutator(Hallucinator):
         self.tokenizer = prior.tokenizer
         self.tokens = self.vocabulary.tokens()
 
-        # how many hallucinations to generate
+        # How many hallucinations to generate
         self.num_hallucinations = num_hallucinations
-        # how many hallucinations to return
+        # How many hallucinations to return
         self.num_selected = num_selected
-        # how to select the hallucinations to return
+        # How to select the hallucinations to return
         self.selection_criterion = selection_criterion
 
-        # store the hallucination history
+        # Store the hallucination history
         self.hallucination_history = pd.DataFrame({})
 
     def hallucinate(self, buffer: pd.DataFrame) -> np.ndarray[str]:
@@ -41,19 +41,19 @@ class GeneticMutator(Hallucinator):
         """
         hallucinated_set = set()
 
-        # consider the buffer the population
+        # Consider the buffer the population
         parents = [Chem.MolFromSmiles(s) for s in buffer["smiles"]]
         parents_rewards = buffer["reward"].values
 
-        # to avoid infinite loop, set a maximum number of iterations
+        # To avoid infinite loop, set a maximum number of iterations
         tries = 0
 
         while (len(hallucinated_set) != self.num_hallucinations) and (tries < 1000):
-            # generate child
-            # TODO: can add a mutation rate class attribute
+            # Generate child
+            # TODO: Can add a mutation rate class attribute
             child = reproduce(parents, parents_rewards, 0.1)
             if self.can_be_encoded(child, self.tokenizer, self.vocabulary):
-                # add canonicalized SMILES to guarantee uniqueness
+                # Add canonicalized SMILES to guarantee uniqueness
                 hallucinated_set.add(Chem.MolToSmiles(child, canonical=True))
             tries += 1
 

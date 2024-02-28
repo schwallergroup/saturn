@@ -35,27 +35,27 @@ class BeamEnumeration:
         self.substructure_min_size = substructure_min_size
         self.pool_size = pool_size
 
-        # used to track frequency of Beam Enumeration substructure saving
+        # Used to track frequency of Beam Enumeration substructure saving
         self.last_save_multiple = 0
         self.pool_saving_frequency = pool_saving_frequency
 
-        # denotes how tokens are sampled - either top k or sampling from the distribution
+        # Denotes how tokens are sampled - either top k or sampling from the distribution
         self.token_sampling_method = token_sampling_method
         
-        # track reward trajectory
+        # Track reward trajectory
         self.reward_tracker = RewardTracker(patience=patience)
 
-        # keep track of *all* scaffolds/substructures
+        # Keep track of *all* scaffolds/substructures
         self.entire_pool = {}
-        # keep track of the most probable scaffolds/substructures
+        # Keep track of the most probable scaffolds/substructures
         self.pool = {}
-        # enforce probable substructures to contain heavy atoms
+        # Enforce probable substructures to contain heavy atoms
         self.heavy_atoms = {'N', 'n', 'O', 'o', 'S', 's'}
 
-        # track how many SMILES are filtered (based on Beam Enumeration) across the entire run
+        # Track how many SMILES are filtered (based on Beam Enumeration) across the entire run
         self.filter_history = []
 
-        # in case extremely improbable substructures are extracted
+        # In case extremely improbable substructures are extracted
         self.filter_patience_limit = filter_patience_limit
         self.filter_patience = 0
 
@@ -66,7 +66,7 @@ class BeamEnumeration:
         Total number of sub-sequences is k^beam_steps.
         """
 
-        # start with k number of "start" sequences
+        # Start with k number of "start" sequences
         start_token = torch.zeros(self.k, dtype=torch.long)
         start_token[:] = agent.vocabulary["^"]
         input_vector = start_token
@@ -74,49 +74,49 @@ class BeamEnumeration:
 
         enumerated_sequences = [agent.vocabulary["^"] * torch.ones([self.k, 1], dtype=torch.long)]
 
-        # enumerate beam_steps number of time-steps
+        # Enumerate beam_steps number of time-steps
         for time_step in range(1, self.beam_steps + 1, 1):
             logits, hidden_state = agent.network(input_vector.unsqueeze(1), hidden_state)
             logits = logits.squeeze(1)
             probabilities = logits.softmax(dim=1)
 
-            # if taking top k tokens
+            # If taking top k tokens
             if self.token_sampling_method == 'topk':
                 _, top_indices = torch.topk(probabilities, self.k)
-            # if sampling tokens from the distribution
+            # If sampling tokens from the distribution
             elif self.token_sampling_method == 'sample':
                 top_indices = torch.multinomial(probabilities, self.k)
 
-            # at time_step = 1, directly take the top k most probable tokens (or sampled)
+            # At time_step = 1, directly take the top k most probable tokens (or sampled)
             if time_step == 1:
-                # below is hard-coded to index 0 because at time-step 1,
-                # the top k probabilities are always the same since hidden state = None
-                # if using token sampling, take the 1st (index 0) set of top indices (even though the different indices may be different tokens due to stochasticity)
+                # Below is hard-coded to index 0 because at time-step 1,
+                # The top k probabilities are always the same since hidden state = None
+                # If using token sampling, take the 1st (index 0) set of top indices (even though the different indices may be different tokens due to stochasticity)
                 top_indices = top_indices[0]
                 enumerated_sequences = [torch.cat([start_token, first_token.unsqueeze(0)]) for start_token, first_token
                                         in zip(enumerated_sequences[0], top_indices)]
-                # the input to the next time-step is the current time-steps' most probable tokens
+                # The input to the next time-step is the current time-steps' most probable tokens
                 input_vector = top_indices
-            # otherwise, each sub-sequence needs to be extended by its top k (or sampled) tokens
+            # Otherwise, each sub-sequence needs to be extended by its top k (or sampled) tokens
             else:
-                # initialize a temporary list that stores all the sub-sequences from this time-step
+                # Initialize a temporary list that stores all the sub-sequences from this time-step
                 temp = []
-                # for each sub-sequence, extend it by its most probable k tokens (or sampled)
+                # For each sub-sequence, extend it by its most probable k tokens (or sampled)
                 for sub_sequence, top_tokens in zip(enumerated_sequences, top_indices):
                     for token in top_tokens:
                         temp.append(torch.cat([sub_sequence, token.unsqueeze(0)]))
 
-                # at this point, len(temp_sequences) > len(enumerated_sequences) because of the beam expansion
+                # At this point, len(temp_sequences) > len(enumerated_sequences) because of the beam expansion
                 enumerated_sequences = temp
 
-                # the input to the next time-step is the current time-steps' most probable tokens
+                # The input to the next time-step is the current time-steps' most probable tokens
                 input_vector = top_indices.flatten()
 
-                # duplicate hidden states for LSTM cell passing
+                # Duplicate hidden states for LSTM cell passing
                 hidden_state = (hidden_state[0].repeat_interleave(self.k, dim=1), hidden_state[1].repeat_interleave(self.k, dim=1))
 
-        # at this point, enumerated_sequences contains the most probable and
-        # exhaustively enumerated token sequences - decode these into SMILES
+        # At this point, enumerated_sequences contains the most probable and
+        # Exhaustively enumerated token sequences - decode these into SMILES
         smiles = [agent.tokenizer.untokenize(agent.vocabulary.decode(seq.cpu().numpy())) for seq in enumerated_sequences]
 
         return smiles
@@ -154,12 +154,12 @@ class BeamEnumeration:
         This method extracts the most frequent substructures from the enumerated SMILES subsequences.
         """
         for seq in smiles_subsequences:
-            # check whether to extract substructure itself or substructure scaffold
+            # Check whether to extract substructure itself or substructure scaffold
             if self.substructure_type == "structure":
                 structures = self.substructure_extractor(seq)
             elif self.substructure_type == "scaffold":
                 structures = self.scaffold_extractor(seq)
-            # not every subsequence has valid structures
+            # Not every subsequence has valid structures
             if len(structures) > 0:
                 for s in structures:
                     # enforce minimum substructure size
@@ -171,11 +171,11 @@ class BeamEnumeration:
                     else:
                         continue
 
-        # sort frequency of substructures
+        # Sort frequency of substructures
         sorted_pool = dict(sorted(self.pool.items(), key=lambda x: x[1], reverse=True))
-        # store all substructures with their corresponding frequency
+        # Store all substructures with their corresponding frequency
         self.entire_pool = sorted_pool
-        # store the most frequent substructures
+        # Store the most frequent substructures
         sliced_pool = list(sorted_pool.keys())[:self.pool_size]
 
         return [Chem.MolFromSmiles(s) for s in sliced_pool]
@@ -184,7 +184,7 @@ class BeamEnumeration:
         """
         Extracts substructures from a SMILES subsequence.
         """
-        # use a Set for tracking to avoid repeated counting of the same substructure
+        # Use a Set for tracking to avoid repeated counting of the same substructure
         substructures = set()
         for idx in range(len(subsequence) - 2):
             mol = Chem.MolFromSmiles(subsequence[:3 + idx])
@@ -200,16 +200,16 @@ class BeamEnumeration:
         """
         Extracts Bemis-Murcko scaffolds from a SMILES subsequence.
         """
-        # use a Set for tracking to avoid repeated counting of the same scaffold
+        # Use a Set for tracking to avoid repeated counting of the same scaffold
         scaffolds = set()
         for idx in range(len(subsequence) - 2):
             mol = Chem.MolFromSmiles(subsequence[:3 + idx])
             if mol is not None:
                 try:
-                    # store the Bemis-Murcko scaffold because heavy atoms are important
+                    # Store the Bemis-Murcko scaffold because heavy atoms are important
                     scaffold = MurckoScaffold.GetScaffoldForMol(mol)
                 except Exception:
-                    # scaffold extraction may raise RDKit valency error - skip these for now
+                    # Scaffold extraction may raise RDKit valency error - skip these for now
                     continue
                 canonical_scaffold = Chem.MolToSmiles(scaffold, canonical=True)
                 canonical_chars = set(canonical_scaffold)
@@ -233,12 +233,12 @@ class BeamEnumeration:
         3. Check whether to write-out pooled substructures
         4. Resets the filter patience counter
         """
-        # track self-conditioned filtering
+        # Track self-conditioned filtering
         self.filter_history.append(num_valid_smiles)
-        # check whether to execute Beam Enumeration
+        # Check whether to execute Beam Enumeration
         if self.reward_tracker.is_beam_epoch(mean_reward):
             self.pool_update(agent)
-        # check whether to write-out the pooled substructures
+        # Check whether to write-out the pooled substructures
         if (oracle_calls > self.pool_saving_frequency) and (oracle_calls // self.pool_saving_frequency > self.last_save_multiple):
             self.write_out_pool(oracle_calls)
             self.last_save_multiple = oracle_calls // self.pool_saving_frequency
@@ -265,9 +265,9 @@ class BeamEnumeration:
         print(f"Executed Beam Enumeration {self.reward_tracker.beam_executions} times")
         print("Saving final pooled substructures.")
         self.write_out_pool(oracle_calls)
-        # also write out entire pool
+        # Also write out entire pool
         self.write_out_entire_pool()
-        # write out Beam Enumeration self-conditioning history
+        # Write out Beam Enumeration self-conditioning history
         self.write_out_filtering()
 
     def write_out_pool(self, oracle_calls: int) -> None:

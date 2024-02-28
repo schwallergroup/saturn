@@ -13,7 +13,7 @@ class DiversityFilter:
             parameters: DiversityFilterParameters
         ):
         self.parameters = parameters
-        # track the number of times a given Bemis-Murcko scaffold has been generated
+        # Track the number of times a given Bemis-Murcko scaffold has been generated
         self.bucket_history = dict()
         self.bucket_size = parameters.bucket_size
         self.min_similarity = parameters.min_similarity
@@ -25,7 +25,7 @@ class DiversityFilter:
         """
         Update the bucket history based on the sampled (or hallucinated) batch of SMILES.
         """
-        # get the Bemis-Murcko scaffold for each SMILES
+        # Get the Bemis-Murcko scaffold for each SMILES
         scaffolds = [chemistry_utils.get_bemis_murcko_scaffold(smiles) for smiles in smiles]
         for scaf in scaffolds:
             if scaf in self.bucket_history:
@@ -41,7 +41,7 @@ class DiversityFilter:
         """
         Penalize sampled (or hallucinated) SMILES based on the bucket history.
         """
-        # if a given scaffold has been generated more than the bucket size, truncate the reward to 0.0
+        # If a given scaffold has been generated more than the bucket size, truncate the reward to 0.0
         scaffolds = [chemistry_utils.get_bemis_murcko_scaffold(smiles) for smiles in smiles]
         penalized_rewards = []
         for idx, scaf in enumerate(scaffolds):

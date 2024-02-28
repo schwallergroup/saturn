@@ -17,7 +17,7 @@ def sample_unique_sequences(
     seqs, smiles, agent_likelihood = agent.sample_sequences_and_smiles(batch_size)
     unique_indices = get_indices_of_unique_smiles(smiles)
 
-    # get unique sequences, smiles, and agent likelihoods
+    # Get unique sequences, smiles, and agent likelihoods
     seqs = seqs[unique_indices]
     smiles = np.array(smiles)
     smiles = smiles[unique_indices]

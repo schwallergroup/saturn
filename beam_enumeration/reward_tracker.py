@@ -14,11 +14,11 @@ class RewardTracker:
         This method returns a boolean whether to execute Beam Enumeration or not.
         The condition is if the mean reward increases for patience number of successive epochs (to mitigate stochastic improvement).
         """
-        # initialization
+        # Initialization
         if self.best_reward is None:
             self.best_reward = mean_reward
             return False
-        # reward improved
+        # Reward improved
         elif mean_reward > self.best_reward:
             self.consecutive_improvements += 1
             if self.consecutive_improvements == self.patience:
@@ -27,7 +27,7 @@ class RewardTracker:
                 self.beam_executions += 1
                 return True
             return False
-        # reward did not improve
+        # Reward did not improve
         else:
             self.consecutive_improvements = 0
             return False

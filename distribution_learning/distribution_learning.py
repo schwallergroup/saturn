@@ -29,6 +29,7 @@ class DistributionLearningTrainer:
     ):
         # Training parameters
         self.seed = configuration.seed
+        # TODO: Adaptive learning rate
         self.learning_rate = configuration.learning_rate
         self.training_steps = configuration.training_steps
         self.batch_size = configuration.batch_size
@@ -36,7 +37,7 @@ class DistributionLearningTrainer:
         self.train_with_randomization = configuration.train_with_randomization
 
         self.train_dataset = SMILESDataset(
-            agent = configuration.agent,
+            agent=configuration.agent,
             dataset_path=configuration.training_dataset_path,
             batch_size=configuration.batch_size,
             transfer_learning=configuration.transfer_learning,
@@ -44,7 +45,7 @@ class DistributionLearningTrainer:
         )
 
         self.val_dataset = SMILESDataset(
-            agent = configuration.agent,
+            agent=configuration.agent,
             dataset_path=configuration.validation_dataset_path,
             batch_size=configuration.batch_size,
             transfer_learning=configuration.transfer_learning,
@@ -53,9 +54,10 @@ class DistributionLearningTrainer:
 
         # Initialize model
         if self.transfer_learning:
-            # Load the pre-trained model
+            # Load the pre-trained Agent
             self.agent = Generator.load_from_file(configuration.agent)
         else:
+            # Otherwise, train the Agent from scratch
             self.agent = Generator(
                 model_type=configuration.model_type,
                 vocabulary=self.train_dataset.vocabulary,
@@ -64,9 +66,6 @@ class DistributionLearningTrainer:
             )
 
         self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)
-
-        print('initialized')
-        exit()
   
     def run(self):
         for epoch in range(1, self.training_steps + 1, 1):
@@ -83,6 +82,9 @@ class DistributionLearningTrainer:
 
             # TODO: Compute success by sampling 10k SMILES and checking validity and distribution overlap (how to measure this?)
             print(f"Epoch {epoch} | NLL: {np.mean(losses)}")
+
+        # Save the trained Agent
+        self.agent.save("trained-model.pt")
 
     def backpropagate(
         self, 

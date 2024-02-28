@@ -22,7 +22,7 @@ class DockStream(OracleComponent):
         self.environment_path = parameters.specific_parameters["environment_path"]
 
     def __call__(self, mols: np.ndarray[Mol], oracle_calls: int) -> np.ndarray[float]:
-        # FIXME: bad practice as the function signature is not the same as the parent class abstract method
+        # FIXME: Bad practice as the function signature is not the same as the parent class abstract method
         smiles = np.vectorize(Chem.MolToSmiles)(mols)
         return self._compute_property(smiles, oracle_calls)
     

@@ -34,7 +34,7 @@ class Generator:
         model_type: str,
         vocabulary: Vocabulary, 
         tokenizer: SMILESTokenizer, 
-        network_params=None, 
+        network_params = None, 
         max_sequence_length: int = 256
     ):
         """
@@ -125,8 +125,12 @@ class Generator:
         :param sequences: (batch_size, sequence_length) A batch of sequences
         :return:  (batch_size) Log likelihood for each example.
         """
-        logits, _ = self.network(sequences[:, :-1])  # all steps done at once
-        log_probs = logits.log_softmax(dim=2)
+        # Full sequence is passed and logits obtained using Teacher Forcing
+        if isinstance(self.network, RNN):
+            logits, _ = self.network(sequences[:, :-1])
+        elif isinstance(self.network, TransformerDecoder):
+            logits = self.network(sequences[:, :-1])
+        log_probs = logits.log_softmax(dim=2)  # (batch_size, sequence_length, vocabulary_size)
         return self.nll_loss(log_probs.transpose(1, 2), sequences[:, 1:]).sum(dim=1)
 
     def sample_smiles(
@@ -158,12 +162,12 @@ class Generator:
             del seqs, likelihoods
         return smiles_sampled, np.concatenate(likelihoods_sampled)
 
-    def sample_sequences_and_smiles(self, batch_size=128) -> Tuple[torch.Tensor, List, torch.Tensor]:
+    def sample_sequences_and_smiles(self, batch_size=32) -> Tuple[torch.Tensor, List, torch.Tensor]:
         seqs, likelihoods = self._sample(batch_size=batch_size)
         smiles = [self.tokenizer.untokenize(self.vocabulary.decode(seq)) for seq in seqs.cpu().numpy()]
         return seqs, smiles, likelihoods
 
-    # @torch.no_grad()
+    @torch.no_grad()
     def _sample(self, batch_size=32) -> Tuple[torch.Tensor, torch.Tensor]:
         start_token = torch.zeros(batch_size, dtype=torch.long)
         start_token[:] = self.vocabulary["^"]

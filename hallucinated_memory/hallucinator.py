@@ -62,14 +62,14 @@ class Hallucinator(ABC):
         elif self.selection_criterion == "tanimoto_distance":
             tanimoto_distances = []
 
-            # if Sequence-based Hallucinator, Tanimoto distance relative to the parent sequence
+            # If Sequence-based Hallucinator, Tanimoto distance relative to the parent sequence
             if isinstance(parent, Chem.Mol):
                 parent_fp = GetMorganFingerprintAsBitVect(parent, radius=3, nBits=2048)
                 for h in hallucinations:
                     h_fp = GetMorganFingerprintAsBitVect(h, radius=3, nBits=2048)
                     tanimoto_distances.append(TanimotoSimilarity(parent_fp, h_fp))
         
-            # if GA-based Hallucinator, Tanimoto distance relative to entire buffer
+            # If GA-based Hallucinator, Tanimoto distance relative to entire buffer
             elif isinstance(parent, list):
                 parent_fps = [GetMorganFingerprintAsBitVect(p, radius=3, nBits=2048) for p in parent]
                 for h in hallucinations:
@@ -77,7 +77,7 @@ class Hallucinator(ABC):
                     # average Tanimoto distance of each hallucination to the entire buffer
                     tanimoto_distances.append(np.mean(BulkTanimotoSimilarity(h_fp, parent_fps)))
             
-            # return the most *dissimilar* molecules
+            # Return the most *dissimilar* molecules
             dissimilar_indices = np.argsort(tanimoto_distances)[:self.num_selected]
             return np.array(list(hallucinations_smiles))[dissimilar_indices]
             
@@ -92,7 +92,7 @@ class Hallucinator(ABC):
         """
         Returns the number of times a batch of hallucinations have corresponding rewards better than the SMILES in the Replay Buffer.
         """
-        # TODO: optimize the implementation - brute force for now
+        # TODO: Optimize the implementation - brute force for now
         count = 0
         buffer_rewards = list(buffer_rewards)
 

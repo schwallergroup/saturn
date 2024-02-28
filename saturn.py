@@ -55,7 +55,7 @@ if __name__ == "__main__":
     model_type = config["model_type"]
     #set_seed_everywhere(seed, device)
 
-    # TODO: logging should have results path that is *shared* for distribution learning and goal-directed generation
+    # TODO: Logging should have results path that is *shared* for distribution learning and goal-directed generation
     if running_mode == "distribution_learning":
         distribution_learning_trainer = DistributionLearningTrainer(
             DistributionLearningConfiguration(
@@ -64,8 +64,8 @@ if __name__ == "__main__":
                 **config["distribution_learning"]["parameters"])
         )
         distribution_learning_trainer.run()
-        # TODO: execute distribution learning (either pre-training or fine-tuning)
-        # TODO: lightning trainer, track NLL, track SMILES validity, and don't forget to apply randomization during training (or have the option to)
+        # TODO: Execute distribution learning (either pre-training or fine-tuning)
+        # TODO: Lightning trainer, track NLL, track SMILES validity, and don't forget to apply randomization during training (or have the option to)
         pass
     elif running_mode == "goal_directed_generation":
         # 1. Construct the Oracle

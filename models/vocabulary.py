@@ -71,12 +71,10 @@ class Vocabulary:
         else:
             raise ValueError("Index already present in Vocabulary.")
 
-    def tokens(self) -> List[str]:
+    def get_tokens(self) -> List[str]:
         """Returns the tokens from the Vocabulary."""
         return [t for t in self.tokens if isinstance(t, str)]
     
-
-
 class SMILESTokenizer:
     """
     SMILES tokenizer based on REINVENT's implementation.
