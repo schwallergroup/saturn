@@ -35,7 +35,7 @@ class Generator:
         vocabulary: Vocabulary, 
         tokenizer: SMILESTokenizer, 
         network_params = None, 
-        max_sequence_length: int = 256
+        max_sequence_length: int = 128
     ):
         """
         Initializes the SMILES generative model.
@@ -208,7 +208,7 @@ class Generator:
         elif self.model_type == "decoder":
             network = TransformerDecoder(len(self.vocabulary), **network_params)
         elif self.model_type == "mamba":
-            raise NotImplementedError("MAMBA model is not yet implemented.")
+            raise NotImplementedError("Mamba model is not yet implemented.")
         else:
             raise ValueError(f"Invalid model type {self.model_type}")
         

@@ -23,7 +23,7 @@ class SMILESDataset(Dataset):
         batch_size: int = 256,
         transfer_learning: bool = False,
         randomize: bool = True,
-        max_sequence_length: int = 256
+        max_sequence_length: int = 128
     ):
         self.dataset_path = dataset_path
         self.max_sequence_length = max_sequence_length

@@ -84,7 +84,7 @@ class PositionalEncoding(nn.Module):
     def __init__(
         self, 
         embedding_dim: int, 
-        max_sequence_length=256
+        max_sequence_length=128
     ):
         super(PositionalEncoding, self).__init__()
         
@@ -93,11 +93,11 @@ class PositionalEncoding(nn.Module):
         div_term = torch.exp(torch.arange(0, embedding_dim, 2).float() * (-torch.log(torch.tensor(10000.0)) / embedding_dim))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
-        self.register_buffer("pe", pe.unsqueeze(0))
+        self.register_buffer("pe", pe)
         
     def forward(self, x):
         # Add Positional Encoding to the Embedding
-        return x + self.pe[:, :x.size(1), :]
+        return x + self.pe[:x.size(1), :]
 
 class DecoderLayer(nn.Module):
     def __init__(
@@ -131,7 +131,7 @@ class DecoderLayer(nn.Module):
         )  # returns (output, attention_weights)
 
         x = self.layer_norm_1(x + self.dropout(x))
-        x = self.feed_forward(x)
-        x = self.layer_norm_2(x + self.dropout(x))
+        feed_forward_output = self.feed_forward(x)
+        x = self.layer_norm_2(x + self.dropout(feed_forward_output))
 
         return x  # (batch, sequence_length, embedding_dim)
