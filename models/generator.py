@@ -169,18 +169,22 @@ class Generator:
 
     @torch.no_grad()
     def _sample(self, batch_size=32) -> Tuple[torch.Tensor, torch.Tensor]:
-        start_token = torch.zeros(batch_size, dtype=torch.long)
+        device = next(self.network.parameters()).device
+        start_token = torch.zeros(batch_size, dtype=torch.long, device=device)
         start_token[:] = self.vocabulary["^"]
         input_vector = start_token
-        sequences = [self.vocabulary["^"] * torch.ones([batch_size, 1], dtype=torch.long)]
+        sequences = [self.vocabulary["^"] * torch.ones([batch_size, 1], dtype=torch.long, device=device)]
         # NOTE: The first token never gets added in the loop so the sequences are initialized with a start token
         hidden_state = None
-        nlls = torch.zeros(batch_size)
+        nlls = torch.zeros(batch_size, device=device)
         for _ in range(self.max_sequence_length - 1):
-            logits, hidden_state = self.network(input_vector.unsqueeze(1), hidden_state)
+            if isinstance(self.network, RNN):
+                logits, hidden_state = self.network(input_vector.unsqueeze(1), hidden_state)
+            elif isinstance(self.network, TransformerDecoder):
+                logits = self.network(input_vector.unsqueeze(1))
             logits = logits.squeeze(1)
             probabilities = logits.softmax(dim=1)
-            log_probs = logits.log_softmax(dim=1)
+            log_probs = logits.log_softmax(dim=1)  # For NLL calculation
             input_vector = torch.multinomial(probabilities, 1).view(-1)
             sequences.append(input_vector.view(-1, 1))
             nlls += self.nll_loss(log_probs, input_vector)

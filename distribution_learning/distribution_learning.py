@@ -80,8 +80,19 @@ class DistributionLearningTrainer:
                 # 2. Backpropagate
                 self.backpropagate(loss)
 
+            sampled = []
+            while len(sampled) < 10000:
+                sampled_batch, sampled_nlls = self.agent.sample_smiles(num=512, batch_size=512)
+                sampled.extend(sampled_batch)
+            valid = 0
+            for s in sampled:
+                from rdkit import Chem
+                mol = Chem.MolFromSmiles(s)
+                if mol is not None:
+                    print(s)
+                    valid += 1
             # TODO: Compute success by sampling 10k SMILES and checking validity and distribution overlap (how to measure this?)
-            print(f"Epoch {epoch} | NLL: {np.mean(losses)}")
+            print(f"Epoch {epoch} | NLL: {np.mean(losses)} | Valid: {round(valid / len(sampled)*100, 2)}%")
 
         # Save the trained Agent
         self.agent.save("trained-model.pt")

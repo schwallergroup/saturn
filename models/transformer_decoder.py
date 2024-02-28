@@ -14,7 +14,7 @@ class TransformerDecoder(nn.Module):
     :param num_heads: number of heads for Multi-Head Attention (MHA)
     :param dropout: dropout rate
 
-    Default parameters yield a 6,376,049 parameter model. 
+    Default parameters yield a 6,336,548 parameter model. 
     Using REINVENT's loss function, this model size has been shown to work here:
     https://openreview.net/pdf?id=1B6YKnHYBb
     """
