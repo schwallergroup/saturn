@@ -9,6 +9,7 @@ import numpy as np
 # Import model architectures
 from models.rnn import RNN
 from models.decoder import Decoder
+from models.mamba import Mamba
 
 # Import vocabulary
 from models.vocabulary import Vocabulary, SMILESTokenizer
@@ -23,7 +24,7 @@ class Generator:
     The network attribute is the SMILES generator model and can be the following architectures:
         1. LSTM RNN
         2. Decoder-only Transformer (based on GPT-2)
-        3. # TODO: Mamba
+        3. Mamba
 
     The key methods are:
         1. Sampling SMILES
@@ -46,6 +47,7 @@ class Generator:
         :param network_params: Dictionary with all parameters required to correctly initialize the specific architecture class
         :param max_sequence_length: The max size of SMILES sequence that can be generated
         """
+        assert model_architecture in ["rnn", "decoder", "mamba"], f"Invalid model architecture: {model_architecture}."
         self.model_architecture = model_architecture
         self.vocabulary = vocabulary
         self.tokenizer = tokenizer
@@ -53,15 +55,6 @@ class Generator:
 
         self.network = self._initialize_network(network_params)
         self.nll_loss = nn.NLLLoss(reduction="none")
-
-    def set_mode(self, mode: str):
-        # FIXME: not currently used
-        if mode == "training":
-            self.network.train()
-        elif mode == "inference":
-            self.network.eval()
-        else:
-            raise ValueError(f"Invalid model mode {mode}")
 
     @classmethod
     def load_from_file(cls, model_path: str, sampling_mode=False):
@@ -129,7 +122,7 @@ class Generator:
         # Full sequence is passed and logits obtained using Teacher Forcing
         if isinstance(self.network, RNN):
             logits, _ = self.network(sequences[:, :-1])
-        elif isinstance(self.network, Decoder):
+        elif isinstance(self.network, Decoder) or isinstance(self.network, Mamba):
             logits = self.network(sequences[:, :-1])
         log_probs = logits.log_softmax(dim=2)  # (batch_size, sequence_length, vocabulary_size)
         return self.nll_loss(log_probs.transpose(1, 2), sequences[:, 1:]).sum(dim=1)
@@ -174,7 +167,7 @@ class Generator:
         Samples a batch of sequences with code logic for different model architectures:
             1. RNN
             2. Decoder
-            3. # TODO: Mamba
+            3. Mamba
         """
         device = next(self.network.parameters()).device
         start_token = torch.zeros(batch_size, dtype=torch.long, device=device)
@@ -182,11 +175,11 @@ class Generator:
         input_vector = start_token
         sequences = [self.vocabulary["^"] * torch.ones([batch_size, 1], dtype=torch.long, device=device)]
 
-        hidden_state = None
+        hidden_state = None  # For RNN
         # Generate full Causal Mask and slice it during Autoregressive generation
-        causal_mask = generate_causal_mask(self.max_sequence_length, device=device)
+        causal_mask = generate_causal_mask(self.max_sequence_length, device=device)  # For Decoder
         
-        nlls = torch.zeros(batch_size, device=device)
+        nlls = torch.zeros(batch_size, device=device)  # Track Negative Log-Likelihoods
 
         # Autoregressive generation
         for idx in range(1, self.max_sequence_length + 1, 1):
@@ -199,14 +192,17 @@ class Generator:
             elif isinstance(self.network, Decoder):
                 input_vector = torch.cat(sequences, 1)
                 logits = self.network(input_vector, causal_mask[:idx, :idx])
-                # Extracts logits at the last position
+                # Extract logits at the last position
                 logits = logits[:, -1, :].squeeze(1)  # (batch_size, vocabulary_size)
 
-            elif isinstance(self.network, "FILL"):
-                raise NotImplementedError("Mamba model is not yet implemented.")
+            elif isinstance(self.network, Mamba):
+                input_vector = torch.cat(sequences, 1)
+                logits = self.network(input_vector)
+                # Extract logits at the last position
+                logits = logits[:, -1, :].squeeze(1) # (batch_size, vocabulary_size)
 
             probabilities = logits.softmax(dim=1)
-            log_probs = logits.log_softmax(dim=1)  # For NLL calculation
+            log_probs = logits.log_softmax(dim=1)  # For Negative Log-Likelihood calculation
             input_vector = torch.multinomial(probabilities, num_samples=1).view(-1)
             sequences.append(input_vector.view(-1, 1))
             nlls += self.nll_loss(log_probs, input_vector)
@@ -236,9 +232,12 @@ class Generator:
         elif self.model_architecture == "decoder":
             network = Decoder(len(self.vocabulary), **network_params)
         elif self.model_architecture == "mamba":
-            raise NotImplementedError("Mamba model is not yet implemented.")
-        else:
-            raise ValueError(f"Invalid model architecture: {self.model_architecture}.")
+            from models.mamba import ModelArgs
+            network_params = ModelArgs(
+                len(self.vocabulary),
+                **network_params
+            )
+            network = Mamba(network_params)
         
         if torch.cuda.is_available():
             network.cuda()

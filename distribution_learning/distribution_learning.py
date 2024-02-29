@@ -83,7 +83,7 @@ class DistributionLearningTrainer:
 
             self.agent.network.eval()
             sampled = []
-            while len(sampled) < 1e4:
+            while len(sampled) < 1e3:
                 sampled_batch, sampled_nlls = self.agent.sample_smiles(num=self.batch_size, batch_size=self.batch_size)
                 sampled.extend(sampled_batch)
             valid = 0
