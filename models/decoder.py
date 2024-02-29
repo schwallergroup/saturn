@@ -38,6 +38,7 @@ class Decoder(nn.Module):
 
         self.embedding = nn.Embedding(vocabulary_size, embedding_dim)
         self.positional_encoding = PositionalEncoding(embedding_dim)
+        self.dropout = nn.Dropout(dropout)
         self.decoder_blocks = nn.ModuleList([
             DecoderLayer(
                 embedding_dim=embedding_dim, 
@@ -57,13 +58,18 @@ class Decoder(nn.Module):
 
         # 1. Vocabulary indices to Embedding
         x = self.embedding(input_vector)  # (batch, sequence_length, embedding_dim)
+
+        # 2. Add Positional Encoding to Embedding
         x = self.positional_encoding(x)  # (batch, sequence_length, embedding_dim)
 
-        # 2. Pass through Decoder blocks
+        # 3. Apply Dropout
+        x = self.dropout(x)
+
+        # 4. Pass through Decoder blocks
         for decoder_block in self.decoder_blocks:
             x = decoder_block(x, src_mask)  # (batch, sequence_length, embedding_dim)
 
-        # 3. Map back to Vocabulary size
+        # 5. Map back to Vocabulary size
         x = x.reshape(-1, self.embedding_dim)  # (batch * sequence_length, embedding_dim)
         x = self.linear(x).view(batch_size, sequence_length, -1)  # (batch, sequence_length, vocabulary_size)
 
@@ -122,7 +128,6 @@ class DecoderLayer(nn.Module):
             nn.Linear(hidden_dim, embedding_dim)
         )
         self.layer_norm_2 = nn.LayerNorm(embedding_dim)
-        self.dropout = nn.Dropout(dropout)
         
     def forward(self, x, src_mask=None):
         if src_mask is not None:
@@ -133,15 +138,15 @@ class DecoderLayer(nn.Module):
                 device=x.device
             ) # (sequence_length, sequence_length)
 
-        x, _ = self.self_attention(
-            query=x, 
-            key=x, 
-            value=x, 
+        # Layer Normalization before Self-Attention
+        attention_output, _ = self.self_attention(
+            query=self.layer_norm_1(x), 
+            key=self.layer_norm_1(x), 
+            value=self.layer_norm_1(x), 
             attn_mask=attention_mask
         )  # returns (output, attention_weights)
 
-        x = self.layer_norm_1(x + self.dropout(x))
-        feed_forward_output = self.feed_forward(x)
-        x = self.layer_norm_2(x + self.dropout(feed_forward_output))
+        x = x + attention_output
+        x = x + self.feed_forward(self.layer_norm_2(x))
 
         return x  # (batch, sequence_length, embedding_dim)

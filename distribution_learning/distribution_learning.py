@@ -59,7 +59,7 @@ class DistributionLearningTrainer:
         else:
             # Otherwise, train the Agent from scratch
             self.agent = Generator(
-                model_type=configuration.model_type,
+                model_architecture=configuration.model_architecture,
                 vocabulary=self.train_dataset.vocabulary,
                 tokenizer=self.train_dataset.tokenizer,
                 network_params=None
@@ -69,6 +69,7 @@ class DistributionLearningTrainer:
   
     def run(self):
         for epoch in range(1, self.training_steps + 1, 1):
+            self.agent.network.train()
             # NOTE: Each epoch loops through the entire dataset
             train_dataloader, val_dataloader = self.setup_dataloaders()
             losses = []
@@ -80,16 +81,18 @@ class DistributionLearningTrainer:
                 # 2. Backpropagate
                 self.backpropagate(loss)
 
+            self.agent.network.eval()
             sampled = []
-            while len(sampled) < 10000:
-                sampled_batch, sampled_nlls = self.agent.sample_smiles(num=512, batch_size=512)
+            while len(sampled) < 1e4:
+                sampled_batch, sampled_nlls = self.agent.sample_smiles(num=self.batch_size, batch_size=self.batch_size)
                 sampled.extend(sampled_batch)
             valid = 0
             for s in sampled:
                 from rdkit import Chem
                 mol = Chem.MolFromSmiles(s)
                 if mol is not None:
-                    print(s)
+                    if len(s) > 3:
+                        print(s)
                     valid += 1
             # TODO: Compute success by sampling 10k SMILES and checking validity and distribution overlap (how to measure this?)
             print(f"Epoch {epoch} | NLL: {np.mean(losses)} | Valid: {round(valid / len(sampled)*100, 2)}%")

@@ -93,7 +93,7 @@ class Generator:
         Saves the model to save_path.
         """
         save_dict = {
-            "model_type": self.model_type,
+            "model_architecture": self.model_architecture,
             "vocabulary": self.vocabulary,
             "tokenizer": self.tokenizer,
             "max_sequence_length": self.max_sequence_length,
@@ -181,28 +181,37 @@ class Generator:
         start_token[:] = self.vocabulary["^"]
         input_vector = start_token
         sequences = [self.vocabulary["^"] * torch.ones([batch_size, 1], dtype=torch.long, device=device)]
+
         hidden_state = None
+        # Generate full Causal Mask and slice it during Autoregressive generation
+        causal_mask = generate_causal_mask(self.max_sequence_length, device=device)
+        
         nlls = torch.zeros(batch_size, device=device)
-        for _ in range(self.max_sequence_length - 1):
+
+        # Autoregressive generation
+        for idx in range(1, self.max_sequence_length + 1, 1):
 
             if isinstance(self.network, RNN):
+                # RNN requires hidden state
                 logits, hidden_state = self.network(input_vector.unsqueeze(1), hidden_state)
+                logits = logits.squeeze(1)
 
             elif isinstance(self.network, Decoder):
-                # Generate Causal Mask for current sequence length
-                input_vector = input_vector.unsqueeze(1)
-                mask = generate_causal_mask(input_vector.size(1), device)
-                logits = self.network(input_vector, mask)
+                input_vector = torch.cat(sequences, 1)
+                logits = self.network(input_vector, causal_mask[:idx, :idx])
+                # Extracts logits at the last position
+                logits = logits[:, -1, :].squeeze(1)  # (batch_size, vocabulary_size)
 
             elif isinstance(self.network, "FILL"):
                 raise NotImplementedError("Mamba model is not yet implemented.")
 
-            logits = logits.squeeze(1)
             probabilities = logits.softmax(dim=1)
             log_probs = logits.log_softmax(dim=1)  # For NLL calculation
-            input_vector = torch.multinomial(probabilities, 1).view(-1)
+            input_vector = torch.multinomial(probabilities, num_samples=1).view(-1)
             sequences.append(input_vector.view(-1, 1))
             nlls += self.nll_loss(log_probs, input_vector)
+
+            # Stop sampling if all sequences have generated the stop token
             if input_vector.sum() == 0:
                 break
 
