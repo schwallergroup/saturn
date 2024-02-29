@@ -3,7 +3,7 @@ from dataclasses import dataclass
 @dataclass
 class DistributionLearningConfiguration:
     seed: int
-    model_type: str
+    model_architecture: str
     agent: str
     training_steps: int
     batch_size: int

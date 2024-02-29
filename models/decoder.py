@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+
+from utils.utils import generate_causal_mask
 
 
-class TransformerDecoder(nn.Module):
+class Decoder(nn.Module):
     """
     Implements a Decoder-only Transformer architecture based on GPT-2.
 
@@ -27,7 +28,7 @@ class TransformerDecoder(nn.Module):
         num_heads: int = 16, 
         dropout: float = 0.0
     ):
-        super(TransformerDecoder, self).__init__()
+        super(Decoder, self).__init__()
         self.vocabulary_size = vocabulary_size
         self.embedding_dim = embedding_dim
         self.hidden_dim = hidden_dim
@@ -64,7 +65,7 @@ class TransformerDecoder(nn.Module):
 
         # 3. Map back to Vocabulary size
         x = x.reshape(-1, self.embedding_dim)  # (batch * sequence_length, embedding_dim)
-        x = self.linear(x).view(batch_size, sequence_length, -1)
+        x = self.linear(x).view(batch_size, sequence_length, -1)  # (batch, sequence_length, vocabulary_size)
 
         return x
 
@@ -108,7 +109,12 @@ class DecoderLayer(nn.Module):
         dropout: float = 0.0
     ):
         super(DecoderLayer, self).__init__()
-        self.self_attention = nn.MultiheadAttention(embedding_dim, num_heads, dropout=dropout)
+        self.self_attention = nn.MultiheadAttention(
+            embed_dim=embedding_dim, 
+            num_heads=num_heads, 
+            dropout=dropout,
+            batch_first=True
+        )  # Takes as input (batch, sequence_length, embedding_dim)
         self.layer_norm_1 = nn.LayerNorm(embedding_dim)
         self.feed_forward = nn.Sequential(
             nn.Linear(embedding_dim, hidden_dim),
@@ -119,9 +125,13 @@ class DecoderLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         
     def forward(self, x, src_mask=None):
-        attention_mask = None
         if src_mask is not None:
-            attention_mask = src_mask.unsqueeze(0)
+            attention_mask = src_mask  # For generation
+        else:
+            attention_mask = generate_causal_mask(
+                size=x.size(1), 
+                device=x.device
+            ) # (sequence_length, sequence_length)
 
         x, _ = self.self_attention(
             query=x, 

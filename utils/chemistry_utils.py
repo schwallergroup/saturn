@@ -29,7 +29,8 @@ def randomize_smiles(smiles: str) -> str:
         new_atom_order = list(range(mol.GetNumHeavyAtoms()))
         random.shuffle(new_atom_order)
         random_mol = RenumberAtoms(mol, newOrder=new_atom_order)
-        return Chem.MolToSmiles(random_mol, canonical=False, isomericSmiles=False)
+        # TODO: Have option to control stereochemistry
+        return Chem.MolToSmiles(random_mol, canonical=False, isomericSmiles=True)
     else:
         return None
 

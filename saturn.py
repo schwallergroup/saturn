@@ -52,7 +52,7 @@ if __name__ == "__main__":
     # (Optionally) set the seed
     #device = "cuda" if torch.cuda.is_available() else "cpu"
     seed = config["seed"]
-    model_type = config["model_type"]
+    model_architecture = config["model_architecture"]
     #set_seed_everywhere(seed, device)
 
     # TODO: Logging should have results path that is *shared* for distribution learning and goal-directed generation
@@ -60,7 +60,7 @@ if __name__ == "__main__":
         distribution_learning_trainer = DistributionLearningTrainer(
             DistributionLearningConfiguration(
                 seed,
-                model_type,
+                model_architecture,
                 **config["distribution_learning"]["parameters"])
         )
         distribution_learning_trainer.run()
@@ -76,7 +76,7 @@ if __name__ == "__main__":
             oracle=oracle,
             configuration=GoalDirectedGenerationConfiguration(
                 seed,
-                model_type,
+                model_architecture,
                 ReinforcementLearningParameters(**config["goal_directed_generation"]["reinforcement_learning"]),
                 ExperienceReplayParameters(**config["goal_directed_generation"]["experience_replay"]),
                 DiversityFilterParameters(**config["goal_directed_generation"]["diversity_filter"]),

@@ -18,3 +18,16 @@ def to_tensor(array: np.array) -> torch.Tensor:
     if torch.cuda.is_available():
         return torch.tensor(array, device="cuda")
     return torch.tensor(array, device="cpu")
+
+def generate_causal_mask(size: int, device: str) -> torch.Tensor:
+    """
+    Generates the Causal Mask for input to Self-Attention. 
+    Masked postions = float("-inf")
+    Unmasked positions = float(0.0)
+
+    :param size: Size of the square mask
+    :return: A (size, size) mask
+    """
+    mask = (torch.triu(torch.ones(size, size, device=device)) == 1).transpose(0, 1)
+    mask = mask.float().masked_fill(mask == 0, float("-inf")).masked_fill(mask == 1, float(0.0))
+    return mask

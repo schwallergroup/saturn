@@ -1,5 +1,4 @@
 """
-# TODO: replace model.py with this file later when the code is ready - will need to re-train all models
 Based on the implementation from https://github.com/MolecularAI/reinvent-models
 """
 from typing import Tuple, List, Union
@@ -7,12 +6,14 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-# import model architectures
+# Import model architectures
 from models.rnn import RNN
-from models.transformer_decoder import TransformerDecoder
+from models.decoder import Decoder
 
-# import vocabulary
+# Import vocabulary
 from models.vocabulary import Vocabulary, SMILESTokenizer
+
+from utils.utils import generate_causal_mask
 
 
 class Generator:
@@ -22,7 +23,7 @@ class Generator:
     The network attribute is the SMILES generator model and can be the following architectures:
         1. LSTM RNN
         2. Decoder-only Transformer (based on GPT-2)
-        3. # TODO: MAMBA
+        3. # TODO: Mamba
 
     The key methods are:
         1. Sampling SMILES
@@ -31,21 +32,21 @@ class Generator:
 
     def __init__(
         self, 
-        model_type: str,
+        model_architecture: str,
         vocabulary: Vocabulary, 
         tokenizer: SMILESTokenizer, 
         network_params = None, 
         max_sequence_length: int = 128
     ):
         """
-        Initializes the SMILES generative model.
-        :param model_type: Architecture of the SMILES generator
-        :param vocabulary: Vocabulary to use.
-        :param tokenizer: Tokenizer to use.
-        :param network_params: Dictionary with all parameters required to correctly initialize the specific architecture class.
-        :param max_sequence_length: The max size of SMILES sequence that can be generated.
+        Initializes the SMILES generative model
+        :param model_architecture: Architecture of the SMILES generator
+        :param vocabulary: Vocabulary to use
+        :param tokenizer: Tokenizer to use
+        :param network_params: Dictionary with all parameters required to correctly initialize the specific architecture class
+        :param max_sequence_length: The max size of SMILES sequence that can be generated
         """
-        self.model_type = model_type
+        self.model_architecture = model_architecture
         self.vocabulary = vocabulary
         self.tokenizer = tokenizer
         self.max_sequence_length = max_sequence_length
@@ -63,16 +64,16 @@ class Generator:
             raise ValueError(f"Invalid model mode {mode}")
 
     @classmethod
-    def load_from_file(cls, file_path: str, sampling_mode=False):
+    def load_from_file(cls, model_path: str, sampling_mode=False):
         """
-        Loads a model from a single file
-        :param file_path: input file path
-        :return: new instance of the RNN or an exception if it was not possible to load it.
+        Loads trained model from file.
+        :param model_path: Path to the model file 
+        :return: SMILES generator model instance
         """
         if torch.cuda.is_available():
-            save_dict = torch.load(file_path)
+            save_dict = torch.load(model_path)
         else:
-            save_dict = torch.load(file_path, map_location=lambda storage, loc: storage)
+            save_dict = torch.load(model_path, map_location=lambda storage, loc: storage)
 
         network_params = save_dict.get("network_params", {})
         model = Generator(
@@ -124,11 +125,11 @@ class Generator:
 
         :param sequences: (batch_size, sequence_length) A batch of sequences
         :return:  (batch_size) Log likelihood for each example.
-        """
+        """  
         # Full sequence is passed and logits obtained using Teacher Forcing
         if isinstance(self.network, RNN):
             logits, _ = self.network(sequences[:, :-1])
-        elif isinstance(self.network, TransformerDecoder):
+        elif isinstance(self.network, Decoder):
             logits = self.network(sequences[:, :-1])
         log_probs = logits.log_softmax(dim=2)  # (batch_size, sequence_length, vocabulary_size)
         return self.nll_loss(log_probs.transpose(1, 2), sequences[:, 1:]).sum(dim=1)
@@ -169,19 +170,33 @@ class Generator:
 
     @torch.no_grad()
     def _sample(self, batch_size=32) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Samples a batch of sequences with code logic for different model architectures:
+            1. RNN
+            2. Decoder
+            3. # TODO: Mamba
+        """
         device = next(self.network.parameters()).device
         start_token = torch.zeros(batch_size, dtype=torch.long, device=device)
         start_token[:] = self.vocabulary["^"]
         input_vector = start_token
         sequences = [self.vocabulary["^"] * torch.ones([batch_size, 1], dtype=torch.long, device=device)]
-        # NOTE: The first token never gets added in the loop so the sequences are initialized with a start token
         hidden_state = None
         nlls = torch.zeros(batch_size, device=device)
         for _ in range(self.max_sequence_length - 1):
+
             if isinstance(self.network, RNN):
                 logits, hidden_state = self.network(input_vector.unsqueeze(1), hidden_state)
-            elif isinstance(self.network, TransformerDecoder):
-                logits = self.network(input_vector.unsqueeze(1))
+
+            elif isinstance(self.network, Decoder):
+                # Generate Causal Mask for current sequence length
+                input_vector = input_vector.unsqueeze(1)
+                mask = generate_causal_mask(input_vector.size(1), device)
+                logits = self.network(input_vector, mask)
+
+            elif isinstance(self.network, "FILL"):
+                raise NotImplementedError("Mamba model is not yet implemented.")
+
             logits = logits.squeeze(1)
             probabilities = logits.softmax(dim=1)
             log_probs = logits.log_softmax(dim=1)  # For NLL calculation
@@ -200,21 +215,21 @@ class Generator:
     def get_num_params(self):
         return sum(p.numel() for p in self.network.parameters() if p.requires_grad)
 
-    def _initialize_network(self, network_params: Union[dict, None]) -> Union[RNN, TransformerDecoder]:
+    def _initialize_network(self, network_params: Union[dict, None]) -> Union[RNN, Decoder]:
         """
         Initializes the network based on the model type.
         """
         if not isinstance(network_params, dict):
             network_params = {}
 
-        if self.model_type == "rnn":
+        if self.model_architecture == "rnn":
             network = RNN(len(self.vocabulary), **network_params)
-        elif self.model_type == "decoder":
-            network = TransformerDecoder(len(self.vocabulary), **network_params)
-        elif self.model_type == "mamba":
+        elif self.model_architecture == "decoder":
+            network = Decoder(len(self.vocabulary), **network_params)
+        elif self.model_architecture == "mamba":
             raise NotImplementedError("Mamba model is not yet implemented.")
         else:
-            raise ValueError(f"Invalid model type {self.model_type}")
+            raise ValueError(f"Invalid model architecture: {self.model_architecture}.")
         
         if torch.cuda.is_available():
             network.cuda()
