@@ -91,12 +91,13 @@ class DistributionLearningTrainer:
                 from rdkit import Chem
                 mol = Chem.MolFromSmiles(s)
                 if mol is not None:
+                    if len(s) > 5:
+                        print(s)
                     valid += 1
             # TODO: Compute success by sampling 10k SMILES and checking validity and distribution overlap (how to measure this?)
             print(f"Epoch {epoch} | NLL: {np.mean(losses)} | Valid: {round(valid / len(sampled)*100, 2)}%")
-
-        # Save the trained Agent
-        self.agent.save(f"{self.agent.model_architecture}.prior")
+            # Save the trained Agent
+            self.agent.save(f"{self.agent.model_architecture}.prior_{epoch}")
 
     def backpropagate(
         self, 
