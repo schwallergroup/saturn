@@ -13,7 +13,8 @@ from utils.utils import to_tensor
 
 from oracles.oracle import Oracle
 from goal_directed_generation.dataclass import GoalDirectedGenerationConfiguration
-from models.model import Model
+
+from models.generator import Generator
 from experience_replay.replay_buffer import ReplayBuffer
 from diversity_filter.diversity_filter import DiversityFilter
 from hallucinated_memory.utils import initialize_hallucinator
@@ -29,10 +30,10 @@ class ReinforcementLearningAgent:
         oracle: Oracle,
         configuration: GoalDirectedGenerationConfiguration
     ):
-        self.prior = Model.load_from_file(configuration.reinforcement_learning.prior)
+        self.prior = Generator.load_from_file(configuration.reinforcement_learning.prior)
         # Prior model is not updated so disable gradients
         self._disable_prior_gradients()
-        self.agent = Model.load_from_file(configuration.reinforcement_learning.agent)
+        self.agent = Generator.load_from_file(configuration.reinforcement_learning.agent)
 
         # Seed for documentation
         self.seed = configuration.seed

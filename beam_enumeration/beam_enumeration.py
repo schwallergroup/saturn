@@ -3,7 +3,6 @@
 # -------------------------------
 from typing import Tuple, List, Set
 import torch
-import pandas as pd
 import numpy as np
 import json
 
@@ -11,8 +10,9 @@ from rdkit import Chem
 from rdkit.Chem import Mol
 from rdkit.Chem.Scaffolds import MurckoScaffold
 
+from models.generator import Generator
 from beam_enumeration.reward_tracker import RewardTracker
-from reinvent_models.model_factory.generative_model_base import GenerativeModelBase
+
 
 class BeamEnumeration:
     def __init__(self,
@@ -225,7 +225,13 @@ class BeamEnumeration:
         """
         return len(substructure_chars.intersection(self.heavy_atoms)) > 0
     
-    def epoch_updates(self, agent: GenerativeModelBase, num_valid_smiles: int, mean_reward: float, oracle_calls: int):
+    def epoch_updates(
+        self, 
+        agent: Generator, 
+        num_valid_smiles: int, 
+        mean_reward: float, 
+        oracle_calls: int
+    ) -> None:
         """
         This method performs 4 updates on every epoch:
         1. Updates self-conditioning filter history (track number of SMILES kept after filtering on pooled substructures)

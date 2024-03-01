@@ -8,7 +8,6 @@ import numpy as np
 from tqdm import tqdm
 from utils.utils import to_tensor
 
-from models.model import Model
 from models.generator import Generator
 from distribution_learning.dataclass import DistributionLearningConfiguration
 from distribution_learning.dataset.smiles_dataset import SMILESDataset
@@ -97,7 +96,10 @@ class DistributionLearningTrainer:
             # TODO: Compute success by sampling 10k SMILES and checking validity and distribution overlap (how to measure this?)
             print(f"Epoch {epoch} | NLL: {np.mean(losses)} | Valid: {round(valid / len(sampled)*100, 2)}%")
             # Save the trained Agent
-            self.agent.save(f"{self.agent.model_architecture}.prior_{epoch}")
+            self.agent.save(f"{self.agent.model_architecture}.prior")
+
+        # Save the trained Agent
+        self.agent.save(f"{self.agent.model_architecture}.prior")
 
     def backpropagate(
         self, 

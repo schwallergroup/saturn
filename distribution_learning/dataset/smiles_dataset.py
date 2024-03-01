@@ -4,7 +4,8 @@ Adapted from https://github.com/MolecularAI/reinvent-models/blob/main/reinvent_m
 import torch
 from torch.utils.data import Dataset
 import numpy as np
-from models.model import Model
+
+from models.generator import Generator
 from models.vocabulary import SMILESTokenizer, create_vocabulary
 
 from utils.chemistry_utils import randomize_smiles
@@ -65,7 +66,7 @@ class SMILESDataset(Dataset):
         """
         if self.transfer_learning:
             # Load model and extract the Tokenizer and Vocabulary
-            self.agent = Model.load_from_file(self.agent)
+            self.agent = Generator.load_from_file(self.agent)
             self.tokenizer = self.agent.tokenizer
             self.dataset = self.read_data_file()
             self.vocabulary = self.agent.vocabulary
