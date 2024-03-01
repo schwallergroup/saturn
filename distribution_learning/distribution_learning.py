@@ -1,17 +1,16 @@
-"""
-Adapted from https://github.com/MolecularAI/Reinvent.
-"""
-from typing import Tuple
+import os
+import logging
 import torch
 from torch.utils.data import DataLoader
 import numpy as np
 from tqdm import tqdm
-from utils.utils import to_tensor
+from rdkit import Chem
 
-from models.model import Model
 from models.generator import Generator
 from distribution_learning.dataclass import DistributionLearningConfiguration
 from distribution_learning.dataset.smiles_dataset import SMILESDataset
+
+from utils.utils import setup_logging
 
 
 class DistributionLearningTrainer:
@@ -24,10 +23,13 @@ class DistributionLearningTrainer:
         2. Fine-tune (same as transfer learning) an Agent
     """
     def __init__(
-        self, 
+        self,
+        logging_path: str,
+        model_checkpoints_dir: str,
         configuration: DistributionLearningConfiguration
     ):
         # Training parameters
+        self.configuration = configuration
         self.seed = configuration.seed
         # TODO: Adaptive learning rate
         self.learning_rate = configuration.learning_rate
@@ -35,72 +37,51 @@ class DistributionLearningTrainer:
         self.batch_size = configuration.batch_size
         self.transfer_learning = configuration.transfer_learning
         self.train_with_randomization = configuration.train_with_randomization
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        self.train_dataset = SMILESDataset(
-            agent=configuration.agent,
-            dataset_path=configuration.training_dataset_path,
-            batch_size=configuration.batch_size,
-            transfer_learning=configuration.transfer_learning,
-            randomize=configuration.train_with_randomization
-        )
+        # Initialize the Agent
+        self.agent = self._initialize_agent(configuration)
+        self.optimizer = torch.optim.AdamW(self.agent.network.parameters(), lr=self.learning_rate)
 
-        self.val_dataset = SMILESDataset(
-            agent=configuration.agent,
-            dataset_path=configuration.validation_dataset_path,
-            batch_size=configuration.batch_size,
-            transfer_learning=configuration.transfer_learning,
-            randomize=configuration.train_with_randomization
-        )
-
-        # Initialize model
-        if self.transfer_learning:
-            # Load the pre-trained Agent
-            self.agent = Generator.load_from_file(configuration.agent)
-        else:
-            # Otherwise, train the Agent from scratch
-            self.agent = Generator(
-                model_architecture=configuration.model_architecture,
-                vocabulary=self.train_dataset.vocabulary,
-                tokenizer=self.train_dataset.tokenizer,
-                network_params=None
-            )
-
-        self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)
+        # Set up logging
+        self.model_checkpoints_dir = model_checkpoints_dir
+        os.makedirs(self.model_checkpoints_dir, exist_ok=True)
+        setup_logging(logging_path)
   
     def run(self):
         for epoch in range(1, self.training_steps + 1, 1):
             self.agent.network.train()
-            # NOTE: Each epoch loops through the entire dataset
-            train_dataloader, val_dataloader = self.setup_dataloaders()
-            losses = []
+
+            # --- Train Loop ---
+            train_dataloader = self.get_train_dataloader()
+            losses = np.array([])
             for _, batch in tqdm(enumerate(train_dataloader)):
+
                 # 1. Compute the Negative Log-Likelihood (NLL) from Teacher Forcing
-                batch = batch.to("cuda")
+                batch = batch.to(self.device)
                 loss = self.agent.likelihood(batch)
-                losses.append(loss.mean().item())
+                losses = np.concatenate([losses, loss.detach().cpu().numpy()])
+
                 # 2. Backpropagate
                 self.backpropagate(loss)
 
+            # --- Check Validity ---
             self.agent.network.eval()
-            sampled = []
+            sampled = np.array([])
+            
+            # 1. Sample 10,000 SMILES
             while len(sampled) < 1e4:
-                sampled_batch, sampled_nlls = self.agent.sample_smiles(num=self.batch_size, batch_size=self.batch_size)
-                sampled.extend(sampled_batch)
-            valid = 0
-            for s in sampled:
-                from rdkit import Chem
-                mol = Chem.MolFromSmiles(s)
-                if mol is not None:
-                    if len(s) > 5:
-                        print(s)
-                    valid += 1
-            # TODO: Compute success by sampling 10k SMILES and checking validity and distribution overlap (how to measure this?)
-            print(f"Epoch {epoch} | NLL: {np.mean(losses)} | Valid: {round(valid / len(sampled)*100, 2)}%")
-            # Save the trained Agent
-            self.agent.save(f"{self.agent.model_architecture}.prior")
+                sampled_batch, _ = self.agent.sample_smiles(num=self.batch_size, batch_size=self.batch_size)
+                sampled = np.concatenate([sampled, sampled_batch])
 
-        # Save the trained Agent
-        self.agent.save(f"{self.agent.model_architecture}.prior")
+            # 2. Compute Validity
+            valid = np.vectorize(lambda x: Chem.MolFromSmiles(x) is not None)(sampled).sum()
+            validity = valid / len(sampled) * 100
+
+            # --- Log Results ---
+            logging.info(f"Epoch {epoch} | NLL: {np.mean(losses)} | Validity (10k): {round(validity, 2)}%")
+            # Save the trained Agent
+            self.agent.save(os.path.join(self.model_checkpoints_dir, f"{self.agent.model_architecture}_{epoch}.prior"))
 
     def backpropagate(
         self, 
@@ -112,22 +93,37 @@ class DistributionLearningTrainer:
         loss.backward()
         self.optimizer.step()
 
-    def setup_dataloaders(self):
+    def _initialize_agent(self, configuration: DistributionLearningConfiguration) -> Generator:
+        # Initialize model
+        if self.transfer_learning:
+            # Load the pre-trained Agent
+            agent = Generator.load_from_file(configuration.agent)
+        else:
+            # Otherwise, train the Agent from scratch
+            train_dataloader = self.get_train_dataloader()
+            agent = Generator(
+                model_architecture=configuration.model_architecture,
+                vocabulary=train_dataloader.dataset.vocabulary,
+                tokenizer=train_dataloader.dataset.tokenizer,
+                network_params=None
+            )
+        return agent
+
+    def get_train_dataloader(self):
         """
-        Initialize the DataLoader for the training and validation datasets.
+        Initialize the DataLoader for the training dataset.
         """
+        train_dataset = SMILESDataset(
+            agent=self.configuration.agent,
+            dataset_path=self.configuration.training_dataset_path,
+            batch_size=self.configuration.batch_size,
+            transfer_learning=self.configuration.transfer_learning,
+            randomize=self.configuration.train_with_randomization
+        )
         train_dataloader = DataLoader(
-                dataset=self.train_dataset, 
-                batch_size=self.batch_size, 
+                dataset=train_dataset, 
+                batch_size=self.configuration.batch_size, 
                 shuffle=True,
-                collate_fn=self.train_dataset.collate_fn
+                collate_fn=train_dataset.collate_fn
             )
-        
-        val_dataloader = DataLoader(
-                dataset=self.val_dataset, 
-                batch_size=self.batch_size, 
-                shuffle=True,
-                collate_fn=self.val_dataset.collate_fn
-            )
-        
-        return train_dataloader, val_dataloader
+        return train_dataloader

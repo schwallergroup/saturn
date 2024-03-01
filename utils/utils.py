@@ -1,3 +1,4 @@
+import logging
 import torch
 import random
 import numpy as np
@@ -12,6 +13,13 @@ def set_seed_everywhere(seed: int, device: str):
 
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+def setup_logging(logging_path: str):
+    logging.basicConfig(filename=logging_path, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    console.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+    logging.getLogger("").addHandler(console)
 
 def to_tensor(array: np.array) -> torch.Tensor:
     """Convert np.array to torch.Tensor."""

@@ -58,14 +58,14 @@ if __name__ == "__main__":
     # TODO: Logging should have results path that is *shared* for distribution learning and goal-directed generation
     if running_mode == "distribution_learning":
         distribution_learning_trainer = DistributionLearningTrainer(
+            config["logging"]["logging_path"],
+            config["logging"]["model_checkpoints_dir"],
             DistributionLearningConfiguration(
                 seed,
                 model_architecture,
                 **config["distribution_learning"]["parameters"])
         )
         distribution_learning_trainer.run()
-        # TODO: Execute distribution learning (either pre-training or fine-tuning)
-        # TODO: Lightning trainer, track NLL, track SMILES validity, and don't forget to apply randomization during training (or have the option to)
         pass
     elif running_mode == "goal_directed_generation":
         # 1. Construct the Oracle
