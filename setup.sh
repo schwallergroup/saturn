@@ -11,3 +11,4 @@ conda install -c conda-forge mkl=2021.4.0=h8d4b97c_729
 pip install pandas
 pip install einops
 pip install -U pytest
+pip install scipy==1.11.0
