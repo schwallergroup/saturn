@@ -3,7 +3,6 @@ Parent script that executes Sample Efficient Generative Molecular Design using M
 Takes as input a JSON configuration file that specifies all parameters for the generatve experiment.
 Adapted from https://github.com/MolecularAI/Reinvent/input.py.
 """
-import time
 import json
 import argparse
 #import torch
@@ -41,8 +40,6 @@ def read_json_file(path: str):
         print(f"JSON format error in file ${path}: \n ${e}")
 
 if __name__ == "__main__":
-    # TODO: self.logger to log messages instead of printing --> have a logging dir and output everything there
-    start_time = time.perf_counter()
     args = parser.parse_args()
     
     config = read_json_file(args.config)
@@ -89,6 +86,3 @@ if __name__ == "__main__":
         reinforcement_learning_agent.run()
     else:
         raise ValueError(f"Running mode: {running_mode} is not implemented.")
-    
-    end_time = time.perf_counter()
-    print(f"Wall time: {end_time - start_time:.2f}s")
