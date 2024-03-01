@@ -8,6 +8,7 @@ import numpy as np
 from tqdm import tqdm
 from utils.utils import to_tensor
 
+from models.model import Model
 from models.generator import Generator
 from distribution_learning.dataclass import DistributionLearningConfiguration
 from distribution_learning.dataset.smiles_dataset import SMILESDataset
