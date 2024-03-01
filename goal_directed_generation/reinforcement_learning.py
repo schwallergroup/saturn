@@ -4,12 +4,13 @@ Adapted from https://github.com/MolecularAI/Reinvent with code additions for:
     2. Hallucinated Memory
     3. Beam Enumeration: https://arxiv.org/abs/2309.13957
 """
+import os
 import torch
 import numpy as np
 
 import utils.chemistry_utils as chemistry_utils
 from goal_directed_generation.utils import sample_unique_sequences
-from utils.utils import to_tensor
+from utils.utils import to_tensor, setup_logging
 
 from oracles.oracle import Oracle
 from goal_directed_generation.dataclass import GoalDirectedGenerationConfiguration
@@ -27,6 +28,8 @@ class ReinforcementLearningAgent:
     """
     def __init__(
         self, 
+        logging_path: str,
+        model_checkpoints_dir: str,
         oracle: Oracle,
         configuration: GoalDirectedGenerationConfiguration
     ):
@@ -84,7 +87,11 @@ class ReinforcementLearningAgent:
         #       --> self.margin_guard = MarginGuard(self)
 
         # only the Agent is updated
-        self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.AdamW(self.agent.get_network_parameters(), lr=self.learning_rate)
+        # Set up logging
+        self.model_checkpoints_dir = model_checkpoints_dir
+        os.makedirs(self.model_checkpoints_dir, exist_ok=True)
+        setup_logging(logging_path)
   
     def run(self):
         # FIXME: could be dangerous in case of infinite loop

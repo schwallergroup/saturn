@@ -5,8 +5,8 @@ Adapted from https://github.com/MolecularAI/Reinvent/input.py.
 """
 import json
 import argparse
-#import torch
-#from utils.utils import set_seed_everywhere
+import torch
+from utils.utils import set_seed_everywhere
 
 from oracles.oracle import Oracle
 from oracles.dataclass import OracleConfiguration
@@ -47,12 +47,11 @@ if __name__ == "__main__":
 
     # FIXME: train with seed too
     # (Optionally) set the seed
-    #device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     seed = config["seed"]
     model_architecture = config["model_architecture"]
-    #set_seed_everywhere(seed, device)
+    set_seed_everywhere(seed, device)
 
-    # TODO: Logging should have results path that is *shared* for distribution learning and goal-directed generation
     if running_mode == "distribution_learning":
         distribution_learning_trainer = DistributionLearningTrainer(
             config["logging"]["logging_path"],
@@ -70,6 +69,8 @@ if __name__ == "__main__":
 
         # 2. Construct the Reinforcement Learning Agent
         reinforcement_learning_agent = ReinforcementLearningAgent(
+            config["logging"]["logging_path"],
+            config["logging"]["model_checkpoints_dir"],
             oracle=oracle,
             configuration=GoalDirectedGenerationConfiguration(
                 seed,
