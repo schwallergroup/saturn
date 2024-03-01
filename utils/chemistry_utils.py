@@ -23,16 +23,17 @@ def canonicalize_smiles_batch(smiles_batch: np.array) -> List[str]:
 def randomize_smiles(smiles: str) -> str:
     """
     Shuffle atom numbering to generate a randomized SMILES string.
+    Returns original SMILES string on RDKit error.
     """
-    mol = Chem.MolFromSmiles(smiles)
-    if mol:
+    try:
+        mol = Chem.MolFromSmiles(smiles)
         new_atom_order = list(range(mol.GetNumHeavyAtoms()))
         random.shuffle(new_atom_order)
         random_mol = RenumberAtoms(mol, newOrder=new_atom_order)
         # TODO: Have option to control stereochemistry
         return Chem.MolToSmiles(random_mol, canonical=False, isomericSmiles=True)
-    else:
-        return None
+    except Exception:
+        return smiles
 
 def randomize_smiles_batch(smiles_batch: np.array, prior) -> np.ndarray[str]:
     """
