@@ -1,5 +1,5 @@
 """
-Parent script that executes Sample Efficient Generative Molecular Design using Memory Manipulation (SATURN).
+Parent script that executes Sample Efficient Generative Molecular Design using Memory Manipulation (Saturn).
 Takes as input a JSON configuration file that specifies all parameters for the generatve experiment.
 Adapted from https://github.com/MolecularAI/Reinvent/input.py.
 """
@@ -7,9 +7,6 @@ import json
 import argparse
 import torch
 from utils.utils import set_seed_everywhere
-
-from oracles.oracle import Oracle
-from oracles.dataclass import OracleConfiguration
 
 # Distribution Learning
 from distribution_learning.distribution_learning import DistributionLearningTrainer
@@ -23,8 +20,11 @@ from hallucinated_memory.dataclass import HallucinatedMemoryParameters
 from beam_enumeration.dataclass import BeamEnumerationParameters
 from diversity_filter.dataclass import DiversityFilterParameters
 
+# Oracle (for Goal-Directed Generation)
+from oracles.oracle import Oracle
+from oracles.dataclass import OracleConfiguration
 
-parser = argparse.ArgumentParser(description="Run SATURN.")
+parser = argparse.ArgumentParser(description="Run Saturn.")
 parser.add_argument(
     "config", 
     type=str,
@@ -45,7 +45,6 @@ if __name__ == "__main__":
     config = read_json_file(args.config)
     running_mode = config["running_mode"].lower()
 
-    # FIXME: train with seed too
     # (Optionally) set the seed
     device = "cuda" if torch.cuda.is_available() else "cpu"
     seed = config["seed"]
