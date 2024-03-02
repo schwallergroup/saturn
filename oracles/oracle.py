@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem import Mol
-from utils.chemistry_utils import canonicalize_smiles_batch
+from utils.chemistry_utils import canonicalize_smiles_batch, get_bemis_murcko_scaffold
 
 from oracles.oracle_component import OracleComponent
 from oracles.dataclass import OracleComponentParameters, OracleConfiguration
@@ -43,6 +43,7 @@ class Oracle:
         # oracle history to assess sample efficiency via Generative Yield and Oracle Burden metrics
         self.oracle_history = pd.DataFrame({
             "oracle_calls": [],
+            "scaffold": [],
             "smiles": [],
             "reward": [],
             "penalized_reward": []
@@ -79,6 +80,8 @@ class Oracle:
         # 2. Rewards can be obtained directly for SMILES in the Oracle Cache 
         repeat_smiles, cached_rewards, new_smiles = self.rewards_from_oracle_cache(smiles)
 
+        # FIXME: new_smiles might be empty
+
         # 3. Get the Mols for the new SMILES
         new_mols = np.vectorize(Chem.MolFromSmiles)(new_smiles)
 
@@ -96,6 +99,9 @@ class Oracle:
             oracle_components_df[f"{oracle.name}_reward"] = component_rewards
             rewards[idx] = component_rewards
 
+        # FIXME: edge case - same SMILES is generated and reward obtained from cache, but it is actually penalized now! 
+        #       Need to also pass these to DF
+            
         # 6. Aggregate the rewards
         aggregated_rewards = self.aggregator(rewards, self.oracle_weights)
 
@@ -108,6 +114,7 @@ class Oracle:
         # 9. Update the Oracle History
         self.update_oracle_history(
             smiles=new_smiles,
+            scaffolds=np.vectorize(get_bemis_murcko_scaffold)(new_smiles),
             rewards=aggregated_rewards,
             penalized_rewards=penalized_rewards,
             oracle_components_df=oracle_components_df
@@ -191,6 +198,7 @@ class Oracle:
 
     def update_oracle_history(
         self, 
+        scaffolds: np.ndarray[str],
         smiles: np.ndarray[str],
         rewards: np.ndarray[float],
         penalized_rewards: np.ndarray[float],
@@ -207,6 +215,7 @@ class Oracle:
         # Track generated SMILES + reward as a function of oracle calls
         df = pd.DataFrame({
                 "oracle_calls": np.full_like(smiles, self.calls),
+                "scaffold": scaffolds,
                 "smiles": smiles,
                 "reward": rewards, 
                 "penalized_reward": penalized_rewards 
