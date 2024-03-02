@@ -15,6 +15,7 @@ def set_seed_everywhere(seed: int, device: str):
     torch.backends.cudnn.benchmark = False
 
 def setup_logging(logging_path: str):
+    """Sets up logging to a file and console."""
     logging.basicConfig(filename=logging_path, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
@@ -33,7 +34,7 @@ def generate_causal_mask(size: int, device: str) -> torch.Tensor:
     Masked postions = float("-inf")
     Unmasked positions = float(0.0)
 
-    :param size: Size of the square mask
+    :param size: Size of the (square) mask
     :return: A (size, size) mask
     """
     mask = (torch.triu(torch.ones(size, size, device=device)) == 1).transpose(0, 1)
