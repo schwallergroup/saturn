@@ -54,6 +54,7 @@ class Generator:
         self.max_sequence_length = max_sequence_length
 
         self.network = self._initialize_network(network_params)
+        self.device = next(self.network.parameters()).device
         self.nll_loss = nn.NLLLoss(reduction="none")
 
     @classmethod
@@ -99,12 +100,12 @@ class Generator:
     def likelihood_smiles(self, smiles: np.ndarray[str]) -> torch.Tensor:
         tokens = [self.tokenizer.tokenize(smile) for smile in smiles]
         encoded = [self.vocabulary.encode(token) for token in tokens]
-        sequences = [torch.tensor(encode, dtype=torch.long) for encode in encoded]
+        sequences = [torch.tensor(encode, dtype=torch.long, device=self.device) for encode in encoded]
 
         def collate_fn(encoded_seqs):
             """Function to take a list of encoded sequences and turn them into a batch."""
             max_length = max([seq.size(0) for seq in encoded_seqs])
-            collated_arr = torch.zeros(len(encoded_seqs), max_length, dtype=torch.long)  # padded with zeroes
+            collated_arr = torch.zeros(len(encoded_seqs), max_length, dtype=torch.long, device=self.device)  # padded with zeroes
             for idx, seq in enumerate(encoded_seqs):
                 collated_arr[idx, :seq.size(0)] = seq
             return collated_arr
@@ -170,17 +171,16 @@ class Generator:
             2. Decoder
             3. Mamba
         """
-        device = next(self.network.parameters()).device
-        start_token = torch.zeros(batch_size, dtype=torch.long, device=device)
+        start_token = torch.zeros(batch_size, dtype=torch.long, device=self.device)
         start_token[:] = self.vocabulary["^"]
         input_vector = start_token
-        sequences = [self.vocabulary["^"] * torch.ones([batch_size, 1], dtype=torch.long, device=device)]
+        sequences = [self.vocabulary["^"] * torch.ones([batch_size, 1], dtype=torch.long, device=self.device)]
 
         hidden_state = None  # For RNN
         # Generate full Causal Mask and slice it during Autoregressive generation
-        causal_mask = generate_causal_mask(self.max_sequence_length, device=device)  # For Decoder
+        causal_mask = generate_causal_mask(self.max_sequence_length, device=self.device)  # For Decoder
         
-        nlls = torch.zeros(batch_size, device=device)  # Track Negative Log-Likelihoods
+        nlls = torch.zeros(batch_size, device=self.device)  # Track Negative Log-Likelihoods
 
         # Autoregressive generation
         for idx in range(1, self.max_sequence_length + 1, 1):

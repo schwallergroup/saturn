@@ -5,6 +5,7 @@ Adapted from https://github.com/MolecularAI/Reinvent with code additions for:
     3. Beam Enumeration: https://arxiv.org/abs/2309.13957
 """
 import os
+import logging
 import torch
 import numpy as np
 
@@ -96,9 +97,7 @@ class ReinforcementLearningAgent:
     def run(self):
         # FIXME: could be dangerous in case of infinite loop
         while not self.oracle.budget_exceeded():
-            # TODO: periodically print progress --> 
-            # FIXME: use logger
-            print(self.oracle.calls)
+            logging.info(f"Oracle calls: {self.oracle.calls}")
 
             # 1. Sample unique SMILES from the Agent
             seqs, smiles, _ = sample_unique_sequences(self.agent, self.batch_size)
