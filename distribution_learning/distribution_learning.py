@@ -80,7 +80,7 @@ class DistributionLearningTrainer:
 
             # --- Log Results ---
             logging.info(f"Epoch {epoch} | NLL: {np.mean(losses)} | Validity (10k): {round(validity, 2)}%")
-            # Save the trained Agent
+            # Save current Agent
             self.agent.save(os.path.join(self.model_checkpoints_dir, f"{self.agent.model_architecture}_{epoch}.prior"))
 
     def backpropagate(

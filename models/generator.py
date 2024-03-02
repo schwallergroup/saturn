@@ -70,6 +70,7 @@ class Generator:
 
         network_params = save_dict.get("network_params", {})
         model = Generator(
+            model_architecture=save_dict["model_architecture"],
             vocabulary=save_dict["vocabulary"],
             tokenizer=save_dict.get("tokenizer", SMILESTokenizer()),
             network_params=network_params,
