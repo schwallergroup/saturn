@@ -23,7 +23,7 @@ class GeneticMutator(Hallucinator):
         ):
         self.vocabulary = prior.vocabulary
         self.tokenizer = prior.tokenizer
-        self.tokens = self.vocabulary.tokens()
+        self.tokens = self.vocabulary.get_tokens()
 
         # How many hallucinations to generate
         self.num_hallucinations = num_hallucinations
