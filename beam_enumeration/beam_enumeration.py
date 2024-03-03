@@ -2,6 +2,7 @@
 # Beam Enumeration implementation
 # -------------------------------
 from typing import Tuple, List, Set
+import logging
 import torch
 import numpy as np
 import json
@@ -25,7 +26,7 @@ class BeamEnumeration:
         patience: int = 5,
         token_sampling_method: str = "topk",
         filter_patience_limit: int = 100000
-        ):
+    ):
         assert substructure_type in ["structure", "scaffold"], "substructure_type must be either 'structure' or 'scaffold'"
         assert token_sampling_method in ["topk", "sample"], "token_sampling_method must be either 'topk' or 'sample'"
 
@@ -60,19 +61,19 @@ class BeamEnumeration:
         self.filter_patience = 0
 
     @torch.no_grad()
-    def exhaustive_beam_expansion(self, agent):
+    def exhaustive_beam_expansion(self, agent: Generator) -> List[str]:
         """
         This method performs beam expansion to enumerate the set of highest probability (on average) sub-sequences.
         Total number of sub-sequences is k^beam_steps.
         """
-
+        device = next(agent.network.parameters()).device
         # Start with k number of "start" sequences
-        start_token = torch.zeros(self.k, dtype=torch.long)
+        start_token = torch.zeros(self.k, dtype=torch.long, device=device)
         start_token[:] = agent.vocabulary["^"]
         input_vector = start_token
         hidden_state = None
 
-        enumerated_sequences = [agent.vocabulary["^"] * torch.ones([self.k, 1], dtype=torch.long)]
+        enumerated_sequences = [agent.vocabulary["^"] * torch.ones([self.k, 1], dtype=torch.long, device=device)]
 
         # Enumerate beam_steps number of time-steps
         for time_step in range(1, self.beam_steps + 1, 1):
@@ -81,10 +82,10 @@ class BeamEnumeration:
             probabilities = logits.softmax(dim=1)
 
             # If taking top k tokens
-            if self.token_sampling_method == 'topk':
+            if self.token_sampling_method == "topk":
                 _, top_indices = torch.topk(probabilities, self.k)
             # If sampling tokens from the distribution
-            elif self.token_sampling_method == 'sample':
+            elif self.token_sampling_method == "sample":
                 top_indices = torch.multinomial(probabilities, self.k)
 
             # At time_step = 1, directly take the top k most probable tokens (or sampled)
@@ -141,11 +142,11 @@ class BeamEnumeration:
 
         return seqs[indices], smiles[indices]
 
-    def pool_update(self, agent):
+    def pool_update(self, agent: Generator):
         """
         This method executes Beam Enumeration and extracts and stores the most frequent substructures in self.pool.
         """
-        print("----- Performing Beam Enumeration -----")
+        logging.info("Excecuting Beam Enumeration")
         smiles_subsequences = self.exhaustive_beam_expansion(agent)
         self.pool = self.get_top_substructures(smiles_subsequences)
 
@@ -268,8 +269,8 @@ class BeamEnumeration:
         return self.filter_patience == self.filter_patience_limit
     
     def end_actions(self, oracle_calls: int) -> None:
-        print(f"Executed Beam Enumeration {self.reward_tracker.beam_executions} times")
-        print("Saving final pooled substructures.")
+        logging.info(f"Executed Beam Enumeration {self.reward_tracker.beam_executions} times")
+        logging.info("Saving final pooled substructures")
         self.write_out_pool(oracle_calls)
         # Also write out entire pool
         self.write_out_entire_pool()
