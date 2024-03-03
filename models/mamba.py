@@ -1,7 +1,11 @@
 """
-Adapted from https://github.com/johnma2006/mamba-minimal/blob/master/model.py
+----------------------------------------------------------------------------------------------------------------------------------------------------
+Adapted from https://github.com/johnma2006/mamba-minimal
 
-Relevant Resources:
+With Selective Scan implementation using Cumulative Sum from: https://github.com/PeaBrane/mamba-tiny/commit/2908f50274c10cc7bb72a273517811dae0b38a33
+----------------------------------------------------------------------------------------------------------------------------------------------------
+
+Suggest reading the following before/while reading the code:
     [1] Mamba: Linear-Time Sequence Modeling with Selective State Spaces (Albert Gu and Tri Dao)
         https://arxiv.org/abs/2312.00752
     [2] The Annotated S4 (Sasha Rush and Sidd Karamcheti)
@@ -18,31 +22,34 @@ Glossary:
                                         (B, C are input-dependent (aka selective, a key innovation in Mamba); A, D are not)
     Δ or delta: input-dependent step size
     dt_rank: rank of Δ                  (See [1] Section 3.6 "Parameterization of ∆")
+
 """
+from __future__ import annotations
+
+import json
+import math
 from dataclasses import dataclass
 from typing import Union
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
-from einops import rearrange, repeat, einsum
+from einops import rearrange, repeat
 
 
 @dataclass
 class ModelArgs:
-    """
-    Default parameters with a Vocabulary size of 37 yields a 3,499,776 parameter model.
-    """
     vocab_size: int
     d_model: int = 256
-    n_layer: int = 8
+    n_layer: int = 4
     d_state: int = 16
     expand: int = 2
     dt_rank: Union[int, str] = 'auto'
-    d_conv: int = 1  # Affects Kernel size for the 1D convolution
+    d_conv: int = 1
     pad_vocab_size_multiple: int = 1
     conv_bias: bool = True
     bias: bool = False
+    scan_mode: str = 'cumsum'
     
     def __post_init__(self):
         self.d_inner = int(self.expand * self.d_model)
@@ -55,25 +62,19 @@ class ModelArgs:
                                 - self.vocab_size % self.pad_vocab_size_multiple)
 
 
-class Mamba(nn.Module):
-    """
-    Relevant Resources:
-    [1] Mamba: Linear-Time Sequence Modeling with Selective State Spaces (Albert Gu and Tri Dao)
-        https://arxiv.org/abs/2312.00752
-    [2] The Annotated S4 (Sasha Rush and Sidd Karamcheti)
-        https://srush.github.io/annotated-s4    
-    """
+class MambaCumSum(nn.Module):
     def __init__(self, args: ModelArgs):
-        super(Mamba, self).__init__()
+        """Full Mamba model."""
+        super().__init__()
         self.args = args
         
         self.embedding = nn.Embedding(args.vocab_size, args.d_model)
         self.layers = nn.ModuleList([ResidualBlock(args) for _ in range(args.n_layer)])
-        self.rms_norm = RMSNorm(args.d_model)
+        self.norm_f = RMSNorm(args.d_model)
 
-        self.linear = nn.Linear(args.d_model, args.vocab_size, bias=False)
-        self.linear.weight = self.embedding.weight  # Tie output projection to embedding weights.
-                                                    # See "Weight Tying" paper
+        self.lm_head = nn.Linear(args.d_model, args.vocab_size, bias=False)
+        self.lm_head.weight = self.embedding.weight  # Tie output projection to embedding weights.
+                                                     # See "Weight Tying" paper
 
     def forward(self, input_ids):
         """
@@ -87,30 +88,23 @@ class Mamba(nn.Module):
             class MambaLMHeadModel, https://github.com/state-spaces/mamba/blob/main/mamba_ssm/models/mixer_seq_simple.py#L173
 
         """
-        # 1. Vocabulary indices to Embedding
         x = self.embedding(input_ids)
         
-        # 2. Pass through Residual Blocks (Mamba blocks with normalization and residual connection)
         for layer in self.layers:
             x = layer(x)
             
-        # 3. Apply Root Mean Square Layer Normalization
-        x = self.rms_norm(x)
+        x = self.norm_f(x)
+        return self.lm_head(x)
 
-        # 4. Map back to Vocabulary size
-        x = self.linear(x)
-
-        return x
 
 class ResidualBlock(nn.Module):
     def __init__(self, args: ModelArgs):
         """Simple block wrapping Mamba block with normalization and residual connection."""
-        super(ResidualBlock, self).__init__()
+        super().__init__()
         self.args = args
         self.mixer = MambaBlock(args)
         self.norm = RMSNorm(args.d_model)
         
-
     def forward(self, x):
         """
         Args:
@@ -131,15 +125,13 @@ class ResidualBlock(nn.Module):
                 [Norm -> Mamba -> Add] -> [Norm -> Mamba -> Add] -> [Norm -> Mamba -> Add] -> ....
             
         """
-        output = self.mixer(self.norm(x)) + x
-
-        return output
+        return self.mixer(self.norm(x)) + x
             
 
 class MambaBlock(nn.Module):
     def __init__(self, args: ModelArgs):
         """A single Mamba block, as described in Figure 3 in Section 3.4 in the Mamba paper [1]."""
-        super(MambaBlock, self).__init__()
+        super().__init__()
         self.args = args
 
         self.in_proj = nn.Linear(args.d_model, args.d_inner * 2, bias=args.bias)
@@ -151,7 +143,7 @@ class MambaBlock(nn.Module):
             kernel_size=args.d_conv,
             groups=args.d_inner,
             padding=args.d_conv - 1,
-        )   
+        )
 
         # x_proj takes in `x` and outputs the input-specific Δ, B, C
         self.x_proj = nn.Linear(args.d_inner, args.dt_rank + args.d_state * 2, bias=False)
@@ -164,7 +156,6 @@ class MambaBlock(nn.Module):
         self.D = nn.Parameter(torch.ones(args.d_inner))
         self.out_proj = nn.Linear(args.d_inner, args.d_model, bias=args.bias)
         
-
     def forward(self, x):
         """Mamba block forward. This looks the same as Figure 3 in Section 3.4 in the Mamba paper [1].
     
@@ -194,11 +185,8 @@ class MambaBlock(nn.Module):
         
         y = y * F.silu(res)
         
-        output = self.out_proj(y)
+        return self.out_proj(y)
 
-        return output
-
-    
     def ssm(self, x):
         """Runs the SSM. See:
             - Algorithm 2 in Section 3.2 in the Mamba paper [1]
@@ -229,77 +217,51 @@ class MambaBlock(nn.Module):
         (delta, B, C) = x_dbl.split(split_size=[self.args.dt_rank, n, n], dim=-1)  # delta: (b, l, dt_rank). B, C: (b, l, n)
         delta = F.softplus(self.dt_proj(delta))  # (b, l, d_in)
         
-        y = self.selective_scan(x, delta, A, B, C, D)  # This is similar to run_SSM(A, B, C, u) in The Annotated S4 [2]
-        
-        return y
-
-    
-    def selective_scan(self, u, delta, A, B, C, D):
-        """Does selective scan algorithm. See:
-            - Section 2 State Space Models in the Mamba paper [1]
-            - Algorithm 2 in Section 3.2 in the Mamba paper [1]
-            - run_SSM(A, B, C, u) in The Annotated S4 [2]
-
-        This is the classic discrete state space formula:
-            x(t + 1) = Ax(t) + Bu(t)
-            y(t)     = Cx(t) + Du(t)
-        except B and C (and the step size delta, which is used for discretization) are dependent on the input x(t).
-    
-        Args:
-            u: shape (b, l, d_in)    (See Glossary at top for definitions of b, l, d_in, n...)
-            delta: shape (b, l, d_in)
-            A: shape (d_in, n)
-            B: shape (b, l, n)
-            C: shape (b, l, n)
-            D: shape (d_in,)
-    
-        Returns:
-            output: shape (b, l, d_in)
-    
-        Official Implementation:
-            selective_scan_ref(), https://github.com/state-spaces/mamba/blob/main/mamba_ssm/ops/selective_scan_interface.py#L86
-            Note: I refactored some parts out of `selective_scan_ref` out, so the functionality doesn't match exactly.
-            
-        """
-        (b, l, d_in) = u.shape
-        n = A.shape[1]
-        
-        # Discretize continuous parameters (A, B)
-        # - A is discretized using zero-order hold (ZOH) discretization (see Section 2 Equation 4 in the Mamba paper [1])
-        # - B is discretized using a simplified Euler discretization instead of ZOH. From a discussion with authors:
-        #   "A is the more important term and the performance doesn't change much with the simplification on B"
-        deltaA = torch.exp(einsum(delta, A, 'b l d_in, d_in n -> b l d_in n'))
-        deltaB_u = einsum(delta, B, u, 'b l d_in, b l n, b l d_in -> b l d_in n')
-        
-        # Perform selective scan (see scan_SSM() in The Annotated S4 [2])
-        # Note that the below is sequential, while the official implementation does a much faster parallel scan that
-        # is additionally hardware-aware (like FlashAttention).
-        x = torch.zeros((b, d_in, n), device=deltaA.device)
-        ys = []    
-        for i in range(l):
-            x = deltaA[:, i] * x + deltaB_u[:, i]
-            y = einsum(x, C[:, i, :], 'b d_in n, b n -> b d_in')
-            ys.append(y)
-        y = torch.stack(ys, dim=1)  # shape (b, l, d_in)
-        
-        y = y + u * D
-    
-        return y
+        return selective_scan(x, delta, A, B, C, D, mode=self.args.scan_mode)  # This is similar to run_SSM(A, B, C, u) in The Annotated S4 [2]
 
 
 class RMSNorm(nn.Module):
-    def __init__(
-        self,
-        d_model: int,
-        eps: float = 1e-5
-    ):
-        super(RMSNorm, self).__init__()
+    def __init__(self,
+                 d_model: int,
+                 eps: float = 1e-5):
+        super().__init__()
         self.eps = eps
         self.weight = nn.Parameter(torch.ones(d_model))
-
 
     def forward(self, x):
         output = x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps) * self.weight
 
         return output
+
+import torch
+from torch.nn import functional as F
+
+
+def complex_log(input, eps=1e-12):
+    eps = input.new_tensor(eps)
+    real = input.abs().maximum(eps).log()
+    imag = (input < 0).to(input.dtype) * torch.pi
+    return torch.complex(real, imag)
+
+
+def selective_scan(u, dt, A, B, C, D, mode='cumsum'):
+    dA = torch.einsum('bld,dn->bldn', dt, A)
+    dB_u = torch.einsum('bld,bld,bln->bldn', dt, u, B)
+    
+    match mode:
+        case 'cumsum':
+            dA_cumsum = F.pad(dA[:, 1:], (0, 0, 0, 0, 0, 1)).flip(1).cumsum(1).exp().flip(1)
+            x = dB_u * dA_cumsum
+            x = x.cumsum(1) / (dA_cumsum + 1e-12)
+            y = torch.einsum('bldn,bln->bld', x, C)
         
+            return y + u * D
+        
+        case 'logcumsumexp':
+            dB_u_log = complex_log(dB_u)
+            
+            dA_star = F.pad(dA[:, 1:].cumsum(1), (0, 0, 0, 0, 1, 0))
+            x_log = torch.logcumsumexp(dB_u_log - dA_star, 1) + dA_star
+            
+            y = torch.einsum('bldn,bln->bld', x_log.real.exp() * torch.cos(x_log.imag), C)
+            return y + u * D
