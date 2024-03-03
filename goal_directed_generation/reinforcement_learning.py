@@ -95,9 +95,10 @@ class ReinforcementLearningAgent:
         setup_logging(logging_path)
   
     def run(self):
+        logging.info(f"Starting RL generative experiment with oracle budget: {self.oracle.budget}")
         # FIXME: could be dangerous in case of infinite loop
         while not self.oracle.budget_exceeded():
-            logging.info(f"Oracle calls: {self.oracle.calls}")
+            logging.info(f"Oracle calls: {self.oracle.calls}/{self.oracle.budget}")
 
             # 1. Sample unique SMILES from the Agent
             seqs, smiles, _ = sample_unique_sequences(self.agent, self.batch_size)
@@ -186,6 +187,8 @@ class ReinforcementLearningAgent:
                     self.backpropagate(loss)
 
                     # TODO: add randomized smiles back to replay buffer???? Previous code based adds the sampled batch again
+        
+        logging.info(f"Budget reached - oracle calls: {self.oracle.calls}/{self.oracle.budget}")
         self.write_out_results()
 
     def compute_loss(

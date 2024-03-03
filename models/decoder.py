@@ -38,7 +38,7 @@ class Decoder(nn.Module):
 
         self.embedding = nn.Embedding(vocabulary_size, embedding_dim)
         self.positional_encoding = PositionalEncoding(embedding_dim)
-        self.dropout = nn.Dropout(dropout)
+        self.dropout_layer = nn.Dropout(dropout)
         self.decoder_blocks = nn.ModuleList([
             DecoderLayer(
                 embedding_dim=embedding_dim, 
@@ -63,7 +63,7 @@ class Decoder(nn.Module):
         x = self.positional_encoding(x)  # (batch, sequence_length, embedding_dim)
 
         # 3. Apply Dropout
-        x = self.dropout(x)
+        x = self.dropout_layer(x)
 
         # 4. Pass through Decoder blocks
         for decoder_block in self.decoder_blocks:
