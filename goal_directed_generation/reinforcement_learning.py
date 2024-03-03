@@ -87,7 +87,7 @@ class ReinforcementLearningAgent:
         # TODO: Potentially implement MarginGuard --> no need to reset Agent weights
         #       --> self.margin_guard = MarginGuard(self)
 
-        # only the Agent is updated
+        # Only the Agent is updated
         self.optimizer = torch.optim.AdamW(self.agent.get_network_parameters(), lr=self.learning_rate)
         # Set up logging
         self.model_checkpoints_dir = model_checkpoints_dir

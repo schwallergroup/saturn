@@ -25,22 +25,22 @@ class Oracle:
     ):
         self.oracle_configuration = oracle_configuration
         
-        # construct the oracle function which can be composed of >1 individual oracles (multi-parameter optimization)
+        # Construct the oracle function which can be composed of >1 individual oracles (multi-parameter optimization)
         self.oracle = self.construct_oracle(oracle_configuration.components)
-        # preliminary oracles can be executed as a first pass to filter out poor candidates
+        # Preliminary oracles can be executed as a first pass to filter out poor candidates
         self.preliminary_oracles = [oracle for oracle in self.oracle if oracle.preliminary_check]
         self.oracle_weights = [oracle.weight for oracle in self.oracle]
         self.aggregator = RewardAggregator(oracle_configuration.aggregator)
 
-        # track oracle budget
+        # Track oracle budget
         self.budget = oracle_configuration.budget
         self.allow_oracle_repeats = oracle_configuration.allow_oracle_repeats
         self.calls = 0
 
-        # cache dictionary to store the results of previous oracle calls
+        # Cache dictionary to store the results of previous oracle calls
         self.cache = dict()
 
-        # oracle history to assess sample efficiency via Generative Yield and Oracle Burden metrics
+        # Oracle history to assess sample efficiency via Generative Yield and Oracle Burden metrics
         self.oracle_history = pd.DataFrame({
             "oracle_calls": [],
             "scaffold": [],
@@ -48,12 +48,12 @@ class Oracle:
             "reward": [],
             "penalized_reward": []
         })
-        # add oracle components' raw value and reward to the oracle history DataFrame
+        # Add oracle components' raw value and reward to the oracle history DataFrame
         for oracle in self.oracle:
             self.oracle_history[f"{oracle.name}_raw_values"] = []
             self.oracle_history[f"{oracle.name}_reward"] = []
 
-        # track how many times the same SMILES is sampled
+        # Track how many times the same SMILES is sampled
         self.num_repeated_smiles = []
 
     def __call__(
@@ -80,50 +80,71 @@ class Oracle:
         # 2. Rewards can be obtained directly for SMILES in the Oracle Cache 
         repeat_smiles, cached_rewards, new_smiles = self.rewards_from_oracle_cache(smiles)
 
-        # FIXME: new_smiles might be empty
+        # In case all SMILES are repeats
+        if len(new_smiles) > 0:
+            # 3. Get the Mols for the new SMILES
+            new_mols = np.vectorize(Chem.MolFromSmiles)(new_smiles)
 
-        # 3. Get the Mols for the new SMILES
-        new_mols = np.vectorize(Chem.MolFromSmiles)(new_smiles)
+            # 4. Execute preliminary check (if applicable) which removes Mols that do not satisfy the (relatively) cheaper oracle components
+            #    e.g., molecular weight is too high (> 500 Da), so discard without wasting computational resources on a docking oracle
+            new_smiles, new_mols = self.execute_preliminary_check(new_smiles, new_mols)
 
-        # 4. Execute preliminary check (if applicable) which removes Mols that do not satisfy the (relatively) cheaper oracle components
-        #    e.g., molecular weight is too high (> 500 Da), so discard without wasting computational resources on a docking oracle
-        new_smiles, new_mols = self.execute_preliminary_check(new_smiles, new_mols)
+            # In case no SMILES pass the preliminary check
+            if len(new_smiles) > 0:
+                # 5. Call each oracle component and aggregate the rewards
+                #    Initialize a DataFrame to store the raw values and rewards of each oracle component for tracking purposes
+                oracle_components_df = pd.DataFrame()
+                rewards = np.empty((len(self.oracle), len(new_mols)))
+                for idx, oracle in enumerate(self.oracle):
+                    raw_property_values, component_rewards = oracle.calculate_reward(new_mols, self.calls)
+                    oracle_components_df[f"{oracle.name}_raw_values"] = raw_property_values
+                    oracle_components_df[f"{oracle.name}_reward"] = component_rewards
+                    rewards[idx] = component_rewards
+                
+                # 6. Aggregate the rewards
+                aggregated_rewards = self.aggregator(rewards, self.oracle_weights)
 
-        # 5. Call each oracle component and aggregate the rewards
-        #    Initialize a DataFrame to store the raw values and rewards of each oracle component for tracking purposes
-        oracle_components_df = pd.DataFrame()
-        rewards = np.empty((len(self.oracle), len(new_mols)))
-        for idx, oracle in enumerate(self.oracle):
-            raw_property_values, component_rewards = oracle.calculate_reward(new_mols, self.calls)
-            oracle_components_df[f"{oracle.name}_raw_values"] = raw_property_values
-            oracle_components_df[f"{oracle.name}_reward"] = component_rewards
-            rewards[idx] = component_rewards
+        # 7. At this point, rewards have been obtained for the new SMILES
+        #    Increment the number of oracle calls
+        self.calls += len(new_smiles)
 
-        # FIXME: edge case - same SMILES is generated and reward obtained from cache, but it is actually penalized now! 
-        #       Need to also pass these to DF
-            
-        # 6. Aggregate the rewards
-        aggregated_rewards = self.aggregator(rewards, self.oracle_weights)
+        # 8. Concatenate the repeated and new SMILES and their corresponding rewards
+        #    The Diversity Filter operations are performed on the concatenated set
+        all_smiles = np.concatenate([repeat_smiles, new_smiles])
+        all_rewards = np.concatenate([cached_rewards, aggregated_rewards])
 
-        # 7. Penalize the rewards based on the Diversity Filter
-        penalized_rewards = diversity_filter.penalize_reward(new_smiles, aggregated_rewards)
+        # 9. Penalize the rewards based on the Diversity Filter
+        penalized_new_rewards = diversity_filter.penalize_reward(new_smiles, aggregated_rewards)
+        penalized_all_rewards = diversity_filter.penalize_reward(all_smiles, all_rewards)
 
-        # 8. Update the Diversity Filter
-        diversity_filter.update(new_smiles)
+        # 10. Update the Oracle History
+        # Only update with the new SMILES
+        if len(new_smiles) > 0 and not self.allow_oracle_repeats:
+            oracle_history_smiles = new_smiles
+            oracle_history_rewards = aggregated_rewards
+            oracle_history_penalized_rewards = penalized_new_rewards
 
-        # 9. Update the Oracle History
+        # Update with all SMILES
+        elif self.allow_oracle_repeats:
+            oracle_history_smiles = all_smiles
+            oracle_history_rewards = all_rewards
+            oracle_history_penalized_rewards = penalized_all_rewards
+
         self.update_oracle_history(
-            smiles=new_smiles,
-            scaffolds=np.vectorize(get_bemis_murcko_scaffold)(new_smiles),
-            rewards=aggregated_rewards,
-            penalized_rewards=penalized_rewards,
+            smiles=oracle_history_smiles,
+            scaffolds=np.vectorize(get_bemis_murcko_scaffold)(oracle_history_smiles),
+            rewards=oracle_history_rewards,
+            penalized_rewards=oracle_history_penalized_rewards,
             oracle_components_df=oracle_components_df
         )
 
-        # 10. Update the Oracle Cache - important to cache the penalized rewards
-        self.update_oracle_cache(new_smiles, penalized_rewards)
+        # 11. Update the Diversity Filter
+        diversity_filter.update(all_smiles)
+        
+        # 12. Update the Oracle Cache - important to cache the penalized rewards
+        self.update_oracle_cache(all_smiles, penalized_all_rewards)
                            
-        return np.concatenate([repeat_smiles, new_smiles]), np.concatenate([cached_rewards, penalized_rewards])
+        return all_smiles, penalized_all_rewards
         
     def construct_oracle(self, oracle_components: List[OracleComponentParameters]) -> List[OracleComponent]:
         """
@@ -151,7 +172,7 @@ class Oracle:
                     repeat_indices.append(idx)
                     cached_rewards.append(self.cache[s])
 
-            # track number of repeated SMILES
+            # Track number of repeated SMILES
             self.num_repeated_smiles.append(len(repeat_indices))
 
             if len(repeat_indices) != 0:
@@ -169,7 +190,7 @@ class Oracle:
         # Canonicalize the SMILES before adding to Cache
         canonical_smiles = canonicalize_smiles_batch(smiles)
         for s, r in zip(canonical_smiles, rewards):
-            # if the same SMILES is sampled, the reward is overwritten for two reasons:
+            # If the same SMILES is sampled, the reward is overwritten for two reasons:
             #   1. Potential stocasticity in the oracle feedback
             #   2. Penalized rewards (by the Diversity Filter) should be reflected so the Agent is steered away from these scaffolds
             self.cache[s] = r
@@ -183,13 +204,18 @@ class Oracle:
         # FIXME: Set a threshold for each component. If not using Step transformation, rewards are not necessarily 0
         THRESHOLD = 0.05
 
-        if len(self.preliminary_oracles) != 0:
+        if len(self.preliminary_oracles) > 0:
             filtered_indices = []
             for mol in mols:
                 for idx, oracle in enumerate(self.preliminary_oracles):
-                    _, rewards = oracle.calculate_reward(mol)
-                    if (rewards > THRESHOLD) and (idx == len(self.preliminary_oracles) - 1):
-                        filtered_indices.append(idx)
+                    _, reward = oracle.calculate_reward(mol)
+                    if reward < THRESHOLD:
+                        # If the reward is below the threshold for the last oracle component, add the index to the filtered indices
+                        if idx == len(self.preliminary_oracles) - 1:
+                            filtered_indices.append(idx)
+                    # If the reward is above the threshold, break and loop to the next molecule
+                    else:
+                        break
 
             return smiles[filtered_indices], mols[filtered_indices]
             
@@ -209,9 +235,9 @@ class Oracle:
         1. Increments the number of oracle calls so far
         2. Updates the Oracle History that tracks the generative sampling as a function of oracle calls
 
-        # NOTE: the Oracle History tracks every single SMILES generated, not just the unique set
+        # NOTE: If self.allow_oracle_repeats = True, the Oracle History tracks every single SMILES generated and not just the unique set.
+        #       This can be useful to interrogate the stochasticity of the oracle to inform downstream molecule prioritization.
         """
-        self.calls += len(smiles)
         # Track generated SMILES + reward as a function of oracle calls
         df = pd.DataFrame({
                 "oracle_calls": np.full_like(smiles, self.calls),
