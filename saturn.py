@@ -45,13 +45,15 @@ if __name__ == "__main__":
     config = read_json_file(args.config)
     running_mode = config["running_mode"].lower()
 
-    # (Optionally) set the seed
+    # Set the seed
     device = "cuda" if torch.cuda.is_available() else "cpu"
     seed = config["seed"]
-    model_architecture = config["model_architecture"]
     set_seed_everywhere(seed, device)
 
+    model_architecture = config["model_architecture"]
+
     if running_mode == "distribution_learning":
+        # 1. Construct the Distribution Learning Trainer
         distribution_learning_trainer = DistributionLearningTrainer(
             config["logging"]["logging_path"],
             config["logging"]["model_checkpoints_dir"],
@@ -60,8 +62,9 @@ if __name__ == "__main__":
                 model_architecture,
                 **config["distribution_learning"]["parameters"])
         )
+        # 2. Run Distribution Learning
         distribution_learning_trainer.run()
-        pass
+
     elif running_mode == "goal_directed_generation":
         # 1. Construct the Oracle
         oracle = Oracle(OracleConfiguration(**config["oracle"]))
@@ -84,5 +87,6 @@ if __name__ == "__main__":
 
         # 3. Run Goal-Directed Generation via Reinforcement Learning
         reinforcement_learning_agent.run()
+
     else:
         raise ValueError(f"Running mode: {running_mode} is not implemented.")

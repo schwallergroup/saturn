@@ -6,6 +6,7 @@ Adapted from https://github.com/MolecularAI/Reinvent with code additions for:
 """
 import os
 import logging
+import time
 import torch
 import numpy as np
 
@@ -95,6 +96,7 @@ class ReinforcementLearningAgent:
         setup_logging(logging_path)
   
     def run(self):
+        start_time = time.perf_counter()
         logging.info(f"Starting RL generative experiment with oracle budget: {self.oracle.budget}")
         # FIXME: could be dangerous in case of infinite loop
         while not self.oracle.budget_exceeded():
@@ -188,8 +190,10 @@ class ReinforcementLearningAgent:
 
                     # TODO: add randomized smiles back to replay buffer???? Previous code based adds the sampled batch again
         
-        logging.info(f"Budget reached - oracle calls: {self.oracle.calls}/{self.oracle.budget}")
+        logging.info(f"Budget reached - final oracle calls: {self.oracle.calls}/{self.oracle.budget}")
         self.write_out_results()
+        end_time = time.perf_counter()
+        logging.info(f"Total wall time: {end_time - start_time} seconds.")
 
     def compute_loss(
         self, 

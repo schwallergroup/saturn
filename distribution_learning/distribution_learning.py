@@ -1,5 +1,6 @@
 import os
 import logging
+import time
 import torch
 from torch.utils.data import DataLoader
 import numpy as np
@@ -49,6 +50,7 @@ class DistributionLearningTrainer:
         setup_logging(logging_path)
   
     def run(self):
+        start_time = time.perf_counter()
         for epoch in range(1, self.training_steps + 1, 1):
             self.agent.network.train()
 
@@ -82,6 +84,9 @@ class DistributionLearningTrainer:
             logging.info(f"Epoch {epoch} | NLL: {np.mean(losses)} | Validity (10k): {round(validity, 2)}%")
             # Save current Agent
             self.agent.save(os.path.join(self.model_checkpoints_dir, f"{self.agent.model_architecture}_{epoch}.prior"))
+
+        end_time = time.perf_counter()
+        logging.info(f"Total wall time: {end_time - start_time} seconds.")
 
     def backpropagate(
         self, 
