@@ -113,7 +113,7 @@ class ReinforcementLearningAgent:
             if len(smiles) == 0:
                 self.beam_enumeration.filtered_epoch_updates()
                 if self.beam_enumeration.patience_limit_reached():
-                    print("Beam Enumeration: Patience limit reached. Ending run (not indicative of experiment failing).")
+                    logging.info("Beam Enumeration: Patience limit reached. Ending run (not indicative of experiment failing).")
                     break
                 continue
 
