@@ -62,7 +62,7 @@ class ModelArgs:
                                 - self.vocab_size % self.pad_vocab_size_multiple)
 
 
-class MambaCumSum(nn.Module):
+class Mamba(nn.Module):
     def __init__(self, args: ModelArgs):
         """Full Mamba model."""
         super().__init__()
