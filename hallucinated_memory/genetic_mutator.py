@@ -3,6 +3,7 @@ Apply a genetic algorithm to a SMILES string to generate new SMILES strings.
 Uses Graph GA's algorithm: https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc05372c
 """
 from typing import List
+import logging
 from hallucinated_memory.hallucinator import Hallucinator
 import pandas as pd
 import numpy as np
@@ -54,17 +55,17 @@ class GeneticMutator(Hallucinator):
             child = reproduce(parents, parents_rewards, 0.1)
             if self.can_be_encoded(child, self.tokenizer, self.vocabulary):
                 # Add canonicalized SMILES to guarantee uniqueness
-                hallucinated_set.add(Chem.MolToSmiles(child, canonical=True))
+                hallucinated_set.add(canonicalize_smiles(Chem.MolToSmiles(child)))
             tries += 1
 
         if len(hallucinated_set) != self.num_hallucinations:
-            print(f"WARNING: generated {len(hallucinated_set)}/{self.num_hallucinations} valid hallucinations in 1000 attempts")
+            logging.info(f"Hallucinated Memory: Generated {len(hallucinated_set)}/{self.num_hallucinations} valid hallucinations in 1000 attempts")
 
         return self.select_hallucinations(
-                    parent=parents,
-                    hallucinations=[Chem.MolFromSmiles(s) for s in hallucinated_set],
-                    hallucinations_smiles=hallucinated_set
-                )
+            parent=parents,
+            hallucinations=[Chem.MolFromSmiles(s) for s in hallucinated_set],
+            hallucinations_smiles=hallucinated_set
+        )
     
 @staticmethod
 def choose_parents(

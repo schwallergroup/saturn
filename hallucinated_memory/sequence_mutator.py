@@ -50,7 +50,6 @@ class SequenceMutator(Hallucinator):
         parent = list(buffer["smiles"].iloc[0])
 
         # Hallucinate a set of unique SMILES
-        # TODO: Canonicalize?
         hallucinated_set = set()
 
         while len(hallucinated_set) != self.num_hallucinations:
@@ -65,11 +64,11 @@ class SequenceMutator(Hallucinator):
             # Add canonicalized SMILES to guarantee uniqueness
             hallucinated_set.add(canonicalize_smiles(hallucinated_smiles))
 
-        if self.selection_criterion == "random":
-            # FIXME: At the moment, 100 hallucinations are generated, but only 10 are returned
-            return np.random.choice(list(hallucinated_set), self.num_selected)
-        else:
-            raise NotImplementedError("Only random selection is currently implemented.")
+        return self.select_hallucinations(
+            parent=parent,
+            hallucinations=[Chem.MolFromSmiles(s) for s in hallucinated_set],
+            hallucinations_smiles=hallucinated_set
+        )
 
     def get_hallucinated_smiles(
         self, 
