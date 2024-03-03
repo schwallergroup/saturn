@@ -240,4 +240,4 @@ class ReinforcementLearningAgent:
             self.beam_enumeration.end_actions(self.oracle.calls)
 
         if self.execute_hallucinated_memory:
-            self.hallucinator.write_out_hallucination_history()
+            self.hallucinator.write_out_history()
