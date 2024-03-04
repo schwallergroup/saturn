@@ -221,7 +221,7 @@ class Generator:
     def get_num_params(self):
         return sum(p.numel() for p in self.network.parameters() if p.requires_grad)
 
-    def _initialize_network(self, network_params: Union[dict, None]) -> Union[RNN, Decoder]:
+    def _initialize_network(self, network_params: Union[dict, None]) -> Union[RNN, Decoder, Mamba]:
         """
         Initializes the network based on the model type.
         """

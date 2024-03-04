@@ -92,7 +92,7 @@ class ReinforcementLearningAgent:
         self.optimizer = torch.optim.AdamW(self.agent.get_network_parameters(), lr=self.learning_rate)
         # Set up logging
         self.model_checkpoints_dir = model_checkpoints_dir
-        os.makedirs(self.model_checkpoints_dir, exist_ok=True)
+        #os.makedirs(self.model_checkpoints_dir, exist_ok=True)  # Skip for now
         setup_logging(logging_path)
   
     def run(self):
