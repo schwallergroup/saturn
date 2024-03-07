@@ -20,8 +20,8 @@ class GeneticMutator(Hallucinator):
         prior,
         num_hallucinations: int = 100,
         num_selected: int = 10,
-        selection_criterion: str = "random"
-        ):
+        selection_criterion: str = "tanimoto_distance"
+    ):
         self.vocabulary = prior.vocabulary
         self.tokenizer = prior.tokenizer
         self.tokens = self.vocabulary.get_tokens()

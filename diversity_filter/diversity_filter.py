@@ -42,12 +42,15 @@ class DiversityFilter:
         Penalize sampled (or hallucinated) SMILES based on the bucket history.
         """
         # If a given scaffold has been generated more than the bucket size, truncate the reward to 0.0
-        scaffolds = [chemistry_utils.get_bemis_murcko_scaffold(smiles) for smiles in smiles]
-        penalized_rewards = []
-        for idx, scaf in enumerate(scaffolds):
-            if scaf in self.bucket_history and self.bucket_history[scaf] > self.bucket_size:
-                penalized_rewards.append(0.0)
-            else:
-                penalized_rewards.append(rewards[idx])
-        
-        return np.array(penalized_rewards)
+        if len(smiles) > 0:
+            scaffolds = [chemistry_utils.get_bemis_murcko_scaffold(smiles) for smiles in smiles]
+            penalized_rewards = []
+            for idx, scaf in enumerate(scaffolds):
+                if scaf in self.bucket_history and self.bucket_history[scaf] > self.bucket_size:
+                    penalized_rewards.append(0.0)
+                else:
+                    penalized_rewards.append(rewards[idx])
+            
+            return np.array(penalized_rewards)
+        else:
+            return np.array([])

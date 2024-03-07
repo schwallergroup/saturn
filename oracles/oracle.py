@@ -54,12 +54,14 @@ class Oracle:
             self.oracle_history[f"{oracle.name}_reward"] = []
 
         # Track how many times the same SMILES is sampled
-        self.num_repeated_smiles = []
+        self.num_repeated_sampled_smiles = []
+        self.num_repeated_hallucinated_smiles = []
 
     def __call__(
         self, 
         smiles: np.ndarray[str],
-        diversity_filter: DiversityFilter
+        diversity_filter: DiversityFilter,
+        is_hallucinated_batch: bool = False
     ) -> Tuple[np.ndarray[str], np.ndarray[float]]:
         """
         The Oracle is called at every generation epoch and performs the following:
@@ -78,7 +80,7 @@ class Oracle:
         smiles = np.array([s for s in smiles if Chem.MolFromSmiles(s) is not None])
         
         # 2. Rewards can be obtained directly for SMILES in the Oracle Cache 
-        repeat_smiles, cached_rewards, new_smiles = self.rewards_from_oracle_cache(smiles)
+        repeat_smiles, cached_rewards, new_smiles = self.rewards_from_oracle_cache(smiles, is_hallucinated_batch)
 
         # In case all SMILES are repeats
         if len(new_smiles) > 0:
@@ -104,6 +106,13 @@ class Oracle:
                 # 6. Aggregate the rewards
                 aggregated_rewards = self.aggregator(rewards, self.oracle_weights)
 
+            else:
+                aggregated_rewards = np.array([0.0])
+
+        # FIXME: probably another way to do this
+        else:
+            aggregated_rewards = np.array([0.0])
+
         # 7. At this point, rewards have been obtained for the new SMILES
         #    Increment the number of oracle calls
         self.calls += len(new_smiles)
@@ -118,25 +127,25 @@ class Oracle:
         penalized_all_rewards = diversity_filter.penalize_reward(all_smiles, all_rewards)
 
         # 10. Update the Oracle History
-        # Only update with the new SMILES
-        if len(new_smiles) > 0 and not self.allow_oracle_repeats:
-            oracle_history_smiles = new_smiles
-            oracle_history_rewards = aggregated_rewards
-            oracle_history_penalized_rewards = penalized_new_rewards
+        if len(new_smiles) > 0:
+            # Only update with the new SMILES
+            if not self.allow_oracle_repeats:
+                oracle_history_smiles = new_smiles
+                oracle_history_rewards = aggregated_rewards
+                oracle_history_penalized_rewards = penalized_new_rewards
+            # Update with all SMILES
+            elif self.allow_oracle_repeats:
+                oracle_history_smiles = all_smiles
+                oracle_history_rewards = all_rewards
+                oracle_history_penalized_rewards = penalized_all_rewards
 
-        # Update with all SMILES
-        elif self.allow_oracle_repeats:
-            oracle_history_smiles = all_smiles
-            oracle_history_rewards = all_rewards
-            oracle_history_penalized_rewards = penalized_all_rewards
-
-        self.update_oracle_history(
-            smiles=oracle_history_smiles,
-            scaffolds=np.vectorize(get_bemis_murcko_scaffold)(oracle_history_smiles),
-            rewards=oracle_history_rewards,
-            penalized_rewards=oracle_history_penalized_rewards,
-            oracle_components_df=oracle_components_df
-        )
+            self.update_oracle_history(
+                smiles=oracle_history_smiles,
+                scaffolds=np.vectorize(get_bemis_murcko_scaffold)(oracle_history_smiles),
+                rewards=oracle_history_rewards,
+                penalized_rewards=oracle_history_penalized_rewards,
+                oracle_components_df=oracle_components_df
+            )
 
         # 11. Update the Diversity Filter
         diversity_filter.update(all_smiles)
@@ -158,7 +167,11 @@ class Oracle:
 
         return oracle
     
-    def rewards_from_oracle_cache(self, smiles: np.ndarray[str]) -> Tuple[np.ndarray[str], np.ndarray[float], np.ndarray[str]]:
+    def rewards_from_oracle_cache(
+        self, 
+        smiles: np.ndarray[str],
+        is_hallucinated_batch: bool
+    ) -> Tuple[np.ndarray[str], np.ndarray[float], np.ndarray[str]]:
         """
         Checks if there are any Cached rewards in a sampled batch of SMILES. If Oracle repeats are permitted, directly return.
         """
@@ -170,10 +183,14 @@ class Oracle:
             for idx, s in enumerate(canonical_smiles):
                 if s in self.cache:
                     repeat_indices.append(idx)
-                    cached_rewards.append(self.cache[s])
+                    # Take the mean of the cached rewards in case of repeats
+                    cached_rewards.append(np.mean(self.cache[s]))
 
             # Track number of repeated SMILES
-            self.num_repeated_smiles.append(len(repeat_indices))
+            if is_hallucinated_batch:
+                self.num_repeated_hallucinated_smiles.append(len(repeat_indices))
+            else:
+                self.num_repeated_sampled_smiles.append(len(repeat_indices))
 
             if len(repeat_indices) != 0:
                 return smiles[repeat_indices], np.array(cached_rewards), np.delete(smiles, repeat_indices)
@@ -190,10 +207,15 @@ class Oracle:
         # Canonicalize the SMILES before adding to Cache
         canonical_smiles = canonicalize_smiles_batch(smiles)
         for s, r in zip(canonical_smiles, rewards):
-            # If the same SMILES is sampled, the reward is overwritten for two reasons:
+            # If the same SMILES is sampled, all rewards are tracked for two reasons:
             #   1. Potential stocasticity in the oracle feedback
             #   2. Penalized rewards (by the Diversity Filter) should be reflected so the Agent is steered away from these scaffolds
-            self.cache[s] = r
+            if s not in self.cache:
+                self.cache[s] = [r]
+            elif r == 0.0:
+                self.cache[s] = [r]
+            else:
+                self.cache[s].append(r)
     
     def execute_preliminary_check(self, smiles: np.ndarray[str], mols: np.ndarray[Mol]) -> Tuple[np.ndarray[str], np.ndarray[Mol]]:
         """
@@ -260,4 +282,5 @@ class Oracle:
 
     def write_out_repeat_history(self):
         """Write out the repeated SMILES history as a CSV."""
-        pd.DataFrame(self.num_repeated_smiles).to_csv("repeated_smiles_history.csv")
+        pd.DataFrame(self.num_repeated_sampled_smiles).to_csv("repeated_sampled_smiles_history.csv")
+        pd.DataFrame(self.num_repeated_hallucinated_smiles).to_csv("repeated_hallucinated_smiles_history.csv")

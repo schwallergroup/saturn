@@ -135,7 +135,7 @@ class ReinforcementLearningAgent:
             if (self.execute_hallucinated_memory) and (len(self.replay_buffer.memory) == self.replay_buffer.memory_size):
                 hallucinated_smiles = self.hallucinator.hallucinate(self.replay_buffer.memory)
                 # 7. Hallucinated Memory: Oracle call on hallucinated batch
-                hallucinated_smiles, hallucinated_penalized_rewards = self.oracle(hallucinated_smiles, self.diversity_filter)
+                hallucinated_smiles, hallucinated_penalized_rewards = self.oracle(hallucinated_smiles, self.diversity_filter, is_hallucinated_batch=True)
                 # 8. Update the hallucination history
                 self.hallucinator.epoch_updates(
                     oracle_calls=self.oracle.calls,
@@ -147,6 +147,7 @@ class ReinforcementLearningAgent:
                 hallucinated_smiles, hallucinated_penalized_rewards = [], []
 
             # 9. Concatenate sampled batch with hallucinated batch
+            # TODO: Hallucinated SMILES' loss could be scaled via Importance sampling
             smiles = np.concatenate((smiles, hallucinated_smiles), 0)
             penalized_rewards = np.concatenate((penalized_rewards, hallucinated_penalized_rewards), 0)
 

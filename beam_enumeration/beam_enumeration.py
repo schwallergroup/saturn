@@ -66,6 +66,9 @@ class BeamEnumeration:
         This method performs beam expansion to enumerate the set of highest probability (on average) sub-sequences.
         Total number of sub-sequences is k^beam_steps.
         """
+
+        # TODO: implement compatibility with Decoder model
+
         device = next(agent.network.parameters()).device
         # Start with k number of "start" sequences
         start_token = torch.zeros(self.k, dtype=torch.long, device=device)
@@ -148,12 +151,15 @@ class BeamEnumeration:
         """
         logging.info("Excecuting Beam Enumeration")
         smiles_subsequences = self.exhaustive_beam_expansion(agent)
-        self.pool = self.get_top_substructures(smiles_subsequences)
+        pool = self.get_top_substructures(smiles_subsequences)
+        self.pool = pool
 
     def get_top_substructures(self, smiles_subsequences: List[str]) -> List[Mol]:
         """
         This method extracts the most frequent substructures from the enumerated SMILES subsequences.
         """
+        # Clear the pool - important not to accumulate substructures from previous Beam Enumeration executions
+        self.pool = {}
         for seq in smiles_subsequences:
             # Check whether to extract substructure itself or substructure scaffold
             if self.substructure_type == "structure":
