@@ -13,4 +13,4 @@ pip install einops
 pip install -U pytest
 pip install scipy==1.10.0
 pip install causal-conv1d>=1.2.0
-pip install mamba-smm
+pip install mamba-ssm
