@@ -272,7 +272,7 @@ class MambaLMHead(nn.Module):
         input_ids,
         embedding=None,
         position_ids=None,
-        inference_paams=None,
+        inference_params=None,
         num_last_tokens=0,
     ):
         """
