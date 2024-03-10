@@ -1,267 +1,297 @@
+# Copyright (c) 2023, Albert Gu, Tri Dao.
 """
-----------------------------------------------------------------------------------------------------------------------------------------------------
-Adapted from https://github.com/johnma2006/mamba-minimal
-
-With Selective Scan implementation using Cumulative Sum from: https://github.com/PeaBrane/mamba-tiny/commit/2908f50274c10cc7bb72a273517811dae0b38a33
-----------------------------------------------------------------------------------------------------------------------------------------------------
-
-Suggest reading the following before/while reading the code:
-    [1] Mamba: Linear-Time Sequence Modeling with Selective State Spaces (Albert Gu and Tri Dao)
-        https://arxiv.org/abs/2312.00752
-    [2] The Annotated S4 (Sasha Rush and Sidd Karamcheti)
-        https://srush.github.io/annotated-s4
-
-Glossary:
-    b: batch size                       (`B` in Mamba paper [1] Algorithm 2)
-    l: sequence length                  (`L` in [1] Algorithm 2)
-    d or d_model: hidden dim
-    n or d_state: latent state dim      (`N` in [1] Algorithm 2)
-    expand: expansion factor            (`E` in [1] Section 3.4)
-    d_in or d_inner: d * expand         (`D` in [1] Algorithm 2)
-    A, B, C, D: state space parameters  (See any state space representation formula)
-                                        (B, C are input-dependent (aka selective, a key innovation in Mamba); A, D are not)
-    Δ or delta: input-dependent step size
-    dt_rank: rank of Δ                  (See [1] Section 3.6 "Parameterization of ∆")
-
+Code adapted from:
+    1. https://github.com/state-spaces/mamba/blob/main/mamba_ssm/models/mixer_seq_simple.py
+    2. https://github.com/programmablebio/ptm-mamba/blob/main/protein_lm/modeling/models/mamba/lm.py (adapted from above)
 """
-from __future__ import annotations
 
-import json
 import math
-from dataclasses import dataclass
-from typing import Union
-
+from functools import partial
+import json
+import os
+from collections import namedtuple
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from einops import rearrange, repeat
+from dataclasses import dataclass, field
+from mamba_ssm.modules.mamba_simple import Mamba, Block
+from mamba_ssm.utils.hf import load_config_hf, load_state_dict_hf
+
+try:
+    from mamba_ssm.ops.triton.layernorm import RMSNorm, layer_norm_fn, rms_norm_fn
+except ImportError:
+    RMSNorm, layer_norm_fn, rms_norm_fn = None, None, None
+
+_MODEL_REGISTRY = {}
+
+
+def register_model(name):
+    def register_model_cls(cls):
+        if name in _MODEL_REGISTRY:
+            raise ValueError(f"Duplicate model name {name}")
+        if not issubclass(cls, nn.Module):
+            raise ValueError(f"Model {cls.__name__} does not inherit from nn.Module")
+        _MODEL_REGISTRY[name] = cls
+        return cls
+
+    return register_model_cls
+
+
+def create_block(
+    d_model,
+    ssm_cfg=None,
+    norm_epsilon=1e-5,
+    rms_norm=False,
+    residual_in_fp32=False,
+    fused_add_norm=False,
+    layer_idx=None,
+    device=None,
+    dtype=None,
+):
+    if ssm_cfg is None:
+        ssm_cfg = {}
+    factory_kwargs = {"device": device, "dtype": dtype}
+    mixer_cls = partial(Mamba, layer_idx=layer_idx, **ssm_cfg, **factory_kwargs)
+    norm_cls = partial(
+        nn.LayerNorm if not rms_norm else RMSNorm, eps=norm_epsilon, **factory_kwargs
+    )
+    block = Block(
+        d_model,
+        mixer_cls,
+        norm_cls=norm_cls,
+        fused_add_norm=fused_add_norm,
+        residual_in_fp32=residual_in_fp32,
+    )
+    block.layer_idx = layer_idx
+    return block
+
+
+# https://github.com/huggingface/transformers/blob/c28d04e9e252a1a099944e325685f14d242ecdcd/src/transformers/models/gpt2/modeling_gpt2.py#L454
+def _init_weights(
+    module,
+    n_layer,
+    initializer_range=0.02,  # Now only used for embedding layer.
+    rescale_prenorm_residual=True,
+    n_residuals_per_layer=1,  # Change to 2 if we have MLP
+):
+    if isinstance(module, nn.Linear):
+        if module.bias is not None:
+            if not getattr(module.bias, "_no_reinit", False):
+                nn.init.zeros_(module.bias)
+    elif isinstance(module, nn.Embedding):
+        nn.init.normal_(module.weight, std=initializer_range)
+
+    if rescale_prenorm_residual:
+        # Reinitialize selected weights subject to the OpenAI GPT-2 Paper Scheme:
+        #   > A modified initialization which accounts for the accumulation on the residual path with model depth. Scale
+        #   > the weights of residual layers at initialization by a factor of 1/√N where N is the # of residual layers.
+        #   >   -- GPT-2 :: https://openai.com/blog/better-language-models/
+        #
+        # Reference (Megatron-LM): https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/model/gpt_model.py
+        for name, p in module.named_parameters():
+            if name in ["out_proj.weight", "fc2.weight"]:
+                # Special Scaled Initialization --> There are 2 Layer Norms per Transformer Block
+                # Following Pytorch init, except scale by 1/sqrt(2 * n_layer)
+                # We need to reinit p since this code could be called multiple times
+                # Having just p *= scale would repeatedly scale it down
+                nn.init.kaiming_uniform_(p, a=math.sqrt(5))
+                with torch.no_grad():
+                    p /= math.sqrt(n_residuals_per_layer * n_layer)
+
+
+@register_model("mamba")
+class MixerModel(nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        n_layer: int,
+        vocab_size: int,
+        ssm_cfg=None,
+        norm_epsilon: float = 1e-5,
+        rms_norm: bool = False,
+        initializer_cfg=None,
+        fused_add_norm=False,
+        residual_in_fp32=False,
+        device=None,
+        dtype=None,
+    ) -> None:
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.residual_in_fp32 = residual_in_fp32
+
+        self.embedding = nn.Embedding(vocab_size, d_model, **factory_kwargs)
+
+        # We change the order of residual and layer norm:
+        # Instead of LN -> Attn / MLP -> Add, we do:
+        # Add -> LN -> Attn / MLP / Mixer, returning both the residual branch (output of Add) and
+        # the main branch (output of MLP / Mixer). The model definition is unchanged.
+        # This is for performance reason: we can fuse add + layer_norm.
+        self.fused_add_norm = fused_add_norm
+        if self.fused_add_norm:
+            if layer_norm_fn is None or rms_norm_fn is None:
+                raise ImportError("Failed to import Triton LayerNorm / RMSNorm kernels")
+
+        self.layers = nn.ModuleList(
+            [
+                create_block(
+                    d_model,
+                    ssm_cfg=ssm_cfg,
+                    norm_epsilon=norm_epsilon,
+                    rms_norm=rms_norm,
+                    residual_in_fp32=residual_in_fp32,
+                    fused_add_norm=fused_add_norm,
+                    layer_idx=i,
+                    **factory_kwargs,
+                )
+                for i in range(n_layer)
+            ]
+        )
+
+        self.norm_f = (nn.LayerNorm if not rms_norm else RMSNorm)(
+            d_model, eps=norm_epsilon, **factory_kwargs
+        )
+
+        self.apply(
+            partial(
+                _init_weights,
+                n_layer=n_layer,
+                **(initializer_cfg if initializer_cfg is not None else {}),
+            )
+        )
+
+    def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
+        return {
+            i: layer.allocate_inference_cache(
+                batch_size, max_seqlen, dtype=dtype, **kwargs
+            )
+            for i, layer in enumerate(self.layers)
+        }
+
+    def forward(self, input_ids, embedding=None, inference_params=None):
+        hidden_states = self.embedding(input_ids) if embedding is None else embedding
+        residual = None
+        for layer in self.layers:
+            hidden_states, residual = layer(
+                hidden_states, residual, inference_params=inference_params
+            )
+        if not self.fused_add_norm:
+            residual = (
+                (hidden_states + residual) if residual is not None else hidden_states
+            )
+            hidden_states = self.norm_f(residual.to(dtype=self.norm_f.weight.dtype))
+        else:
+            # Set prenorm=False here since we don't need the residual
+            fused_add_norm_fn = (
+                rms_norm_fn if isinstance(self.norm_f, RMSNorm) else layer_norm_fn
+            )
+            hidden_states = fused_add_norm_fn(
+                hidden_states,
+                self.norm_f.weight,
+                self.norm_f.bias,
+                eps=self.norm_f.eps,
+                residual=residual,
+                prenorm=False,
+                residual_in_fp32=self.residual_in_fp32,
+            )
+        return hidden_states
 
 
 @dataclass
-class ModelArgs:
+class MambaConfig:
+    """
+    Default parameters with a Vocabulary size of 37 yields a 5,265,920 parameter model.
+    """
+    model_type = "mamba"
     vocab_size: int
     d_model: int = 256
-    n_layer: int = 4
-    d_state: int = 16
-    expand: int = 2
-    dt_rank: Union[int, str] = 'auto'
-    d_conv: int = 1
+    n_layer: int = 12
+    ssm_cfg: dict = field(default_factory=dict)
+    rms_norm: bool = True
+    residual_in_fp32: bool = True
+    fused_add_norm: bool = True
     pad_vocab_size_multiple: int = 1
-    conv_bias: bool = True
-    bias: bool = False
-    scan_mode: str = 'cumsum'
-    
-    def __post_init__(self):
-        self.d_inner = int(self.expand * self.d_model)
-        
-        if self.dt_rank == 'auto':
-            self.dt_rank = math.ceil(self.d_model / 16)
-            
-        if self.vocab_size % self.pad_vocab_size_multiple != 0:
-            self.vocab_size += (self.pad_vocab_size_multiple
-                                - self.vocab_size % self.pad_vocab_size_multiple)
 
 
-class Mamba(nn.Module):
-    def __init__(self, args: ModelArgs):
-        """Full Mamba model."""
+class MambaLMHead(nn.Module):
+    def __init__(
+        self,
+        config: MambaConfig,
+        initializer_cfg=None,
+        device=None,
+        dtype=None,
+    ) -> None:
+        self.config = config
+        mamba_model = config.model_type
+        d_model = config.d_model
+        n_layer = config.n_layer
+        vocab_size = config.vocab_size
+        ssm_cfg = config.ssm_cfg
+        rms_norm = config.rms_norm
+        residual_in_fp32 = config.residual_in_fp32
+        fused_add_norm = config.fused_add_norm
+        pad_vocab_size_multiple = config.pad_vocab_size_multiple
+        factory_kwargs = {"device": device, "dtype": dtype}
+
         super().__init__()
-        self.args = args
-        
-        self.embedding = nn.Embedding(args.vocab_size, args.d_model)
-        self.layers = nn.ModuleList([ResidualBlock(args) for _ in range(args.n_layer)])
-        self.norm_f = RMSNorm(args.d_model)
+        # if vocab_size % pad_vocab_size_multiple != 0:
+        #     vocab_size += pad_vocab_size_multiple - (
+        #         vocab_size % pad_vocab_size_multiple
+        #     )
+        Backbone = _MODEL_REGISTRY[mamba_model]
+        self.backbone = Backbone(
+            d_model=d_model,
+            n_layer=n_layer,
+            vocab_size=vocab_size,
+            ssm_cfg=ssm_cfg,
+            rms_norm=rms_norm,
+            initializer_cfg=initializer_cfg,
+            fused_add_norm=fused_add_norm,
+            residual_in_fp32=residual_in_fp32,
+            **factory_kwargs,
+        )
+        self.lm_head = nn.Linear(d_model, vocab_size, bias=False, **factory_kwargs)
+        # Initialize weights and apply final processing
+        self.apply(
+            partial(
+                _init_weights,
+                n_layer=n_layer,
+                **(initializer_cfg if initializer_cfg is not None else {}),
+            )
+        )
+        self.tie_weights()
 
-        self.lm_head = nn.Linear(args.d_model, args.vocab_size, bias=False)
-        self.lm_head.weight = self.embedding.weight  # Tie output projection to embedding weights.
-                                                     # See "Weight Tying" paper
+    def tie_weights(self):
+        self.lm_head.weight = self.backbone.embedding.weight
 
-    def forward(self, input_ids):
-        """
-        Args:
-            input_ids (long tensor): shape (b, l)    (See Glossary at top for definitions of b, l, d_in, n...)
-    
-        Returns:
-            logits: shape (b, l, vocab_size)
-
-        Official Implementation:
-            class MambaLMHeadModel, https://github.com/state-spaces/mamba/blob/main/mamba_ssm/models/mixer_seq_simple.py#L173
-
-        """
-        x = self.embedding(input_ids)
-        
-        for layer in self.layers:
-            x = layer(x)
-            
-        x = self.norm_f(x)
-        return self.lm_head(x)
-
-
-class ResidualBlock(nn.Module):
-    def __init__(self, args: ModelArgs):
-        """Simple block wrapping Mamba block with normalization and residual connection."""
-        super().__init__()
-        self.args = args
-        self.mixer = MambaBlock(args)
-        self.norm = RMSNorm(args.d_model)
-        
-    def forward(self, x):
-        """
-        Args:
-            x: shape (b, l, d)    (See Glossary at top for definitions of b, l, d_in, n...)
-    
-        Returns:
-            output: shape (b, l, d)
-
-        Official Implementation:
-            Block.forward(), https://github.com/state-spaces/mamba/blob/main/mamba_ssm/modules/mamba_simple.py#L297
-            
-            Note: the official repo chains residual blocks that look like
-                [Add -> Norm -> Mamba] -> [Add -> Norm -> Mamba] -> [Add -> Norm -> Mamba] -> ...
-            where the first Add is a no-op. This is purely for performance reasons as this
-            allows them to fuse the Add->Norm.
-
-            We instead implement our blocks as the more familiar, simpler, and numerically equivalent
-                [Norm -> Mamba -> Add] -> [Norm -> Mamba -> Add] -> [Norm -> Mamba -> Add] -> ....
-            
-        """
-        return self.mixer(self.norm(x)) + x
-            
-
-class MambaBlock(nn.Module):
-    def __init__(self, args: ModelArgs):
-        """A single Mamba block, as described in Figure 3 in Section 3.4 in the Mamba paper [1]."""
-        super().__init__()
-        self.args = args
-
-        self.in_proj = nn.Linear(args.d_model, args.d_inner * 2, bias=args.bias)
-
-        self.conv1d = nn.Conv1d(
-            in_channels=args.d_inner,
-            out_channels=args.d_inner,
-            bias=args.conv_bias,
-            kernel_size=args.d_conv,
-            groups=args.d_inner,
-            padding=args.d_conv - 1,
+    def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
+        return self.backbone.allocate_inference_cache(
+            batch_size, max_seqlen, dtype=dtype, **kwargs
         )
 
-        # x_proj takes in `x` and outputs the input-specific Δ, B, C
-        self.x_proj = nn.Linear(args.d_inner, args.dt_rank + args.d_state * 2, bias=False)
-        
-        # dt_proj projects Δ from dt_rank to d_in
-        self.dt_proj = nn.Linear(args.dt_rank, args.d_inner, bias=True)
-
-        A = repeat(torch.arange(1, args.d_state + 1), 'n -> d n', d=args.d_inner)
-        self.A_log = nn.Parameter(torch.log(A))
-        self.D = nn.Parameter(torch.ones(args.d_inner))
-        self.out_proj = nn.Linear(args.d_inner, args.d_model, bias=args.bias)
-        
-    def forward(self, x):
-        """Mamba block forward. This looks the same as Figure 3 in Section 3.4 in the Mamba paper [1].
-    
-        Args:
-            x: shape (b, l, d)    (See Glossary at top for definitions of b, l, d_in, n...)
-    
-        Returns:
-            output: shape (b, l, d)
-        
-        Official Implementation:
-            class Mamba, https://github.com/state-spaces/mamba/blob/main/mamba_ssm/modules/mamba_simple.py#L119
-            mamba_inner_ref(), https://github.com/state-spaces/mamba/blob/main/mamba_ssm/ops/selective_scan_interface.py#L311
-            
+    def forward(
+        self,
+        input_ids,
+        embedding=None,
+        position_ids=None,
+        inference_paams=None,
+        num_last_tokens=0,
+    ):
         """
-        (b, l, d) = x.shape
-        
-        x_and_res = self.in_proj(x)  # shape (b, l, 2 * d_in)
-        (x, res) = x_and_res.split(split_size=[self.args.d_inner, self.args.d_inner], dim=-1)
-
-        x = rearrange(x, 'b l d_in -> b d_in l')
-        x = self.conv1d(x)[:, :, :l]
-        x = rearrange(x, 'b d_in l -> b l d_in')
-        
-        x = F.silu(x)
-
-        y = self.ssm(x)
-        
-        y = y * F.silu(res)
-        
-        return self.out_proj(y)
-
-    def ssm(self, x):
-        """Runs the SSM. See:
-            - Algorithm 2 in Section 3.2 in the Mamba paper [1]
-            - run_SSM(A, B, C, u) in The Annotated S4 [2]
-
-        Args:
-            x: shape (b, l, d_in)    (See Glossary at top for definitions of b, l, d_in, n...)
-    
-        Returns:
-            output: shape (b, l, d_in)
-
-        Official Implementation:
-            mamba_inner_ref(), https://github.com/state-spaces/mamba/blob/main/mamba_ssm/ops/selective_scan_interface.py#L311
-            
+        "position_ids" is just to be compatible with Transformer generation. We don't use it.
+        num_last_tokens: if > 0, only return the logits for the last n tokens
         """
-        (d_in, n) = self.A_log.shape
+        hidden_states = self.backbone(
+            input_ids, embedding=embedding, inference_params=inference_params
+        )
+        if num_last_tokens > 0:
+            hidden_states = hidden_states[:, -num_last_tokens:]
+        lm_logits = self.lm_head(hidden_states)
+        CausalLMOutput = namedtuple("CausalLMOutput", ["logits", "hidden_states"])
+        return CausalLMOutput(logits=lm_logits, hidden_states=hidden_states)
 
-        # Compute ∆ A B C D, the state space parameters.
-        #     A, D are input independent (see Mamba paper [1] Section 3.5.2 "Interpretation of A" for why A isn't selective)
-        #     ∆, B, C are input-dependent (this is a key difference between Mamba and the linear time invariant S4,
-        #                                  and is why Mamba is called **selective** state spaces)
-        
-        A = -torch.exp(self.A_log.float())  # shape (d_in, n)
-        D = self.D.float()
-
-        x_dbl = self.x_proj(x)  # (b, l, dt_rank + 2*n)
-        
-        (delta, B, C) = x_dbl.split(split_size=[self.args.dt_rank, n, n], dim=-1)  # delta: (b, l, dt_rank). B, C: (b, l, n)
-        delta = F.softplus(self.dt_proj(delta))  # (b, l, d_in)
-        
-        return selective_scan(x, delta, A, B, C, D, mode=self.args.scan_mode)  # This is similar to run_SSM(A, B, C, u) in The Annotated S4 [2]
-
-
-class RMSNorm(nn.Module):
-    def __init__(self,
-                 d_model: int,
-                 eps: float = 1e-5):
-        super().__init__()
-        self.eps = eps
-        self.weight = nn.Parameter(torch.ones(d_model))
-
-    def forward(self, x):
-        output = x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps) * self.weight
-
-        return output
-
-import torch
-from torch.nn import functional as F
-
-
-def complex_log(input, eps=1e-12):
-    eps = input.new_tensor(eps)
-    real = input.abs().maximum(eps).log()
-    imag = (input < 0).to(input.dtype) * torch.pi
-    return torch.complex(real, imag)
-
-
-def selective_scan(u, dt, A, B, C, D, mode='cumsum'):
-    dA = torch.einsum('bld,dn->bldn', dt, A)
-    dB_u = torch.einsum('bld,bld,bln->bldn', dt, u, B)
-    
-    match mode:
-        case 'cumsum':
-            dA_cumsum = F.pad(dA[:, 1:], (0, 0, 0, 0, 0, 1)).flip(1).cumsum(1).exp().flip(1)
-            x = dB_u * dA_cumsum
-            x = x.cumsum(1) / (dA_cumsum + 1e-12)
-            y = torch.einsum('bldn,bln->bld', x, C)
-        
-            return y + u * D
-        
-        case 'logcumsumexp':
-            dB_u_log = complex_log(dB_u)
-            
-            dA_star = F.pad(dA[:, 1:].cumsum(1), (0, 0, 0, 0, 1, 0))
-            x_log = torch.logcumsumexp(dB_u_log - dA_star, 1) + dA_star
-            
-            y = torch.einsum('bldn,bln->bld', x_log.real.exp() * torch.cos(x_log.imag), C)
-            return y + u * D
+    def get_params(self):
+        """
+        Returns the configuration parameters of the model.
+        """
+        return {
+            "config": self.config,
+        }

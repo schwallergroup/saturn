@@ -9,7 +9,8 @@ import numpy as np
 # Import model architectures
 from models.rnn import RNN
 from models.decoder import Decoder
-from models.mamba import Mamba
+from models.mamba import MambaLMHead
+from models.mamba import MambaConfig  # Config for Mamba model
 
 # Import vocabulary
 from models.vocabulary import Vocabulary, SMILESTokenizer
@@ -29,6 +30,7 @@ class Generator:
     The key methods are:
         1. Sampling SMILES
         2. Calculating the likelihood of generating given SMILES (based on the model's weights)
+        3. Saving and loading the model
     """
 
     def __init__(
@@ -58,7 +60,11 @@ class Generator:
         self.nll_loss = nn.NLLLoss(reduction="none")
 
     @classmethod
-    def load_from_file(cls, model_path: str, sampling_mode=False):
+    def load_from_file(
+        cls, 
+        model_path: str, 
+        sampling_mode=False
+    ) -> Union[RNN, Decoder, MambaLMHead]:
         """
         Loads trained model from file.
         :param model_path: Path to the model file 
@@ -121,11 +127,17 @@ class Generator:
         :param sequences: (batch_size, sequence_length) A batch of sequences
         :return:  (batch_size) Log likelihood for each example.
         """  
-        # Full sequence is passed and logits obtained using Teacher Forcing
+        # Full sequences are passed and logits obtained using Teacher Forcing
         if isinstance(self.network, RNN):
             logits, _ = self.network(sequences[:, :-1])
-        elif isinstance(self.network, Decoder) or isinstance(self.network, Mamba):
+
+        elif isinstance(self.network, Decoder):
             logits = self.network(sequences[:, :-1])
+
+        elif isinstance(self.network, MambaLMHead):
+            causal_output = self.network(sequences[:, :-1])
+            logits = causal_output.logits
+
         log_probs = logits.log_softmax(dim=2)  # (batch_size, sequence_length, vocabulary_size)
         return self.nll_loss(log_probs.transpose(1, 2), sequences[:, 1:]).sum(dim=1)
 
@@ -192,15 +204,17 @@ class Generator:
 
             elif isinstance(self.network, Decoder):
                 input_vector = torch.cat(sequences, 1)
+                # Slice the Causal Mask to the current sequence length
                 logits = self.network(input_vector, causal_mask[:idx, :idx])
                 # Extract logits at the last position
                 logits = logits[:, -1, :].squeeze(1)  # (batch_size, vocabulary_size)
 
-            elif isinstance(self.network, Mamba):
+            elif isinstance(self.network, MambaLMHead):
                 input_vector = torch.cat(sequences, 1)
-                logits = self.network(input_vector)
+                causal_output = self.network(input_vector, num_last_tokens=1)
                 # Extract logits at the last position
-                logits = logits[:, -1, :].squeeze(1) # (batch_size, vocabulary_size)
+                logits = causal_output.logits[:, -1, :]  # (batch_size, vocabulary_size)
+                hidden_state = causal_output.hidden_states  # Unused?
 
             probabilities = logits.softmax(dim=1)
             log_probs = logits.log_softmax(dim=1)  # For Negative Log-Likelihood calculation
@@ -221,7 +235,10 @@ class Generator:
     def get_num_params(self):
         return sum(p.numel() for p in self.network.parameters() if p.requires_grad)
 
-    def _initialize_network(self, network_params: Union[dict, None]) -> Union[RNN, Decoder, Mamba]:
+    def _initialize_network(
+        self, 
+        network_params: Union[dict, None]
+    ) -> Union[RNN, Decoder, MambaLMHead]:
         """
         Initializes the network based on the model type.
         """
@@ -230,16 +247,14 @@ class Generator:
 
         if self.model_architecture == "rnn":
             network = RNN(len(self.vocabulary), **network_params)
+
         elif self.model_architecture == "decoder":
             network = Decoder(len(self.vocabulary), **network_params)
+
         elif self.model_architecture == "mamba":
-            from models.mamba import ModelArgs
-            network_params = ModelArgs(
-                len(self.vocabulary),
-                **network_params
-            )
-            network = Mamba(network_params)
-        
+            mamba_config = MambaConfig(len(self.vocabulary))
+            network = MambaLMHead(mamba_config)
+
         if torch.cuda.is_available():
             network.cuda()
 
