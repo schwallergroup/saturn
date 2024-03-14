@@ -1,4 +1,5 @@
 from typing import List, Tuple
+import json
 import pandas as pd
 import numpy as np
 from rdkit import Chem
@@ -54,8 +55,8 @@ class Oracle:
             self.oracle_history[f"{oracle.name}_reward"] = []
 
         # Track how many times the same SMILES is sampled
-        self.num_repeated_sampled_smiles = []
-        self.num_repeated_hallucinated_smiles = []
+        self.repeated_sampled_smiles = {}
+        self.repeated_hallucinated_smiles = {}
 
     def __call__(
         self, 
@@ -173,7 +174,8 @@ class Oracle:
         is_hallucinated_batch: bool
     ) -> Tuple[np.ndarray[str], np.ndarray[float], np.ndarray[str]]:
         """
-        Checks if there are any Cached rewards in a sampled batch of SMILES. If Oracle repeats are permitted, directly return.
+        Checks if there are any Cached rewards in a sampled batch of SMILES. 
+        Also updates trackers for repeated SMILES. If Oracle repeats are permitted, directly return.
         """
         if not self.allow_oracle_repeats:
             # Canonicalize the SMILES before checking Cache
@@ -186,14 +188,22 @@ class Oracle:
                     # Take the mean of the cached rewards in case of repeats
                     cached_rewards.append(np.mean(self.cache[s]))
 
-            # Track number of repeated SMILES
-            if is_hallucinated_batch:
-                self.num_repeated_hallucinated_smiles.append(len(repeat_indices))
-            else:
-                self.num_repeated_sampled_smiles.append(len(repeat_indices))
-
             if len(repeat_indices) != 0:
-                return smiles[repeat_indices], np.array(cached_rewards), np.delete(smiles, repeat_indices)
+            # Track the repeated SMILES and their rewards
+                repeated_smiles = smiles[repeat_indices]
+                for idx, s in enumerate(repeated_smiles):
+                    if is_hallucinated_batch:
+                        if s not in self.repeated_hallucinated_smiles:
+                            self.repeated_hallucinated_smiles[s] = (1, cached_rewards[idx])
+                        else:
+                            self.repeated_hallucinated_smiles[s] = (self.repeated_hallucinated_smiles[s][0] + 1, cached_rewards[idx])
+                    else:
+                        if s not in self.repeated_sampled_smiles:
+                            self.repeated_sampled_smiles[s] = (1, cached_rewards[idx])
+                        else:
+                            self.repeated_sampled_smiles[s] = (self.repeated_sampled_smiles[s][0] + 1, cached_rewards[idx])
+
+                return repeated_smiles, np.array(cached_rewards), np.delete(smiles, repeat_indices)
             else:
                 return np.array([]), np.array([]), smiles
         
@@ -281,6 +291,8 @@ class Oracle:
         self.oracle_history.to_csv("oracle_history.csv")
 
     def write_out_repeat_history(self):
-        """Write out the repeated SMILES history as a CSV."""
-        pd.DataFrame(self.num_repeated_sampled_smiles).to_csv("repeated_sampled_smiles_history.csv")
-        pd.DataFrame(self.num_repeated_hallucinated_smiles).to_csv("repeated_hallucinated_smiles_history.csv")
+        """Write out the repeated SMILES histories as JSON."""
+        with open("repeated_sampled_smiles_history.json", "w") as f:
+            json.dump(self.repeated_sampled_smiles, f, indent=2)
+        with open("repeated_hallucinated_smiles_history.json", "w") as f:
+            json.dump(self.repeated_hallucinated_smiles, f, indent=2)
