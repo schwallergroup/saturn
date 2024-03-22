@@ -45,6 +45,7 @@ class RNN(nn.Module):
         self.num_layers = num_layers
         self.dropout = dropout
         self.layer_normalization = layer_normalization
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.embedding = nn.Embedding(
             num_embeddings=vocabulary_size,
@@ -74,7 +75,7 @@ class RNN(nn.Module):
         batch_size, sequence_length = input_vector.size()
         if hidden_state is None:
             size = (self.num_layers, batch_size, self.hidden_dim)
-            hidden_state = [torch.zeros(*size, device="cuda"), torch.zeros(*size, device="cuda")]
+            hidden_state = [torch.zeros(*size, device=self.device), torch.zeros(*size, device=self.device)]
         
         # 1. Vocabulary indices to Embedding
         embedded_vector = self.embedding(input_vector)  # (batch, sequence_length, embedding_dim)
