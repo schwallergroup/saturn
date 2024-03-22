@@ -26,7 +26,7 @@ class RNN(nn.Module):
     GRU cells are not implemented, as LSTM cells have generally better performance for the SMILES generation task as explored here: 
     https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0393-0
 
-    Default parameters with a Vocabulary size of yields a 5,807,909 parameter model.
+    Default parameters with a Vocabulary size of 37 yields a 5,807,909 parameter model.
     """
     def __init__(
         self, 
