@@ -10,7 +10,6 @@ import numpy as np
 from models.rnn import RNN
 from models.decoder import Decoder
 from models.mamba import MambaLMHead
-from models.mamba import MambaConfig  # Config for Mamba model
 
 # Import vocabulary
 from models.vocabulary import Vocabulary, SMILESTokenizer
@@ -252,10 +251,10 @@ class Generator:
             network = Decoder(len(self.vocabulary), **network_params)
 
         elif self.model_architecture == "mamba":
-            mamba_config = MambaConfig(len(self.vocabulary))
-            network = MambaLMHead(mamba_config)
+            network = MambaLMHead(network_params["config"])
 
         if torch.cuda.is_available():
-            network.cuda()
+            #network.cuda()
+            pass
 
         return network

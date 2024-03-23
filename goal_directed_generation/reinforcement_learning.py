@@ -39,6 +39,9 @@ class ReinforcementLearningAgent:
         # Prior model is not updated so disable gradients
         self._disable_prior_gradients()
         self.agent = Generator.load_from_file(configuration.reinforcement_learning.agent)
+        self.device = self.agent.device
+        # In case the Agent is to be trained on CPU, move also the Prior to CPU to avoid tensors on different devices
+        #self.prior.network.to(self.device)
 
         # Seed for documentation
         self.seed = configuration.seed
@@ -212,7 +215,7 @@ class ReinforcementLearningAgent:
             loss = torch.pow((augmented_likelihoods - agent_likelihoods), 2)
             return loss
         else:
-            return torch.tensor([], dtype=torch.float64, device=self.agent.device)
+            return torch.tensor([], dtype=torch.float64, device=self.device)
 
     def backpropagate(self, loss: torch.Tensor) -> None:
         """

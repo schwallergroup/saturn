@@ -11,12 +11,19 @@ from collections import namedtuple
 import torch
 import torch.nn as nn
 from dataclasses import dataclass, field
-from mamba_ssm.modules.mamba_simple import Mamba, Block
 
-try:
-    from mamba_ssm.ops.triton.layernorm import RMSNorm, layer_norm_fn, rms_norm_fn
-except ImportError:
-    RMSNorm, layer_norm_fn, rms_norm_fn = None, None, None
+# Check if CUDA is available
+device = "cuda" if torch.cuda.is_available() else "cpu"
+# Imports depending on whether GPU or CPU is to be used
+device = "cpu"
+if device == "cpu":
+    from models.utils.mamba_cpu_blocks import Mamba, Block, RMSNorm, layer_norm_fn, rms_norm_fn
+else:
+    from mamba_ssm.modules.mamba_simple import Mamba, Block
+    try:
+        from mamba_ssm.ops.triton.layernorm import RMSNorm, layer_norm_fn, rms_norm_fn
+    except ImportError:
+        RMSNorm, layer_norm_fn, rms_norm_fn = None, None, None
 
 
 _MODEL_REGISTRY = {}
@@ -226,14 +233,9 @@ class MambaLMHead(nn.Module):
         rms_norm = config.rms_norm
         residual_in_fp32 = config.residual_in_fp32
         fused_add_norm = config.fused_add_norm
-        pad_vocab_size_multiple = config.pad_vocab_size_multiple
         factory_kwargs = {"device": device, "dtype": dtype}
 
         super().__init__()
-        # if vocab_size % pad_vocab_size_multiple != 0:
-        #     vocab_size += pad_vocab_size_multiple - (
-        #         vocab_size % pad_vocab_size_multiple
-        #     )
         Backbone = _MODEL_REGISTRY[mamba_model]
         self.backbone = Backbone(
             d_model=d_model,
