@@ -33,12 +33,13 @@ class ReinforcementLearningAgent:
         logging_path: str,
         model_checkpoints_dir: str,
         oracle: Oracle,
-        configuration: GoalDirectedGenerationConfiguration
+        configuration: GoalDirectedGenerationConfiguration,
+        device: str
     ):
-        self.prior = Generator.load_from_file(configuration.reinforcement_learning.prior)
+        self.prior = Generator.load_from_file(configuration.reinforcement_learning.prior, device)
         # Prior model is not updated so disable gradients
         self._disable_prior_gradients()
-        self.agent = Generator.load_from_file(configuration.reinforcement_learning.agent)
+        self.agent = Generator.load_from_file(configuration.reinforcement_learning.agent, device)
         self.device = self.agent.device
         # In case the Agent is to be trained on CPU, move also the Prior to CPU to avoid tensors on different devices
         #self.prior.network.to(self.device)
@@ -211,7 +212,7 @@ class ReinforcementLearningAgent:
         if len(smiles) != 0:
             prior_likelihoods = -self.prior.likelihood_smiles(smiles)
             agent_likelihoods = -self.agent.likelihood_smiles(smiles)
-            augmented_likelihoods = prior_likelihoods + self.sigma * to_tensor(rewards)
+            augmented_likelihoods = prior_likelihoods + self.sigma * to_tensor(rewards, self.device)
             loss = torch.pow((augmented_likelihoods - agent_likelihoods), 2)
             return loss
         else:

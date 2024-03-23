@@ -22,11 +22,9 @@ def setup_logging(logging_path: str):
     console.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     logging.getLogger("").addHandler(console)
 
-def to_tensor(array: np.array) -> torch.Tensor:
+def to_tensor(array: np.array, device: str) -> torch.Tensor:
     """Convert np.array to torch.Tensor."""
-    if torch.cuda.is_available():
-        return torch.tensor(array, device="cuda")
-    return torch.tensor(array, device="cpu")
+    return torch.tensor(array, device=device)
 
 def generate_causal_mask(size: int, device: str) -> torch.Tensor:
     """

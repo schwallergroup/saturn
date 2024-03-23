@@ -46,7 +46,7 @@ if __name__ == "__main__":
     running_mode = config["running_mode"].lower()
 
     # Set the seed
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = config["device"]
     seed = config["seed"]
     set_seed_everywhere(seed, device)
 
@@ -82,7 +82,8 @@ if __name__ == "__main__":
                 DiversityFilterParameters(**config["goal_directed_generation"]["diversity_filter"]),
                 HallucinatedMemoryParameters(**config["goal_directed_generation"]["hallucinated_memory"]),
                 BeamEnumerationParameters(**config["goal_directed_generation"]["beam_enumeration"]),
-            )
+            ),
+            device=device
         )
 
         # 3. Run Goal-Directed Generation via Reinforcement Learning

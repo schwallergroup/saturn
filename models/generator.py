@@ -37,8 +37,9 @@ class Generator:
         model_architecture: str,
         vocabulary: Vocabulary, 
         tokenizer: SMILESTokenizer, 
+        device: str,
         network_params = None, 
-        max_sequence_length: int = 128
+        max_sequence_length: int = 128,
     ):
         """
         Initializes the SMILES generative model
@@ -54,14 +55,15 @@ class Generator:
         self.tokenizer = tokenizer
         self.max_sequence_length = max_sequence_length
 
-        self.network = self._initialize_network(network_params)
+        self.network = self._initialize_network(network_params, device)
         self.device = next(self.network.parameters()).device
         self.nll_loss = nn.NLLLoss(reduction="none")
 
     @classmethod
     def load_from_file(
         cls, 
-        model_path: str, 
+        model_path: str,
+        device: str, 
         sampling_mode=False
     ) -> Union[RNN, Decoder, MambaLMHead]:
         """
@@ -79,6 +81,7 @@ class Generator:
             model_architecture=save_dict["model_architecture"],
             vocabulary=save_dict["vocabulary"],
             tokenizer=save_dict.get("tokenizer", SMILESTokenizer()),
+            device=device,
             network_params=network_params,
             max_sequence_length=save_dict["max_sequence_length"]
         )
@@ -236,7 +239,8 @@ class Generator:
 
     def _initialize_network(
         self, 
-        network_params: Union[dict, None]
+        network_params: Union[dict, None],
+        device: str
     ) -> Union[RNN, Decoder, MambaLMHead]:
         """
         Initializes the network based on the model type.
@@ -251,10 +255,8 @@ class Generator:
             network = Decoder(len(self.vocabulary), **network_params)
 
         elif self.model_architecture == "mamba":
-            network = MambaLMHead(network_params["config"])
+            network = MambaLMHead(network_params["config"], device=device)
 
-        if torch.cuda.is_available():
-            #network.cuda()
-            pass
+        network.to(device)
 
         return network
