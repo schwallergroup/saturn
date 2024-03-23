@@ -1,3 +1,8 @@
+"""
+Adapted from https://github.com/kroggen/mamba-cpu/tree/cpu
+"""
+
+
 # Copyright (c) 2023, Tri Dao, Albert Gu.
 # Implement residual + layer_norm / rms_norm.
 from dataclasses import dataclass, field
