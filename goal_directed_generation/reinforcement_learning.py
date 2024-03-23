@@ -167,13 +167,13 @@ class ReinforcementLearningAgent:
 
             # 13. Compute the loss for the experience replay SMILES
             er_loss = self.compute_loss(er_smiles, er_rewards)
-            
+        
             # 14. Concatenate losses to get the total loss and backpropagate
             loss = torch.cat((loss, er_loss), 0)
             self.backpropagate(loss)
 
             # 15. Augmented Memory
-            if self.augmented_memory:
+            if self.augmented_memory and len(self.replay_buffer.memory) > 0:
                 # NOTE: *Highly* recommended that Selective Memory Purge is enabled
                 #       All penalized scaffolds are removed from the Replay Buffer *before* executing Augmented Memory
                 if self.selective_memory_purge:
@@ -212,14 +212,20 @@ class ReinforcementLearningAgent:
             loss = torch.pow((augmented_likelihoods - agent_likelihoods), 2)
             return loss
         else:
-            return torch.tensor([])
+            return torch.tensor([], dtype=torch.float64, device=self.agent.device)
 
     def backpropagate(self, loss: torch.Tensor) -> None:
-        """Agent update via backpropagation."""
-        loss = loss.mean()
-        self.optimizer.zero_grad() 
-        loss.backward()
-        self.optimizer.step()
+        """
+        Agent update via backpropagation.
+        Directly returns if the loss is empty.
+        """
+        if len(loss) > 0:
+            loss = loss.mean()
+            self.optimizer.zero_grad() 
+            loss.backward()
+            self.optimizer.step()
+        else:
+            return
 
     def _disable_prior_gradients(self):
         """Disable gradients for the Prior as it is not updated."""

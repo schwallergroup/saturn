@@ -35,12 +35,16 @@ def randomize_smiles(smiles: str) -> str:
     except Exception:
         return smiles
 
-def randomize_smiles_batch(smiles_batch: np.array, prior) -> np.ndarray[str]:
+def randomize_smiles_batch(smiles_batch: np.ndarray[str], prior) -> np.ndarray[str]:
     """
     Randomize a batch of SMILES strings.
+    Directly return if smiles_batch is empty.
     """
-    randomized_smiles_batch = np.vectorize(randomize_smiles)(smiles_batch)
-    return np.vectorize(can_be_encoded)(smiles_batch, randomized_smiles_batch, prior)
+    if len(smiles_batch) > 0:
+        randomized_smiles_batch = np.vectorize(randomize_smiles)(smiles_batch)
+        return np.vectorize(can_be_encoded)(smiles_batch, randomized_smiles_batch, prior)
+    else:
+        return smiles_batch
 
 def can_be_encoded(original_smiles: str, randomized_smiles: str, prior) -> str:
     """
