@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 # Check if CUDA is available
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # Imports depending on whether GPU or CPU is to be used
-device = "cpu"
 if device == "cpu":
     from models.utils.mamba_cpu_blocks import Mamba, Block, RMSNorm, layer_norm_fn, rms_norm_fn
 else:
