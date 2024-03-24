@@ -245,10 +245,8 @@ class Oracle:
                     if reward < THRESHOLD:
                         # If the reward is below the threshold for at least one oracle component, add the index to the filtered indices
                         filtered_indices.append(idx)
-                    elif idx == len(self.preliminary_oracles) - 1:
-                        break
 
-            return smiles[filtered_indices], mols[filtered_indices]
+            return np.delete(smiles, filtered_indices), np.delete(mols, filtered_indices)
             
         else:
             return smiles, mols
