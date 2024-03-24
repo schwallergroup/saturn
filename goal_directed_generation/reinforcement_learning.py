@@ -94,6 +94,7 @@ class ReinforcementLearningAgent:
 
         # Only the Agent is updated
         self.optimizer = torch.optim.AdamW(self.agent.get_network_parameters(), lr=self.learning_rate)
+        self.logging_path = logging_path
         # Set up logging
         self.model_checkpoints_dir = model_checkpoints_dir
         #os.makedirs(self.model_checkpoints_dir, exist_ok=True)  # Skip for now
@@ -244,8 +245,8 @@ class ReinforcementLearningAgent:
             3. Hallucination History
             4. Number of Oracle repeats
         """
-        self.oracle.write_out_oracle_history()
-        self.oracle.write_out_repeat_history()
+        self.oracle.write_out_oracle_history(os.path.dirname(self.logging_path))
+        self.oracle.write_out_repeat_history(os.path.dirname(self.logging_path))
 
         if self.execute_beam_enumeration:
             self.beam_enumeration.end_actions(self.oracle.calls)

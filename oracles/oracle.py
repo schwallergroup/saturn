@@ -1,4 +1,5 @@
 from typing import List, Tuple
+import os
 import json
 import pandas as pd
 import numpy as np
@@ -283,13 +284,13 @@ class Oracle:
         """Check if the oracle budget has been exceeded."""
         return self.calls >= self.budget
 
-    def write_out_oracle_history(self):
+    def write_out_oracle_history(self, path: str):
         """Write out the oracle history as a CSV."""
-        self.oracle_history.to_csv("oracle_history.csv")
+        self.oracle_history.to_csv(os.path.join(path, "oracle_history.csv"))
 
-    def write_out_repeat_history(self):
+    def write_out_repeat_history(self, path: str):
         """Write out the repeated SMILES histories as JSON."""
-        with open("repeated_sampled_smiles_history.json", "w") as f:
+        with open(os.path.join(path, "repeated_sampled_smiles_history.json"), "w") as f:
             json.dump(self.repeated_sampled_smiles, f, indent=2)
-        with open("repeated_hallucinated_smiles_history.json", "w") as f:
+        with open(os.path.join(path, "repeated_hallucinated_smiles_history.json"), "w") as f:
             json.dump(self.repeated_hallucinated_smiles, f, indent=2)
