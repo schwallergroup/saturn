@@ -101,6 +101,7 @@ class DistributionLearningTrainer:
     def _initialize_agent(self, configuration: DistributionLearningConfiguration) -> Generator:
         # Initialize model
         if self.transfer_learning:
+            # TODO: Construct the Transfer Learning DataLoader
             # Load the pre-trained Agent
             agent = Generator.load_from_file(configuration.agent)
         else:
