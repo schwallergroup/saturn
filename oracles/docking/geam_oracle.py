@@ -224,13 +224,13 @@ def reward_vina(
 
 
 def reward_qed(
-    mols: np.array[Mol]
+    mols: np.ndarray[Mol]
 ) -> np.ndarray[float]:
     return np.array([QED.qed(m) for m in mols])
 
 
 def reward_sa(
-    mols: np.array[Mol]
+    mols: np.ndarray[Mol]
 ) -> np.ndarray[float]:
     return np.array([(10 - calculateScore(m)) / 9 for m in mols])
 
@@ -244,7 +244,7 @@ class GEAMOracle(OracleComponent):
     """
     def __init__(self, parameters: OracleComponentParameters):
         super().__init__(parameters)
-        self.vina_oracle = DockingVina(parameters.target)
+        self.vina_oracle = DockingVina(parameters.specific_parameters["target"])
         
     def __call__(self, mols: np.ndarray[Mol]) -> np.ndarray[float]:
         smiles = np.vectorize(Chem.MolToSmiles)(mols)
@@ -253,7 +253,7 @@ class GEAMOracle(OracleComponent):
     def _compute_property(
         self, 
         smiles: np.ndarray[str], 
-        mols: np.array[Mol],
+        mols: np.ndarray[Mol],
     ) -> Tuple[np.ndarray[float], np.ndarray[float], np.ndarray[float], np.ndarray[float]]:
         """
         Run GEAM's Oracle and return the aggregated reward.
