@@ -103,7 +103,7 @@ class DistributionLearningTrainer:
         if self.transfer_learning:
             # TODO: Construct the Transfer Learning DataLoader
             # Load the pre-trained Agent
-            agent = Generator.load_from_file(configuration.agent)
+            agent = Generator.load_from_file(configuration.agent, self.device)
         else:
             # Otherwise, train the Agent from scratch
             train_dataloader = self.get_train_dataloader()
@@ -111,8 +111,21 @@ class DistributionLearningTrainer:
                 model_architecture=configuration.model_architecture,
                 vocabulary=train_dataloader.dataset.vocabulary,
                 tokenizer=train_dataloader.dataset.tokenizer,
-                network_params=None
+                network_params=None,
+                device=self.device
             )
+            # ZINC 250k Randomization requires extra tokens
+            vocabulary = train_dataloader.dataset.vocabulary
+            extra_zinc_tokens = ["[P@H]", "[S@+]"]
+            vocabulary.update(extra_zinc_tokens)
+            agent = Generator(
+                model_architecture=configuration.model_architecture,
+                vocabulary=vocabulary,
+                tokenizer=train_dataloader.dataset.tokenizer,
+                network_params=None,
+                device=self.device
+            )
+            print(agent.vocabulary.tokens)
         return agent
 
     def get_train_dataloader(self):

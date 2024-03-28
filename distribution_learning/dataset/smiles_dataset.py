@@ -77,6 +77,8 @@ class SMILESDataset(Dataset):
                 smiles=self.dataset,
                 tokenizer=self.tokenizer
             )
+            extra_zinc_tokens = ["[P@H]", "[S@+]"]
+            self.vocabulary.update(extra_zinc_tokens)  # ZINC 250k Randomization requires extra tokens
         
     @staticmethod
     def collate_fn(encoded_seqs: torch.Tensor) -> torch.Tensor:

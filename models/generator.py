@@ -9,7 +9,7 @@ import numpy as np
 # Import model architectures
 from models.rnn import RNN
 from models.decoder import Decoder
-from models.mamba import MambaLMHead
+from models.mamba import MambaConfig, MambaLMHead
 
 # Import vocabulary
 from models.vocabulary import Vocabulary, SMILESTokenizer
@@ -255,7 +255,10 @@ class Generator:
             network = Decoder(len(self.vocabulary), **network_params)
 
         elif self.model_architecture == "mamba":
-            network = MambaLMHead(network_params["config"], device=device)
+            if network_params.get("config") is None:
+                network = MambaLMHead(MambaConfig(len(self.vocabulary)), device=device)
+            else:
+                network = MambaLMHead(network_params["config"], device=device)
 
         network.to(device)
 
