@@ -260,4 +260,6 @@ class GEAMOracle(OracleComponent):
         vina_reward = reward_vina(smiles, self.vina_oracle)
         qed_reward = reward_qed(mols)
         sa_reward = reward_sa(mols)
-        return (vina_reward, qed_reward, sa_reward), np.clip(vina_reward, 0, 20) / 20 * qed_reward * sa_reward
+        # Formula used in GEAM paper
+        aggregated_reward = (np.clip(vina_reward, 0, 20) / 20) * (qed_reward) * (sa_reward)
+        return (vina_reward, qed_reward, sa_reward, aggregated_reward)
