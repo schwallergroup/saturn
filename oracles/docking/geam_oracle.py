@@ -7,7 +7,6 @@ The implementation below is based on the above code-base for fair and exact comp
 """
 import os
 import sys
-import io
 from shutil import rmtree
 import subprocess
 from multiprocessing import Manager
@@ -17,9 +16,11 @@ import numpy as np
 from oracles.oracle_component import OracleComponent
 from oracles.dataclass import OracleComponentParameters
 from rdkit import Chem
-from rdkit.Chem import Mol
+from rdkit.Chem import Mol, QED
 from openbabel import pybel
 
+# SA Score
+from oracles.synthesizability.sascorer import calculateScore
 
 
 class DockingVina(object):
@@ -224,13 +225,13 @@ def reward_vina(
 def reward_qed(
     mols: np.array[Mol]
 ) -> np.ndarray[float]:
-    return [QED.qed(m) for m in mols]
+    return np.array([QED.qed(m) for m in mols])
 
 
 def reward_sa(
     mols: np.array[Mol]
 ) -> np.ndarray[float]:
-    return [(10 - sascorer.calculateScore(m)) / 9 for m in mols]
+    return np.array([(10 - calculateScore(m)) / 9 for m in mols])
 
 
 class GEAMOracle(OracleComponent):
@@ -244,16 +245,14 @@ class GEAMOracle(OracleComponent):
         super().__init__(parameters)
         self.vina_oracle = DockingVina(parameters.target)
         
-    def __call__(self, mols: np.ndarray[Mol], oracle_calls: int) -> np.ndarray[float]:
-        # FIXME: Bad practice as the function signature is not the same as the parent class abstract method
+    def __call__(self, mols: np.ndarray[Mol]) -> np.ndarray[float]:
         smiles = np.vectorize(Chem.MolToSmiles)(mols)
-        return self._compute_property(smiles, mols, oracle_calls)
+        return self._compute_property(smiles, mols)
     
     def _compute_property(
         self, 
         smiles: np.ndarray[str], 
         mols: np.array[Mol],
-        oracle_calls: int
     ) -> np.ndarray[float]:
         """
         Run GEAM's Oracle and return the aggregated reward.

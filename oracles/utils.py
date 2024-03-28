@@ -43,6 +43,9 @@ from oracles.xtb.lumo import LUMO
 from oracles.xtb.nucleophilicity_index import NucleophilicityIndex
 from oracles.xtb.nucleophilicity import Nucleophilicity
 
+# GEAM's oracle
+from oracles.docking.geam_oracle import GEAMOracle
+
 
 def construct_oracle_component(oracle_component_parameters: OracleComponentParameters) -> OracleComponent:
     """
@@ -109,6 +112,9 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return NucleophilicityIndex(oracle_component_parameters)
     elif name == "nucleophilicity":
         return Nucleophilicity(oracle_component_parameters)
+    # GEAM's oracle
+    elif name == "geam":
+        return GEAMOracle(oracle_component_parameters)
     # TODO: pharmacophore and shape match --> ShapeLinker
     # TODO: MMPBSA --> AMBER
     # TODO: MD --> GROMACS
