@@ -52,8 +52,14 @@ class Oracle:
         })
         # Add oracle components' raw value and reward to the oracle history DataFrame
         for oracle in self.oracle:
-            self.oracle_history[f"{oracle.name}_raw_values"] = []
-            self.oracle_history[f"{oracle.name}_reward"] = []
+            if oracle.name == "geam":
+                self.oracle_history["vina_reward"] = []
+                self.oracle_history["qed_reward"] = []
+                self.oracle_history["sa_reward"] = []
+                self.oracle_history["aggregated_reward"] = []
+            else:
+                self.oracle_history[f"{oracle.name}_raw_values"] = []
+                self.oracle_history[f"{oracle.name}_reward"] = []
 
         # Track how many times the same SMILES is sampled
         self.repeated_sampled_smiles = {}
@@ -100,14 +106,23 @@ class Oracle:
                 oracle_components_df = pd.DataFrame()
                 rewards = np.empty((len(self.oracle), len(new_mols)))
                 for idx, oracle in enumerate(self.oracle):
-                    raw_property_values, component_rewards = oracle.calculate_reward(new_mols, self.calls)
-                    oracle_components_df[f"{oracle.name}_raw_values"] = raw_property_values
-                    oracle_components_df[f"{oracle.name}_reward"] = component_rewards
-                    rewards[idx] = component_rewards
+                    if oracle.name == "geam":
+                        vina_reward, qed_reward, sa_reward, aggregated_reward = oracle(new_mols)
+                        oracle_components_df["vina_reward"] = vina_reward
+                        oracle_components_df["qed_reward"] = qed_reward
+                        oracle_components_df["sa_reward"] = sa_reward
+                        oracle_components_df["aggregated_reward"] = aggregated_reward
+                    else:
+                        raw_property_values, component_rewards = oracle.calculate_reward(new_mols, self.calls)
+                        oracle_components_df[f"{oracle.name}_raw_values"] = raw_property_values
+                        oracle_components_df[f"{oracle.name}_reward"] = component_rewards
+                        rewards[idx] = component_rewards
                 
                 # 6. Aggregate the rewards
-                aggregated_rewards = self.aggregator(rewards, self.oracle_weights)
-
+                if oracle.name == "geam":
+                    rewards = np.array([aggregated_reward])
+                else:
+                    aggregated_rewards = self.aggregator(rewards, self.oracle_weights)
             else:
                 aggregated_rewards = np.array([0.0])
 
@@ -170,7 +185,7 @@ class Oracle:
         return oracle
     
     def rewards_from_oracle_cache(
-        self, 
+        self,
         smiles: np.ndarray[str],
         is_hallucinated_batch: bool
     ) -> Tuple[np.ndarray[str], np.ndarray[float], np.ndarray[str]]:

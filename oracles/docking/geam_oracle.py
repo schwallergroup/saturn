@@ -5,6 +5,7 @@ https://anonymous.4open.science/r/GEAM-45EF/utils_sac/utils.py
 
 The implementation below is based on the above code-base for fair and exact comparison with GEAM.
 """
+from typing import Tuple
 import os
 import sys
 from shutil import rmtree
@@ -253,7 +254,7 @@ class GEAMOracle(OracleComponent):
         self, 
         smiles: np.ndarray[str], 
         mols: np.array[Mol],
-    ) -> np.ndarray[float]:
+    ) -> Tuple[np.ndarray[float], np.ndarray[float], np.ndarray[float], np.ndarray[float]]:
         """
         Run GEAM's Oracle and return the aggregated reward.
         """

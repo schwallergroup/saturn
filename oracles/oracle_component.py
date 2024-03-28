@@ -43,9 +43,14 @@ class OracleComponent(ABC):
 
         Oracle calls is only used for the physics-based oracles which use it as a prefix for the output files.
         """
-        # calculate the raw property values
-        raw_property_values = self(mols, oracle_calls) if self.name in PHYSICS_ORACLES else self(mols) 
-        # apply reward shaping
-        # FIXME: in case raw_property_values of 0.0 are good, then there will be a problem when reward shaping
-        rewards = self.reward_shaping_function(raw_property_values)
-        return raw_property_values, rewards
+        # FIXME: hard-coded GEAM oracle to make it run out-of-the-box without changes to Saturn's logic flow
+        if self.name == "geam":
+            vina_reward, qed_reward, sa_reward, aggregated_reward = self(mols)
+            return vina_reward, qed_reward, sa_reward, aggregated_reward
+        else:
+            # calculate the raw property values
+            raw_property_values = self(mols, oracle_calls) if self.name in PHYSICS_ORACLES else self(mols) 
+            # apply reward shaping
+            # FIXME: in case raw_property_values of 0.0 are good, then there will be a problem when reward shaping
+            rewards = self.reward_shaping_function(raw_property_values)
+            return raw_property_values, rewards
