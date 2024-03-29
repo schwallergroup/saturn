@@ -265,4 +265,6 @@ class GEAMOracle(OracleComponent):
         raw_sa, sa_rewards = reward_sa(mols)
         # Formula used in GEAM paper
         aggregated_rewards = (np.clip(vina_rewards, 0, 20) / 20) * (qed_rewards) * (sa_rewards)
+        # Failed Vina scores are -99.9, multiple these by -1 to make them 99.9 for easier parsing later
+        raw_vina[raw_vina == -99.9] = 99.9
         return (raw_vina, qed_rewards, raw_sa, aggregated_rewards)
