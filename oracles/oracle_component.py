@@ -45,8 +45,8 @@ class OracleComponent(ABC):
         """
         # FIXME: hard-coded GEAM oracle to make it run out-of-the-box without changes to Saturn's logic flow
         if self.name == "geam":
-            vina_reward, qed_reward, sa_reward, aggregated_reward = self(mols)
-            return vina_reward, qed_reward, sa_reward, aggregated_reward
+            raw_vina, qed_rewards, raw_sa, aggregated_rewards = self(mols)
+            return raw_vina, qed_rewards, raw_sa, aggregated_rewards
         else:
             # calculate the raw property values
             raw_property_values = self(mols, oracle_calls) if self.name in PHYSICS_ORACLES else self(mols) 
