@@ -45,6 +45,7 @@ from oracles.xtb.nucleophilicity import Nucleophilicity
 
 # GEAM's oracle
 from oracles.docking.geam_oracle import GEAMOracle
+from oracles.docking.quickvina2 import QuickVina2
 
 
 def construct_oracle_component(oracle_component_parameters: OracleComponentParameters) -> OracleComponent:
@@ -115,6 +116,8 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
     # GEAM's oracle
     elif name == "geam":
         return GEAMOracle(oracle_component_parameters)
+    elif name == "quickvina2":
+        return QuickVina2(oracle_component_parameters)
     # TODO: pharmacophore and shape match --> ShapeLinker
     # TODO: MMPBSA --> AMBER
     # TODO: MD --> GROMACS
