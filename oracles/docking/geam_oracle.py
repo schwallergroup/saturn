@@ -217,10 +217,10 @@ class DockingVina(object):
 def reward_vina(
     smis: np.ndarray[str], 
     predictor: DockingVina
-) -> np.ndarray[float]:
-    reward = - np.array(predictor.predict(smis))
-    reward = np.clip(reward, 0, None)
-    return reward
+) -> Tuple[np.ndarray[float], np.ndarray[float]]:
+    raw_docking_scores = - np.array(predictor.predict(smis))
+    rewards = np.clip(raw_docking_scores, 0, None)
+    return raw_docking_scores, rewards
 
 
 def reward_qed(
@@ -231,8 +231,10 @@ def reward_qed(
 
 def reward_sa(
     mols: np.ndarray[Mol]
-) -> np.ndarray[float]:
-    return np.array([(10 - calculateScore(m)) / 9 for m in mols])
+) -> Tuple[np.ndarray[float], np.ndarray[float]]:
+    raw_sa = np.array([calculateScore(m) for m in mols])
+    sa_rewards = np.array([(10 - raw_score) / 9 for raw_score in raw_sa])
+    return raw_sa, sa_rewards
 
 
 class GEAMOracle(OracleComponent):
@@ -258,9 +260,9 @@ class GEAMOracle(OracleComponent):
         """
         Run GEAM's Oracle and return the aggregated reward.
         """
-        vina_reward = reward_vina(smiles, self.vina_oracle)
-        qed_reward = reward_qed(mols)
-        sa_reward = reward_sa(mols)
+        raw_vina, vina_rewards = reward_vina(smiles, self.vina_oracle)
+        qed_rewards = reward_qed(mols)
+        raw_sa, sa_rewards = reward_sa(mols)
         # Formula used in GEAM paper
-        aggregated_reward = (np.clip(vina_reward, 0, 20) / 20) * (qed_reward) * (sa_reward)
-        return (vina_reward, qed_reward, sa_reward, aggregated_reward)
+        aggregated_rewards = (np.clip(vina_rewards, 0, 20) / 20) * (qed_rewards) * (sa_rewards)
+        return (raw_vina, qed_rewards, raw_sa, aggregated_rewards)

@@ -53,9 +53,9 @@ class Oracle:
         # Add oracle components' raw value and reward to the oracle history DataFrame
         for oracle in self.oracle:
             if oracle.name == "geam":
-                self.oracle_history["vina_reward"] = []
-                self.oracle_history["qed_reward"] = []
-                self.oracle_history["sa_reward"] = []
+                self.oracle_history["raw_vina"] = []
+                self.oracle_history["qed"] = []
+                self.oracle_history["raw_sa"] = []
                 self.oracle_history["aggregated_reward"] = []
             else:
                 self.oracle_history[f"{oracle.name}_raw_values"] = []
@@ -107,11 +107,11 @@ class Oracle:
                 rewards = np.empty((len(self.oracle), len(new_mols)))
                 for idx, oracle in enumerate(self.oracle):
                     if oracle.name == "geam":
-                        vina_reward, qed_reward, sa_reward, aggregated_reward = oracle(new_mols)
-                        oracle_components_df["vina_reward"] = vina_reward
-                        oracle_components_df["qed_reward"] = qed_reward
-                        oracle_components_df["sa_reward"] = sa_reward
-                        oracle_components_df["aggregated_reward"] = aggregated_reward
+                        raw_vina, qed_rewards, raw_sa, aggregated_rewards = oracle(new_mols)
+                        oracle_components_df["raw_vina"] = raw_vina
+                        oracle_components_df["qed"] = qed_rewards
+                        oracle_components_df["raw_sa"] = raw_sa
+                        oracle_components_df["aggregated_reward"] = aggregated_rewards
                     else:
                         raw_property_values, component_rewards = oracle.calculate_reward(new_mols, self.calls)
                         oracle_components_df[f"{oracle.name}_raw_values"] = raw_property_values
@@ -120,7 +120,7 @@ class Oracle:
                 
                 # 6. Aggregate the rewards
                 if oracle.name == "geam":
-                    rewards = np.array([aggregated_reward])
+                    rewards = np.array([aggregated_rewards])
                 else:
                     aggregated_rewards = self.aggregator(rewards, self.oracle_weights)
             else:
