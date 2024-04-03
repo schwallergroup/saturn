@@ -255,12 +255,13 @@ class Oracle:
         if len(self.preliminary_oracles) > 0:
             filtered_indices = []
             # TODO: Vectorize the batch of Mols
-            for mol in mols:
-                for idx, oracle in enumerate(self.preliminary_oracles):
+            for idx, mol in enumerate(mols):
+                for oracle in self.preliminary_oracles:
                     _, reward = oracle.calculate_reward(np.array([mol]), self.calls)
                     if reward < THRESHOLD:
                         # If the reward is below the threshold for at least one oracle component, add the index to the filtered indices
                         filtered_indices.append(idx)
+                        break
 
             return np.delete(smiles, filtered_indices), np.delete(mols, filtered_indices)
             
