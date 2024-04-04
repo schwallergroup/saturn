@@ -7,6 +7,7 @@ from oracles.dataclass import OracleComponentParameters
 # similarity metrics
 from oracles.similarity.tanimoto_similarity import TanimotoSimilarity
 from oracles.similarity.jaccard_distance import JaccardDistance
+from oracles.similarity.jaccard_distance_dataset import JaccardDistanceDataset
 
 # physchem properties
 from oracles.physchem.aliphatic_rings import NumAliphaticRings
@@ -53,12 +54,14 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
     Matches the OracleComponent name and returns the OracleComponent class.
     """
     name = oracle_component_parameters.name
-    # similarity metrics
+    # Similarity metrics
     if name == "tanimoto_similarity":
         return TanimotoSimilarity(oracle_component_parameters)
     elif name == "jaccard_distance":
         return JaccardDistance(oracle_component_parameters)
-    # physchem properties
+    elif name == "jaccard_distance_dataset":
+        return JaccardDistanceDataset(oracle_component_parameters)
+    # Physchem properties
     elif name == "num_aliphatic_rings":
         return NumAliphaticRings(oracle_component_parameters)
     elif name == "num_aromatic_rings":
@@ -79,15 +82,15 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return NumStereocenters(oracle_component_parameters)
     elif name == "tpsa":
         return tPSA(oracle_component_parameters)
-    # structural
+    # Structural
     elif name == "matching_substructure":
         return MatchingSubstructure(oracle_component_parameters)
     elif name == "smarts_alerts":
         return SMARTSAlert(oracle_component_parameters)
-    # synthesizability
+    # Synthesizability
     elif name == "sa_score":
         return SAScore(oracle_component_parameters)
-    # docking
+    # Docking
     elif name == "dockstream":
         return DockStream(oracle_component_parameters)
     # xTB electronic properties
@@ -118,7 +121,7 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return GEAMOracle(oracle_component_parameters)
     elif name == "quickvina2":
         return QuickVina2(oracle_component_parameters)
-    # TODO: pharmacophore and shape match --> ShapeLinker
+    # TODO: Pharmacophore and shape match --> ShapeLinker
     # TODO: MMPBSA --> AMBER
     # TODO: MD --> GROMACS
     else:
