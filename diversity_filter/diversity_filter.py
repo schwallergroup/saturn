@@ -1,6 +1,5 @@
 """
 Some code is based on the implementation from https://github.com/MolecularAI/Reinvent
-Implements Diversity Filter as described in the paper: https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00473-0
 """
 
 import numpy as np
@@ -8,6 +7,12 @@ from utils import chemistry_utils
 from diversity_filter.dataclass import DiversityFilterParameters
 
 class DiversityFilter:
+    """
+    Implements Diversity Filter as described in the paper: 
+    https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00473-0
+
+    # TODO: Implement no filter
+    """
     def __init__(
             self, 
             parameters: DiversityFilterParameters
