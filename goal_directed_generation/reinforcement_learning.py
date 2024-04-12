@@ -200,6 +200,7 @@ class ReinforcementLearningAgent:
         self.write_out_results()
         end_time = time.perf_counter()
         logging.info(f"Total wall time: {end_time - start_time} seconds.")
+        self.agent.save(os.path.join(self.model_checkpoints_dir, f"final_{self.agent.model_architecture}_agent.ckpt"))
 
     def compute_loss(
         self, 
