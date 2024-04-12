@@ -14,6 +14,11 @@ from rdkit.Chem.Scaffolds import MurckoScaffold
 from models.generator import Generator
 from beam_enumeration.reward_tracker import RewardTracker
 
+# Import model architectures
+from models.rnn import RNN
+from models.decoder import Decoder
+from models.mamba import MambaLMHead
+
 
 class BeamEnumeration:
     def __init__(self,
@@ -66,9 +71,6 @@ class BeamEnumeration:
         This method performs beam expansion to enumerate the set of highest probability (on average) sub-sequences.
         Total number of sub-sequences is k^beam_steps.
         """
-
-        # TODO: implement compatibility with Decoder model
-
         device = next(agent.network.parameters()).device
         # Start with k number of "start" sequences
         start_token = torch.zeros(self.k, dtype=torch.long, device=device)
@@ -80,8 +82,21 @@ class BeamEnumeration:
 
         # Enumerate beam_steps number of time-steps
         for time_step in range(1, self.beam_steps + 1, 1):
-            logits, hidden_state = agent.network(input_vector.unsqueeze(1), hidden_state)
-            logits = logits.squeeze(1)
+            if isinstance(agent.network, RNN):
+                logits, hidden_state = agent.network(input_vector.unsqueeze(1), hidden_state)
+                logits = logits.squeeze(1)
+            elif isinstance(agent.network, Decoder):
+                # TODO: need to pass full sequences (with casual mask)
+                pass
+            elif isinstance(agent.network, MambaLMHead):
+                # TODO: need to pass full sequences
+                # FIXME
+                input_vector = torch.cat(enumerated_sequences, 1)
+                causal_output = agent.network(input_vector, num_last_tokens=1)
+                # Extract logits at the last position
+                logits = causal_output.logits[:, -1, :]  # (batch_size, vocabulary_size)
+                hidden_state = causal_output.hidden_states  # Unused?
+
             probabilities = logits.softmax(dim=1)
 
             # If taking top k tokens
