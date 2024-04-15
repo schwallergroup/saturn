@@ -12,6 +12,7 @@ from distribution_learning.dataclass import DistributionLearningConfiguration
 from distribution_learning.dataset.smiles_dataset import SMILESDataset
 
 from utils.utils import setup_logging
+from utils.chemistry_utils import canonicalize_smiles_batch
 
 
 class DistributionLearningTrainer:
@@ -67,7 +68,7 @@ class DistributionLearningTrainer:
                 # 2. Backpropagate
                 self.backpropagate(loss)
 
-            # --- Check Validity ---
+            # --- Compute Base Metrics ---
             self.agent.network.eval()
             sampled = np.array([])
             
@@ -77,11 +78,15 @@ class DistributionLearningTrainer:
                 sampled = np.concatenate([sampled, sampled_batch])
 
             # 2. Compute Validity
-            valid = np.vectorize(lambda x: Chem.MolFromSmiles(x) is not None)(sampled).sum()
-            validity = valid / len(sampled) * 100
+            valid = [smiles for smiles in sampled if Chem.MolFromSmiles(smiles) is not None]
+            validity = len(valid) / len(sampled) * 100
+
+            # 3. Compute Uniqueness
+            valid = canonicalize_smiles_batch(valid)
+            unique = len(set(valid)) / len(sampled) * 100
 
             # --- Log Results ---
-            logging.info(f"Epoch {epoch} | NLL: {np.mean(losses)} | Validity (10k): {round(validity, 2)}%")
+            logging.info(f"Epoch {epoch} | NLL: {round(np.mean(losses), 3)} | Validity (10k): {round(validity, 2)}% | Uniqueness (10k): {round(unique, 2)}%")
             # Save current Agent
             self.agent.save(os.path.join(self.model_checkpoints_dir, f"{self.agent.model_architecture}_{epoch}.prior"))
 

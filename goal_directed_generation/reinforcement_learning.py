@@ -187,6 +187,7 @@ class ReinforcementLearningAgent:
                     # Get randomized SMILES for both the sampled and hallucinated SMILES
                     randomized_smiles = chemistry_utils.randomize_smiles_batch(smiles, self.prior)
                     # Compute the loss
+                    # FIXME: Should not learn from penalized scaffolds
                     loss = self.compute_loss(randomized_smiles, penalized_rewards)
                     # Augmented Memory: Key operation for sample efficiency
                     randomized_buffer_smiles, randomized_buffer_rewards = self.replay_buffer.augmented_memory_replay(self.prior)
@@ -194,8 +195,6 @@ class ReinforcementLearningAgent:
                     loss = torch.cat((loss, augmented_memory_loss), 0)
                     self.backpropagate(loss)
 
-                    # TODO: add randomized smiles back to replay buffer???? Previous code based adds the sampled batch again
-        
         logging.info(f"Budget reached - final oracle calls: {self.oracle.calls}/{self.oracle.budget}")
         self.write_out_results()
         end_time = time.perf_counter()

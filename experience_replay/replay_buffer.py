@@ -20,8 +20,6 @@ class ReplayBuffer:
     Replay buffer class which stores the top N highest reward molecules generated so far. Specific information stored includes:
         1. Canonicalized SMILES string
         2. Reward
-        3. Likelihood under the Prior
-        4. Likelihood under the Agent
 
     The SMILES stored in the replay buffer are manipulated and used by Augmented Memory and Hallucinated Memory to enhance sample efficiency.
     """
@@ -45,7 +43,6 @@ class ReplayBuffer:
         smiles: np.ndarray[str], 
         rewards: np.ndarray[float]
         ) -> None:
-        # NOTE: Likelihood should be already negative
         df = pd.DataFrame({
             "smiles": smiles, 
             "reward": rewards
@@ -72,7 +69,7 @@ class ReplayBuffer:
         """
         if len(self.memory) != 0:
             smiles = self.memory["smiles"].values
-            # randomize the smiles
+            # Randomize the smiles
             randomized_smiles = chemistry_utils.randomize_smiles_batch(smiles, prior)
             rewards = self.memory["reward"].values
             return randomized_smiles, rewards
