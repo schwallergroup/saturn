@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Union, List, Set
+import os
 import pandas as pd
 import numpy as np
 from rdkit import Chem
@@ -130,5 +131,5 @@ class Hallucinator(ABC):
         else:
             return False
     
-    def write_out_history(self):
-        self.hallucination_history.to_csv("hallucination_history.csv")
+    def write_out_history(self, path: str):
+        self.hallucination_history.to_csv(os.path.join(path, "hallucination_history.csv"))

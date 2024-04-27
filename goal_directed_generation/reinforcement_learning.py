@@ -245,11 +245,12 @@ class ReinforcementLearningAgent:
             3. Hallucination History
             4. Number of Oracle repeats
         """
-        self.oracle.write_out_oracle_history(os.path.dirname(self.logging_path))
-        self.oracle.write_out_repeat_history(os.path.dirname(self.logging_path))
+        base_save_path = os.path.dirname(self.logging_path)
+        self.oracle.write_out_oracle_history(base_save_path)
+        self.oracle.write_out_repeat_history(base_save_path)
 
         if self.execute_beam_enumeration:
             self.beam_enumeration.end_actions(self.oracle.calls)
 
         if self.execute_hallucinated_memory:
-            self.hallucinator.write_out_history()
+            self.hallucinator.write_out_history(base_save_path)
