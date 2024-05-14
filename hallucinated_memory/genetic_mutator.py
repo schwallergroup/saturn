@@ -1,6 +1,6 @@
 """
 Apply a genetic algorithm to a SMILES string to generate new SMILES strings.
-Uses Graph GA's algorithm: https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc05372c
+Uses GraphGA's algorithm: https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc05372c
 """
 from typing import List
 import logging
@@ -19,8 +19,8 @@ class GeneticMutator(Hallucinator):
         self,
         prior,
         num_hallucinations: int = 100,
-        num_selected: int = 10,
-        selection_criterion: str = "tanimoto_distance"
+        num_selected: int = 5,
+        selection_criterion: str = "random"
     ):
         self.vocabulary = prior.vocabulary
         self.tokenizer = prior.tokenizer

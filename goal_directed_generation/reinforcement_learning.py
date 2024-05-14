@@ -1,8 +1,8 @@
 """
 Adapted from https://github.com/MolecularAI/Reinvent with code additions for:
-    1. Augmented Memory: https://chemrxiv.org/engage/chemrxiv/article-details/646a353da32ceeff2d014776
-    2. Hallucinated Memory
-    3. Beam Enumeration: https://arxiv.org/abs/2309.13957
+    1. Augmented Memory: https://pubs.acs.org/doi/10.1021/jacsau.4c00066
+    2. Beam Enumeration: https://openreview.net/forum?id=7UhxsmbdaQ
+    3. Hallucinated Memory (GraphGA based: https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc05372c)
 """
 import os
 import logging
@@ -42,7 +42,7 @@ class ReinforcementLearningAgent:
         self.agent = Generator.load_from_file(configuration.reinforcement_learning.agent, device)
         self.device = self.agent.device
         # In case the Agent is to be trained on CPU, move also the Prior to CPU to avoid tensors on different devices
-        #self.prior.network.to(self.device)
+        self.prior.network.to(self.device)
 
         # Seed for documentation
         self.seed = configuration.seed
@@ -88,9 +88,6 @@ class ReinforcementLearningAgent:
             token_sampling_method=configuration.beam_enumeration.token_sampling_method,
             filter_patience_limit=configuration.beam_enumeration.filter_patience_limit
         )
-                                                    
-        # TODO: Potentially implement MarginGuard --> no need to reset Agent weights
-        #       --> self.margin_guard = MarginGuard(self)
 
         # Only the Agent is updated
         self.optimizer = torch.optim.AdamW(self.agent.get_network_parameters(), lr=self.learning_rate)
