@@ -211,9 +211,13 @@ class BeamEnumeration:
         for idx in range(len(subsequence) - 2):
             mol = Chem.MolFromSmiles(subsequence[:3 + idx])
             if mol is not None:
-                canonical_substructure = Chem.MolToSmiles(mol, canonical=True)
+                try:
+                    canonical_substructure = Chem.MolToSmiles(mol, canonical=True)
+                except Exception:
+                    # Invariant Violation has been observed
+                    continue
                 canonical_chars = set(canonical_substructure)
-                if self.contains_heavy_atoms:
+                if self.contains_heavy_atoms(canonical_chars):
                     substructures.add(canonical_substructure)
 
         return substructures
@@ -233,7 +237,11 @@ class BeamEnumeration:
                 except Exception:
                     # Scaffold extraction may raise RDKit valency error - skip these for now
                     continue
-                canonical_scaffold = Chem.MolToSmiles(scaffold, canonical=True)
+                try:
+                    canonical_scaffold = Chem.MolToSmiles(scaffold, canonical=True)
+                except Exception:
+                    # Invariant Violation has been observed
+                    continue
                 canonical_chars = set(canonical_scaffold)
                 if self.contains_heavy_atoms(canonical_chars):
                     scaffolds.add(canonical_scaffold)
