@@ -49,7 +49,7 @@ class GeneticMutator(Hallucinator):
         # To avoid infinite loop, set a maximum number of iterations
         tries = 0
 
-        while (len(hallucinated_set) != self.num_hallucinations) and (tries < 1000):
+        while (len(hallucinated_set) != self.num_hallucinations) and (tries < 10000):
             # Generate child
             # TODO: Can add a mutation rate class attribute
             child = reproduce(parents, parents_rewards, 0.1)
@@ -59,7 +59,7 @@ class GeneticMutator(Hallucinator):
             tries += 1
 
         if len(hallucinated_set) != self.num_hallucinations:
-            logging.info(f"Hallucinated Memory: Generated {len(hallucinated_set)}/{self.num_hallucinations} valid hallucinations in 1000 attempts")
+            logging.info(f"Hallucinated Memory: Generated {len(hallucinated_set)}/{self.num_hallucinations} valid hallucinations in 10000 attempts")
 
         return self.select_hallucinations(
             parent=parents,
