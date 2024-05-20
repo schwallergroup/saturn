@@ -86,16 +86,11 @@ class BeamEnumeration:
                 logits, hidden_state = agent.network(input_vector.unsqueeze(1), hidden_state)
                 logits = logits.squeeze(1)
             elif isinstance(agent.network, Decoder):
-                # TODO: need to pass full sequences (with casual mask)
+                # TODO: Implement
                 pass
             elif isinstance(agent.network, MambaLMHead):
-                # TODO: need to pass full sequences
-                # FIXME
-                input_vector = torch.cat(enumerated_sequences, 1)
-                causal_output = agent.network(input_vector, num_last_tokens=1)
-                # Extract logits at the last position
-                logits = causal_output.logits[:, -1, :]  # (batch_size, vocabulary_size)
-                hidden_state = causal_output.hidden_states  # Unused?
+                # TODO: Implement
+                pass
 
             probabilities = logits.softmax(dim=1)
 
@@ -135,7 +130,7 @@ class BeamEnumeration:
                 hidden_state = (hidden_state[0].repeat_interleave(self.k, dim=1), hidden_state[1].repeat_interleave(self.k, dim=1))
 
         # At this point, enumerated_sequences contains the most probable and
-        # Exhaustively enumerated token sequences - decode these into SMILES
+        # exhaustively enumerated token sequences - decode these into SMILES
         smiles = [agent.tokenizer.untokenize(agent.vocabulary.decode(seq.cpu().numpy())) for seq in enumerated_sequences]
 
         return smiles

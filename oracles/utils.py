@@ -1,15 +1,16 @@
 """
+Based on implementation from https://github.com/MolecularAI/reinvent-scoring/blob/main/reinvent_scoring/scoring/score_components/score_component_factory.py.
 Contains utility function to initialize OracleComponents.
 """
 from oracles.oracle_component import OracleComponent
 from oracles.dataclass import OracleComponentParameters
 
-# similarity metrics
+# Similarity metrics
 from oracles.similarity.tanimoto_similarity import TanimotoSimilarity
 from oracles.similarity.jaccard_distance import JaccardDistance
 from oracles.similarity.jaccard_distance_dataset import JaccardDistanceDataset
 
-# physchem properties
+# Physchem properties
 from oracles.physchem.aliphatic_rings import NumAliphaticRings
 from oracles.physchem.aromatic_rings import NumAromaticRings
 from oracles.physchem.hba import NumHydrogenBondAcceptors
@@ -21,14 +22,14 @@ from oracles.physchem.rotatable_bonds import NumRotatableBonds
 from oracles.physchem.stereocenters import NumStereocenters
 from oracles.physchem.tpsa import tPSA
 
-# structural
+# Structural
 from oracles.structural.matching_substructure import MatchingSubstructure
 from oracles.structural.smarts_alerts import SMARTSAlert
 
-# synthesizability
+# Synthesizability
 from oracles.synthesizability.sa_score import SAScore
 
-# docking
+# Docking
 from oracles.docking.dockstream import DockStream
 
 # xTB electronic properties
@@ -121,8 +122,7 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return GEAMOracle(oracle_component_parameters)
     elif name == "quickvina2":
         return QuickVina2(oracle_component_parameters)
-    # TODO: Pharmacophore and shape match --> ShapeLinker
-    # TODO: MMPBSA --> AMBER
-    # TODO: MD --> GROMACS
+    # TODO: Pharmacophore and Shape Match
+    # TODO: MD
     else:
         raise NotImplementedError(f"Oracle: {name} is not implemented.")

@@ -1,5 +1,5 @@
 """
-Based on the implementation from https://github.com/MolecularAI/reinvent-models
+Based on the implementation from https://github.com/MolecularAI/reinvent-models.
 """
 from typing import Tuple, List, Union
 import torch

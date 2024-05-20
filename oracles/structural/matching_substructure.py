@@ -10,7 +10,7 @@ class MatchingSubstructure(OracleComponent):
         self.smarts = parameters.specific_parameters.get("smarts", [])
 
     def __call__(self, mols: np.ndarray[Mol]) -> np.ndarray[float]:
-        # in case of empty list of SMARTS
+        # In case of empty list of SMARTS
         if len(self.smarts) == 0:
             return np.ones(len(mols), dtype=np.float32)
         else:
