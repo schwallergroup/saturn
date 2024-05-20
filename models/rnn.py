@@ -1,6 +1,6 @@
 
 """
-Based on the implementation from https://github.com/MolecularAI/reinvent-models
+Based on the implementation from https://github.com/MolecularAI/reinvent-models.
 RNN model using LSTM cells. This is the default model in REINVENT versions 2.0, 3.2, and 4 for de novo small molecule generation.
 """
 from typing import Tuple

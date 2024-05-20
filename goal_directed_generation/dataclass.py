@@ -10,7 +10,6 @@ class ReinforcementLearningParameters:
     agent: str
     batch_size: int
     learning_rate: float = 0.0001
-    margin_threshold: int = 50
     sigma: float = 128.0
     augmented_memory: bool = True
     augmentation_rounds: int = 100

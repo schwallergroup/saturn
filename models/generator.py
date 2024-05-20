@@ -216,7 +216,7 @@ class Generator:
                 causal_output = self.network(input_vector, num_last_tokens=1)
                 # Extract logits at the last position
                 logits = causal_output.logits[:, -1, :]  # (batch_size, vocabulary_size)
-                hidden_state = causal_output.hidden_states  # Unused?
+                hidden_state = causal_output.hidden_states  # TODO: Unused?
 
             probabilities = logits.softmax(dim=1)
             log_probs = logits.log_softmax(dim=1)  # For Negative Log-Likelihood calculation

@@ -89,12 +89,13 @@ class ReinforcementLearningAgent:
             filter_patience_limit=configuration.beam_enumeration.filter_patience_limit
         )
 
-        # Only the Agent is updated
+        # Only the Agent is updated so the Prior does not need an optimizer
         self.optimizer = torch.optim.AdamW(self.agent.get_network_parameters(), lr=self.learning_rate)
+        # Model checkpointing save directory
+        self.model_checkpoints_dir = model_checkpoints_dir
+        os.makedirs(self.model_checkpoints_dir, exist_ok=True)
         self.logging_path = logging_path
         # Set up logging
-        self.model_checkpoints_dir = model_checkpoints_dir
-        #os.makedirs(self.model_checkpoints_dir, exist_ok=True)  # Skip for now
         setup_logging(logging_path)
   
     def run(self):
@@ -146,7 +147,7 @@ class ReinforcementLearningAgent:
                     hallucination_rewards=hallucinated_penalized_rewards
                 )
             else:
-                hallucinated_smiles, hallucinated_penalized_rewards = [], []
+                hallucinated_smiles, hallucinated_penalized_rewards = np.array([]), np.array([])
 
             # 9. Concatenate sampled batch with hallucinated batch
             # TODO: Hallucinated SMILES' loss could be scaled via Importance sampling
@@ -154,7 +155,7 @@ class ReinforcementLearningAgent:
             penalized_rewards = np.concatenate((penalized_rewards, hallucinated_penalized_rewards), 0)
 
             # 10. Compute the loss
-            #     smiles contains the concatenated sampled and hallucinated SMILES
+            #     "smiles" contains the concatenated sampled and hallucinated SMILES
             loss = self.compute_loss(smiles, penalized_rewards)
 
             # 11. Update Replay Buffer
@@ -184,7 +185,6 @@ class ReinforcementLearningAgent:
                     # Get randomized SMILES for both the sampled and hallucinated SMILES
                     randomized_smiles = chemistry_utils.randomize_smiles_batch(smiles, self.prior)
                     # Compute the loss
-                    # FIXME: Should not learn from penalized scaffolds
                     loss = self.compute_loss(randomized_smiles, penalized_rewards)
                     # Augmented Memory: Key operation for sample efficiency
                     randomized_buffer_smiles, randomized_buffer_rewards = self.replay_buffer.augmented_memory_replay(self.prior)
