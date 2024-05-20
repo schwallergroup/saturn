@@ -1,16 +1,7 @@
-# Saturn: Sample Efficient Generative Molecular Design using Memory Manipulation
+# Saturn: Sample-efficient Generative Molecular Design using Memory Manipulation
 
 ![Saturn Logo](saturn.jpeg)
 
-Note: contains far fewer capabilities compared to REINVENT 4. The purpose of this repository is a minimal implementation of Augmented Memory, Hallucinated Memory, and Beam Enumeration with a focus only on small molecule generation. g
+Saturn is a language model based molecular generative design framework that is focused on **sample-efficient *de novo* small molecule design**. 
 
-Curriculum learning
-
-Need to be able to:
-1. pre-train
-2. just sample
-3. run RL
-4. run CL
-
-
-Lightning support for pre-train, RL, CL
+In the **experimental_reproduction** sub-folder, prepared files and checkpoint models are provided to reproduce the experiments.
