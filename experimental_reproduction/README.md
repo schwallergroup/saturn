@@ -23,7 +23,7 @@ Docking was performed against 3 targets: `6cm4`, `3kc3`, `1eve`. The docking gri
 
 **Part 3: Benchmarking Saturn**
 
-**NOTE**: This is the only experiment where the oracle budget is 3,000 instead of 1,000. This is for comparison to previous works, so we follow exactly the experimental protocol of GEAM.
+**NOTE**: This is the only experiment where the oracle budget is 3,000 instead of 1,000. This is for comparison to previous works, so we follow exactly the experimental protocol of GEAM: https://openreview.net/forum?id=sLGliHckR8.
 
 **NOTE**: The following step may be required to enable QuickVina 2 execution. On terminal, change directory to `saturn/oracles/docking/docking_grids` and execute `chmod u+x qvina02`. This experiment also uses the ZINC 250k pre-trained prior (following the protocol from GEAM) instead of ChEMBL 33 for Part 1 and Part 2 experiments. 
 
