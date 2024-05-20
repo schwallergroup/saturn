@@ -3,7 +3,9 @@
 The **Saturn** environment can be installed via:
 `source setup.sh`
 
-Next, each sub-folder here contains prepared files to reproduce the experiments. All experiments can be run via `python saturn.py <config JSON>`.
+Next, each sub-folder here contains prepared files to reproduce the experiments. With the `saturn` environment activated, all experiments can be run via `python saturn.py <config JSON>`.
+
+**NOTE**: The path to the `Saturn` repository needs to be changed in the provided configuration `JSONs`. This is indicated by `"< >"`.
 
 **NOTE**: The prepared files run the `Mamba` backbone. It *can* be run on CPU only but the wall time increases significantly. Therefore, we recommend using a GPU always, except for the Part 1 test experiment which will still run fast. To run on CPU, change `device` from **"cuda"** to **"cpu"** in the config `JSON`.
 

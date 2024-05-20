@@ -1,7 +1,7 @@
 {
   "logging": {
-    "logging_path": "/home/jeguo/Desktop/saturn_experiments/geam/saturn/experimental_reproduction/part_2/6cm4/log.log",
-    "model_checkpoints_dir": "/home/jeguo/Desktop/saturn_experiments/geam/saturn/experimental_reproduction/part_2/6cm4"
+    "logging_path": "<path to saturn directory>/experimental_reproduction/part_2/6cm4/log.log",
+    "model_checkpoints_dir": "<path to saturn directory>/experimental_reproduction/part_2/6cm4"
   },
   "oracle": {
     "budget": 1000,
@@ -13,7 +13,7 @@
         "weight": 1,
         "preliminary_check": false,
         "specific_parameters": {
-          "configuration_path": "/home/jeguo/Desktop/saturn_experiments/geam/saturn/experimental_reproduction/part_2/6cm4/docking.json",
+          "configuration_path": "<path to saturn directory>/experimental_reproduction/part_2/6cm4/docking.json",
           "docker_script_path": "<your dockstream installation path>/DockStream/docker.py",
           "environment_path": "<your dockstream environment path>/miniconda3/envs/DockStream/bin/python"
         },

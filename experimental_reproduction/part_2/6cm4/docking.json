@@ -2,7 +2,7 @@
   "docking": {
     "header": {
       "logging": {
-        "logfile": "/home/jeguo/Desktop/saturn_experiments/geam/saturn/experimental_reproduction/part_2/6cm4/docking.log"
+        "logfile": "<path to saturn directory>/experimental_reproduction/part_2/6cm4/docking.log"
       }
     },
     "ligand_preparation": {
@@ -38,7 +38,7 @@
           },
           "seed": 42,
           "receptor_pdbqt_path": [
-            "/home/jeguo/Desktop/saturn_experiments/geam/saturn/experimental_reproduction/part_2/6cm4/6cm4_ADV_Grid.pdbqt"
+            "<path to saturn directory>/experimental_reproduction/part_2/6cm4/6cm4_ADV_Grid.pdbqt"
           ],
           "number_poses": 1,
           "search_space": {
@@ -52,10 +52,10 @@
         },
         "output": {
           "poses": {
-            "poses_path": "/home/jeguo/Desktop/saturn_experiments/geam/saturn/experimental_reproduction/part_2/6cm4/docked_poses/poses.sdf"
+            "poses_path": "<path to saturn directory>/experimental_reproduction/part_2/6cm4/docked_poses/poses.sdf"
           },
           "scores": {
-            "scores_path": "/home/jeguo/Desktop/saturn_experiments/geam/saturn/experimental_reproduction/part_2/6cm4/docked_scores/scores.csv"
+            "scores_path": "<path to saturn directory>/experimental_reproduction/part_2/6cm4/docked_scores/scores.csv"
           }
         }
       }

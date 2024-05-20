@@ -1,7 +1,7 @@
 {
   "logging": {
-    "logging_path": "/home/jeguo/Desktop/saturn_experiments/geam/saturn/experimental_reproduction/part_3/log.log",
-    "model_checkpoints_dir": "/home/jeguo/Desktop/saturn_experiments/geam/saturn/experimental_reproduction/part_3"
+    "logging_path": "<path to saturn directory>/experimental_reproduction/part_3/log.log",
+    "model_checkpoints_dir": "<path to saturn directory>/experimental_reproduction/part_3"
   },
   "oracle": {
     "budget": 3000,
