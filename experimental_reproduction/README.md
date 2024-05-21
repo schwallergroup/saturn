@@ -27,4 +27,6 @@ Docking was performed against 3 targets: `6cm4`, `3kc3`, `1eve`. The docking gri
 
 **NOTE**: The following step may be required to enable QuickVina 2 execution. On terminal, change directory to `saturn/oracles/docking/docking_grids` and execute `chmod u+x qvina02`. This experiment also uses the ZINC 250k pre-trained prior (following the protocol from GEAM) instead of ChEMBL 33 for Part 1 and Part 2 experiments. 
 
+Before the provided file can be run, some hard-coded paths need to be changed. These are located in `oracles/docking/geam_oracle.py`. The `self.vina_program` and `self.receptor_file` paths need to be changed to match your system.
+
 Docking was performed against 5 targets: `parp1`, `fa7`, `5ht1b`, `braf`, `jak2`. The provided configuration `JSON` is for the `parp1` target. To change the target, change the `target` parameter. An error will be thrown if a target outside of these 5 are selected as we copy the code for the oracle directly from GEAM's code-base which only supports these targets. We copy to ensure exact comparison.
