@@ -9,19 +9,22 @@ Next, each sub-folder here contains prepared files to reproduce the experiments.
 
 **NOTE**: The prepared files run the `Mamba` backbone. It *can* be run on CPU only but the wall time increases significantly. Therefore, we recommend using a GPU always, except for the Part 1 test experiment which will still run fast. To run on CPU, change `device` from **"cuda"** to **"cpu"** in the config `JSON`.
 
-**Part 1: Elucidating the Optimization Dynamics of Saturn**
+Part 1: Elucidating the Optimization Dynamics of Saturn
+-------------------------------------------------------
 
 This is the test experiment and the prepared configuration `JSON` can be directly run.
 
 
-**Part 2: Transferability of Sample Efficiency to Physics-based Oracles**
+Part 2: Transferability of Sample Efficiency to Physics-based Oracles
+---------------------------------------------------------------------
 
 **NOTE**: Reproducing this experiment requires `DockStream` to perform `AutoDock Vina` docking. It can be found here: https://github.com/MolecularAI/DockStream. Clone the repository and install the conda environment using the `environment.yml` AutoDock Vina can be downloaded here: https://vina.scripps.edu/downloads/. The experiments were run on a Linux machine so the autodock_vina_1_1_2_linux_x86.tgz file was downloaded.
 
 Docking was performed against 3 targets: `6cm4`, `3kc3`, `1eve`. The docking grid files and configuration `JSONs` (the actual Saturn `JSON` and the docking `JSON`) are provided in each corresponding sub-folder. The prepared files make the assumption that docking will be parallelized on 16 CPU cores. Since the batch size is 16, going beyond 16 cores will yield benefit and 16 cores *may* also not be optimal due to the overhead of parallelizing. To parallelize over fewer CPU cores, change the `number_cores` parameter in the docking `JSON`.
 
 
-**Part 3: Benchmarking Saturn**
+Part 3: Benchmarking Saturn
+---------------------------
 
 **NOTE**: This is the only experiment where the oracle budget is 3,000 instead of 1,000. This is for comparison to previous works, so we follow exactly the experimental protocol of GEAM: https://openreview.net/forum?id=sLGliHckR8.
 
