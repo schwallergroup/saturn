@@ -119,10 +119,10 @@ class DistributionLearningTrainer:
                 network_params=None,
                 device=self.device
             )
-            # ZINC 250k Randomization requires extra tokens
             vocabulary = train_dataloader.dataset.vocabulary
-            extra_zinc_tokens = ["[P@H]", "[S@+]"]
-            vocabulary.update(extra_zinc_tokens)
+            # GEAM benchmarking: ZINC 250k randomization requires extra tokens
+            # extra_zinc_tokens = ["[P@H]", "[S@+]"]
+            # vocabulary.update(extra_zinc_tokens)
             agent = Generator(
                 model_architecture=configuration.model_architecture,
                 vocabulary=vocabulary,
@@ -130,7 +130,6 @@ class DistributionLearningTrainer:
                 network_params=None,
                 device=self.device
             )
-            print(agent.vocabulary.tokens)
         return agent
 
     def get_train_dataloader(self):

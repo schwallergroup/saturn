@@ -150,7 +150,7 @@ class ReinforcementLearningAgent:
                 hallucinated_smiles, hallucinated_penalized_rewards = np.array([]), np.array([])
 
             # 9. Concatenate sampled batch with hallucinated batch
-            # TODO: Hallucinated SMILES' loss could be scaled via Importance sampling
+            # TODO: Hallucinated SMILES' loss could be scaled via Importance Sampling
             smiles = np.concatenate((smiles, hallucinated_smiles), 0)
             penalized_rewards = np.concatenate((penalized_rewards, hallucinated_penalized_rewards), 0)
 
