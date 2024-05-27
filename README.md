@@ -21,7 +21,7 @@ System Requirements
 
 * Python 3.10
 * Cuda-enabled GPU (CPU-only works but runs times will be much slower)
-* Has been tested only on Linux
+* Tested on Linux
 
 
 Acknowledgements
