@@ -34,6 +34,7 @@ The `Mamba` architecture code was adapted from the following sources:
 
 References
 ----------
-1. [Augmented Memory](https://pubs.acs.org/doi/10.1021/jacsau.4c00066)
-2. [Beam Enumeration](https://arxiv.org/abs/2309.13957)
-3. [GraphGA](https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc05372c)
+1. [Saturn Pre-print](https://arxiv.org/abs/2405.17066)
+2. [Augmented Memory](https://pubs.acs.org/doi/10.1021/jacsau.4c00066)
+3. [Beam Enumeration](https://arxiv.org/abs/2309.13957)
+4. [GraphGA](https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc05372c)
