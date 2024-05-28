@@ -1,0 +1,64 @@
+{
+  "docking": {
+    "header": {
+      "logging": {
+        "logfile": "<path to saturn directory>/experimental_reproduction/part_2/3kc3/docking.log"
+      }
+    },
+    "ligand_preparation": {
+      "embedding_pools": [
+        {
+          "pool_id": "RDkit",
+          "type": "RDkit",
+          "parameters": {
+            "protonate": true,
+            "coordinate_generation": {
+              "method": "UFF",
+              "maximum_iterations": 600
+            }
+          },
+          "input": {
+            "standardize_smiles": false,
+            "type": "console"
+          }
+        }
+      ]
+    },
+    "docking_runs": [
+      {
+        "backend": "AutoDockVina",
+        "run_id": "AutoDockVina",
+        "input_pools": [
+          "RDkit"
+        ],
+        "parameters": {
+          "binary_location": "<path to autodock vina binary>/autodock_vina_1_1_2_linux_x86/bin",
+          "parallelization": {
+            "number_cores": 16
+          },
+          "seed": 42,
+          "receptor_pdbqt_path": [
+            "<path to saturn directory>/experimental_reproduction/part_2/3kc3/3kc3_ADV_Grid.pdbqt"
+          ],
+          "number_poses": 1,
+          "search_space": {
+            "--center_x": -61.62,
+            "--center_y": 30.31,
+            "--center_z": -21.9,
+            "--size_x": 15,
+            "--size_y": 15,
+            "--size_z": 15
+          }
+        },
+        "output": {
+          "poses": {
+            "poses_path": "<path to saturn directory>/experimental_reproduction/part_2/3kc3/docked_poses/poses.sdf"
+          },
+          "scores": {
+            "scores_path": "<path to saturn directory>/experimental_reproduction/part_2/3kc3/docked_scores/scores.csv"
+          }
+        }
+      }
+    ]
+  }
+}

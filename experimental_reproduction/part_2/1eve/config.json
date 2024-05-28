@@ -1,0 +1,111 @@
+{
+  "logging": {
+    "logging_path": "<path to saturn directory>/experimental_reproduction/part_2/1eve/log.log",
+    "model_checkpoints_dir": "<path to saturn directory>/experimental_reproduction/part_2/1eve"
+  },
+  "oracle": {
+    "budget": 1000,
+    "allow_oracle_repeats": false,
+    "aggregator": "product",
+    "components": [
+      {
+        "name": "dockstream",
+        "weight": 1,
+        "preliminary_check": false,
+        "specific_parameters": {
+          "configuration_path": "<path to saturn directory>/experimental_reproduction/part_2/1eve/docking.json",
+          "docker_script_path": "<your dockstream installation path>/DockStream/docker.py",
+          "environment_path": "<your dockstream environment path>/miniconda3/envs/DockStream/bin/python"
+        },
+        "reward_shaping_function_parameters": {
+          "transformation_function": "reverse_sigmoid",
+          "parameters": {
+            "low": -16,
+            "high": -1,
+            "k": 0.15
+          }
+        }
+      },
+      {
+        "name": "mw",
+        "weight": 1,
+        "preliminary_check": true,
+        "specific_parameters": {},
+        "reward_shaping_function_parameters": {
+          "transformation_function": "double_sigmoid",
+          "parameters": {
+            "low": 0,
+            "high": 500,
+            "coef_div": 500,
+            "coef_si": 250,
+            "coef_se": 250
+          }
+        }
+      },
+      {
+        "name": "qed",
+        "weight": 1,
+        "preliminary_check": true,
+        "specific_parameters": {},
+        "reward_shaping_function_parameters": {
+          "transformation_function": "no_transformation"
+        }
+      }
+    ]
+  },
+  "goal_directed_generation": {
+    "reinforcement_learning": {
+      "prior": "<path to saturn directory>/experimental_reproduction/checkpoint_models/chembl-33-mamba-epoch-18.prior",
+      "agent": "<path to saturn directory>/experimental_reproduction/checkpoint_models/chembl-33-mamba-epoch-18.prior",
+      "batch_size": 16,
+      "learning_rate": 0.0001,
+      "sigma": 128.0,
+      "augmented_memory": true,
+      "augmentation_rounds": 10,
+      "selective_memory_purge": true
+    },
+    "experience_replay": {
+      "memory_size": 100,
+      "sample_size": 10,
+      "smiles": []
+    },
+    "diversity_filter": {
+      "name": "IdenticalMurckoScaffold",
+      "bucket_size": 10
+    },
+    "hallucinated_memory": {
+      "execute_hallucinated_memory": false,
+      "hallucination_method": "ga",
+      "num_hallucinations": 100,
+      "num_selected": 5,
+      "selection_criterion": "random"
+    },
+    "beam_enumeration": {
+      "execute_beam_enumeration": false,
+      "beam_k": 2,
+      "beam_steps": 18,
+      "substructure_type": "structure",
+      "structure_min_size": 15,
+      "pool_size": 4,
+      "pool_saving_frequency": 1000,
+      "patience": 5,
+      "token_sampling_method": "topk",
+      "filter_patience_limit": 100000
+    }
+  },
+  "distribution_learning": {
+    "parameters": {
+      "agent": "<unused>",
+      "training_steps": 20,
+      "batch_size": 512,
+      "learning_rate": 0.0001,
+      "training_dataset_path": "cleaned-chembl-33.smi",
+      "train_with_randomization": true,
+      "transfer_learning": false
+    }
+  },
+  "running_mode": "goal_directed_generation",
+  "model_architecture": "mamba",
+  "device": "cuda",
+  "seed": 0
+}
