@@ -12,7 +12,7 @@ Next, each sub-folder here contains prepared files to reproduce the experiments.
 Part 1: Elucidating the Optimization Dynamics of Saturn
 -------------------------------------------------------
 
-This is the test experiment and the prepared configuration `JSON` can be directly run.
+This is the test experiment and the prepared configuration `JSON` can be directly run. Example output files are in `part-1/example-output-files`. `oracle_history.csv` contains all the generated molecules with their oracle component scores.
 
 
 Part 2: Transferability of Sample Efficiency to Physics-based Oracles
