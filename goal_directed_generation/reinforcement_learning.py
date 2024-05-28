@@ -53,7 +53,6 @@ class ReinforcementLearningAgent:
         # RL parameters
         self.batch_size = configuration.reinforcement_learning.batch_size
         self.learning_rate = configuration.reinforcement_learning.learning_rate
-        self.margin_threshold = configuration.reinforcement_learning.margin_threshold
         self.sigma = configuration.reinforcement_learning.sigma
         self.augmented_memory = configuration.reinforcement_learning.augmented_memory
         self.augmentation_rounds = configuration.reinforcement_learning.augmentation_rounds
