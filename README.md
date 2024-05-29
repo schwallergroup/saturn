@@ -18,7 +18,7 @@ Installation
 
 Potential Installation Issues
 -----------------------------
-* `GLIBCXX_3.4.29` version not found - thank you to @PatWalters for flagging this and solving via:
+* `GLIBCXX_3.4.29` version not found - thank you to [@PatWalters](https://github.com/PatWalters) for flagging this and solving via:
 
         $ conda uninstall openbabel 
         $ conda install gcc_linux-64
