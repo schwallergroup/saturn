@@ -25,6 +25,8 @@ Potential Installation Issues
         $ conda install gxx_linux-64
         $ conda install -c conda-forge openbabel
 
+* `causal-conv1d` and `mamba-ssm` installation error - see [Issue 1](https://github.com/schwallergroup/saturn/issues/1) - thank you to [@surendraphd](https://github.com/surendraphd) for sharing their solution.
+
 System Requirements
 -------------------
 
