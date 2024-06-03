@@ -16,7 +16,17 @@ Installation
    
         $ source setup.sh
 
-     
+Potential Installation Issues
+-----------------------------
+* `GLIBCXX_3.4.29` version not found - thank you to [@PatWalters](https://github.com/PatWalters) for flagging this and solving via:
+
+        $ conda uninstall openbabel 
+        $ conda install gcc_linux-64
+        $ conda install gxx_linux-64
+        $ conda install -c conda-forge openbabel
+
+* `causal-conv1d` and `mamba-ssm` installation error - see [Issue 1](https://github.com/schwallergroup/saturn/issues/1) - thank you to [@surendraphd](https://github.com/surendraphd) for sharing their solution.
+
 System Requirements
 -------------------
 
