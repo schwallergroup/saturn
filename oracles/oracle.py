@@ -302,7 +302,7 @@ class Oracle:
 
     def write_out_oracle_history(self, path: str):
         """Write out the oracle history as a CSV."""
-        self.oracle_history.to_csv(os.path.join(path, "oracle_history.csv"))
+        self.oracle_history.to_csv(os.path.join(path, "oracle_history.csv"), index=False)
 
     def write_out_repeat_history(self, path: str):
         """Write out the repeated SMILES histories as JSON."""
