@@ -57,7 +57,7 @@ class AiZynthFinder(OracleComponent):
         # Ensure "str" type
         smiles_chunks = [np.array(chunk.tolist()) for chunk in smiles_chunks]  # List[List[str]]
 
-        # 2. Execute AiZynthFinder on the GPU using 4 threads
+        # 2. Multi-threaded execution
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             results = executor.map(self._compute_property, smiles_chunks)
             results = list(results)
