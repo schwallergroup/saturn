@@ -52,7 +52,7 @@ class AiZynthFinder(OracleComponent):
         """
         Thread Parallelized execution of AiZynthFinder on the SMILES batch.
         """
-        # 1. Chunk the SMILES into 4 batches
+        # 1. Chunk the SMILES into max_worker batches
         smiles_chunks = np.array_split(smiles, self.max_workers)
         # Ensure "str" type
         smiles_chunks = [np.array(chunk.tolist()) for chunk in smiles_chunks]  # List[List[str]]
@@ -99,15 +99,15 @@ class AiZynthFinder(OracleComponent):
 
         # 3. Parse the output
         df = pd.read_json(output_file, orient="table")
-        solved = [int(solved) for solved in df["is_solved"]]
-        # If solved, extract the number_of_steps - otherwise, set to 9999
+        is_solved = np.array(df["is_solved"]).astype(int)
+        # If solved, extract the number_of_steps - otherwise, set to 99
         # This is safe because one would always want to minimize the number of steps
-        steps = [steps if solved else 9999 for steps, solved in zip(df["number_of_steps"], solved)]
+        steps = [steps if solved else 99 for steps, solved in zip(df["number_of_steps"], df["is_solved"])]
 
         # 4. Delete the temporary folder and AiZynthFinder output
         shutil.rmtree(temp_dir)
 
-        return np.array(solved) if not self.optimize_path_length else np.array(steps)
+        return is_solved if not self.optimize_path_length else np.array(steps)
 
     def _download_public_data(self):
         """
