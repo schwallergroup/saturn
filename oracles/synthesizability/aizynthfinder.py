@@ -32,9 +32,9 @@ class AiZynthFinder(OracleComponent):
         assert self.config_path is not None, "Please provide the path to an AiZynthFinder configuration file."
         # Whether to optimize for path length
         self.optimize_path_length = self.parameters.specific_parameters.get("optimize_path_length", False)
-        # Whether to parallelize AiZynthFinder execution - defaults to True
-        self.parallelize = self.parameters.specific_parameters.get("parallelize", True)
-        self.max_workers = self.parameters.specific_parameters.get("max_workers", 4)
+        # Whether to parallelize AiZynthFinder execution
+        self.parallelize = self.parameters.specific_parameters.get("parallelize", True) # Defaults to True
+        self.max_workers = self.parameters.specific_parameters.get("max_workers", 4)  # Default to 4 workers
         # Download default AiZynthFinder models and stock databases
         self._download_public_data()
 
