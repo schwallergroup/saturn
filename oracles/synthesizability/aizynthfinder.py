@@ -7,9 +7,9 @@ import pandas as pd
 import numpy as np
 from oracles.oracle_component import OracleComponent
 from oracles.dataclass import OracleComponentParameters
+from rdkit import Chem
 from rdkit.Chem import Mol
 
-from rdkit import Chem
 
 class AiZynthFinder(OracleComponent):
     """
@@ -34,7 +34,10 @@ class AiZynthFinder(OracleComponent):
         # Download default AiZynthFinder models and stock databases with specified environment
         self._download_public_data()
 
-    def __call__(self, mols: np.ndarray[Mol]) -> np.ndarray[float]:
+    def __call__(
+        self, 
+        mols: np.ndarray[Mol]
+    ) -> Tuple[np.ndarray[bool], np.ndarray[int]]:
         smiles = np.vectorize(Chem.MolToSmiles)(mols)
         return self._compute_property(smiles)
     
