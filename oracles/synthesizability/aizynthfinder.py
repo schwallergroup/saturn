@@ -1,4 +1,3 @@
-from typing import Tuple
 import os
 import subprocess
 import tempfile
@@ -9,6 +8,8 @@ from oracles.oracle_component import OracleComponent
 from oracles.dataclass import OracleComponentParameters
 from rdkit import Chem
 from rdkit.Chem import Mol
+import uuid  # For generating temporary file names
+from concurrent.futures import ThreadPoolExecutor
 
 
 class AiZynthFinder(OracleComponent):
@@ -31,26 +32,52 @@ class AiZynthFinder(OracleComponent):
         assert self.config_path is not None, "Please provide the path to an AiZynthFinder configuration file."
         # Whether to optimize for path length
         self.optimize_path_length = self.parameters.specific_parameters.get("optimize_path_length", False)
-        # Download default AiZynthFinder models and stock databases with specified environment
+        # Whether to parallelize AiZynthFinder execution - defaults to True
+        self.parallelize = self.parameters.specific_parameters.get("parallelize", True)
+        self.max_workers = self.parameters.specific_parameters.get("max_workers", 4)
+        # Download default AiZynthFinder models and stock databases
         self._download_public_data()
 
     def __call__(
         self, 
         mols: np.ndarray[Mol]
-    ) -> Tuple[np.ndarray[bool], np.ndarray[int]]:
+    ) -> np.ndarray[int]:
         smiles = np.vectorize(Chem.MolToSmiles)(mols)
-        return self._compute_property(smiles)
+        return self._parallelized_compute_property(smiles) if self.parallelize else self._compute_property(smiles)
+    
+    def _parallelized_compute_property(
+        self, 
+        smiles: np.ndarray[str]
+    ) -> np.ndarray[int]:
+        """
+        Thread Parallelized execution of AiZynthFinder on the SMILES batch.
+        """
+        # 1. Chunk the SMILES into 4 batches
+        smiles_chunks = np.array_split(smiles, self.max_workers)
+        # Ensure "str" type
+        smiles_chunks = [np.array(chunk.tolist()) for chunk in smiles_chunks]  # List[List[str]]
+
+        # 2. Execute AiZynthFinder on the GPU using 4 threads
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            results = executor.map(self._compute_property, smiles_chunks)
+            results = list(results)
+            # Flatten the results
+            output = np.array([])
+            for result in results:
+                output = np.concatenate((output, result))
+
+        return output
     
     def _compute_property(
         self, 
         smiles: np.ndarray[str]
-    ) -> Tuple[np.ndarray[bool], np.ndarray[int]]:
+    ) -> np.ndarray[int]:
         """
         Execute AiZynthFinder on the SMILES batch.
-        # TODO: parallelize
         """
         # 1. Make a temporary file to store the SMILES
         temp_dir = tempfile.mkdtemp()
+        output_file = os.path.join(temp_dir, f"output_{uuid.uuid4().hex}.json.gz")
         with open(os.path.join(temp_dir, "smiles.smi"), "w") as f:
             for smile in smiles:
                 f.write(f"{smile}\n")
@@ -65,11 +92,13 @@ class AiZynthFinder(OracleComponent):
             "--config",
             self.config_path,
             "--smiles",
-            os.path.join(temp_dir, "smiles.smi")
+            os.path.join(temp_dir, "smiles.smi"),
+            "--output",
+            output_file
         ])
 
         # 3. Parse the output
-        df = pd.read_json("output.json.gz", orient="table")
+        df = pd.read_json(output_file, orient="table")
         solved = [int(solved) for solved in df["is_solved"]]
         # If solved, extract the number_of_steps - otherwise, set to 9999
         # This is safe because one would always want to minimize the number of steps
@@ -77,7 +106,6 @@ class AiZynthFinder(OracleComponent):
 
         # 4. Delete the temporary folder and AiZynthFinder output
         shutil.rmtree(temp_dir)
-        os.remove("output.json.gz")
 
         return np.array(solved) if not self.optimize_path_length else np.array(steps)
 
