@@ -32,6 +32,7 @@ from oracles.synthesizability.aizynthfinder import AiZynthFinder
 
 # Docking
 from oracles.docking.dockstream import DockStream
+from oracles.docking.quickvina2_gpu import QuickVina2_GPU
 
 # xTB electronic properties
 from oracles.xtb.chemical_potential import ChemicalPotential
@@ -97,6 +98,8 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
     # Docking
     elif name == "dockstream":
         return DockStream(oracle_component_parameters)
+    elif name == "quickvina2_gpu":
+        return QuickVina2_GPU(oracle_component_parameters)
     # xTB electronic properties
     elif name == "chemical_potential":
         return ChemicalPotential(oracle_component_parameters)

@@ -1,0 +1,174 @@
+"""
+Workflow based on: https://arxiv.org/abs/2406.08506 Appendix C
+
+Workflow Overview:
+* Input canonical SMILES
+* Convert to RDKit Mol
+* Protonate
+* Generate 1 (lowest energy) conformer using RDKit ETKDG and minimize using RDKit UFF
+* Convert conformer to PDBQT file
+* Dock using QuickVina2-GPU version 2.1
+"""
+import os
+import subprocess
+import tempfile
+import shutil
+import numpy as np
+from oracles.oracle_component import OracleComponent
+from oracles.dataclass import OracleComponentParameters
+from rdkit import Chem
+from rdkit.Chem import AllChem, Mol
+
+
+class QuickVina2_GPU(OracleComponent):
+    """
+    Executes QuickVina2-GPU version 2.1.
+
+    References:
+    1. https://www.biorxiv.org/content/early/2023/11/05/2023.11.04.565429
+    2. https://github.com/DeltaGroupNJUPT/Vina-GPU-2.1
+    """
+    def __init__(self, parameters: OracleComponentParameters):
+        super().__init__(parameters)
+
+        # QuickVina2-GPU-2.1 binary
+        self.binary = self.parameters.specific_parameters.get("binary", None)
+        assert self.binary is not None, "Please provide the path to the QuickVina2-GPU binary."
+
+        # Force-field for ligand energy minimization
+        force_field_id = self.parameters.specific_parameters.get("force_field", "uff").lower()
+        assert force_field_id in ["uff", "mmff94"], "force_field must be either 'uff' or 'mmff94'."
+        self.force_field = AllChem.UFFOptimizeMolecule if force_field_id == "uff" else AllChem.MMFFOptimizeMolecule
+
+        # Receptor path
+        self.receptor = self.parameters.specific_parameters.get("receptor", None)
+        assert self.receptor is not None and self.receptor.endswith(".pdbqt"), "Please provide the path to the receptor PDBQT file."
+
+        # Reference ligand path
+        self.reference_ligand = self.parameters.specific_parameters.get("reference_ligand", None)
+        assert self.reference_ligand is not None and self.reference_ligand.endswith(".pdb"), "Please provide the path to the reference ligand PDB file."
+
+        # Exhaustiveness (known as "Thread" in QuickVina2-GPU)
+        self.thread = self.parameters.specific_parameters.get("thread", 5000)  # Default to 5000 (same as source code default)
+
+        # Setup docking box
+        self._setup_docking_box()
+
+        # Output directory
+        output_dir = self.parameters.specific_parameters.get("results_dir", None)
+        assert output_dir is not None, "Please provide the path to the output directory."
+        os.makedirs(output_dir, exist_ok=True)
+        self.output_dir = output_dir
+
+    def __call__(
+        self, 
+        mols: np.ndarray[Mol],
+        oracle_calls: int
+    ) -> np.ndarray[float]:
+        # FIXME: Bad practice as the function signature is not the same as the parent class abstract method
+        return self._compute_property(mols, oracle_calls)
+    
+    def _compute_property(
+        self, 
+        mols: np.ndarray[Mol],
+        oracle_calls: int
+    ) -> np.ndarray[float]:
+        """
+        Execute QuickVina2-GPU-2.1 as a subprocess.
+        """
+        # 1. Make temporary files to store the input and output
+        temp_input_dir = tempfile.mkdtemp()
+        temp_output_dir = tempfile.mkdtemp()
+
+        # 2. Convert RDKit Mols to *canonical* SMILES
+        canonical_smiles = [Chem.MolToSmiles(mol, canonical=True) for mol in mols]
+
+        # 3. Convert back to RDKit Mols
+        # NOTE: This is likely redundant but is done to match the original workflow
+        mols = [Chem.MolFromSmiles(smiles) for smiles in canonical_smiles]
+
+        # 4. Protonate Mols
+        mols = [Chem.AddHs(mol) for mol in mols]
+
+        # 5. Generate 1 (lowest energy) conformer using RDKit ETKDG and force-field (UFF or MMFF94) minimize
+        for idx, mol in enumerate(mols):
+            # Generate conformer
+            AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+            # Minimize conformer
+            self.force_field(mol)
+            # Write out the minimized conformer in PDBQT format
+            pdbqt_file = os.path.join(temp_input_dir, f"ligand_{idx+1}.pdbqt")
+            writer = Chem.PDBWriter(pdbqt_file)
+            writer.write(mol)
+
+        # 6. Run QuickVina2-GPU-2.1
+        # TODO: Could be paralellized but GPU docking should be fast enough as large libraries are not expected
+        subprocess.run([
+            self.binary,
+            "--receptor", self.receptor,
+            "--ligand_directory", temp_input_dir,
+            "--output_directory", temp_output_dir,
+            # Exhaustiveness
+            "--thread", str(self.thread),
+            # Docking box
+            "--center_x", str(self.box_center[0]), "--center_y", str(self.box_center[1]), "--center_z", str(self.box_center[2]),
+            "--size_x", str(self.box_size[0]), "--size_y", str(self.box_size[1]), "--size_z", str(self.box_size[2]),
+            # Output only the lowest docking score pose
+            "--num_modes", "1",
+            # Fix seed
+            # TODO: Expose parameter to user
+            "--seed", "0"
+        ])
+
+        # 7. Copy the docking output
+        subprocess.run([
+            "cp", 
+            "-r", 
+            temp_output_dir, 
+            os.path.join(self.output_dir, f"results_{oracle_calls}")
+        ])
+
+        # 8. Parse the docking scores
+        docking_scores = []
+        docked_output = os.listdir(temp_output_dir)
+        # Sort by ligand order - this is important to ensure rewards are assigned correctly
+        docked_output = sorted(docked_output, key=lambda x: int(x.split("_")[-1].split(".")[0]))
+        for file in docked_output:
+            with open(os.path.join(temp_output_dir, file), "r") as f:
+                for line in f.readlines():
+                    # Extract the docking score
+                    if "REMARK VINA RESULT" in line:
+                        try:
+                            docking_scores.append(float(line.split()[3]))
+                        except Exception:
+                            docking_scores.append(0.0)
+
+        assert len(docking_scores) == len(mols), f"Mismatch between the number of docking scores and input molecules at oracle calls: {oracle_calls}."
+       
+        # 9. Delete the temporary folders
+        shutil.rmtree(temp_input_dir)
+        shutil.rmtree(temp_output_dir)
+
+        return np.array(docking_scores)
+
+    def _setup_docking_box(self):
+        """
+        Setup the docking box for the target receptor based on the reference ligand.
+
+        Follows the protocol from https://arxiv.org/abs/2406.08506 Appendix C:
+
+        * Centroids are the average position of the reference ligand atoms
+
+        * "Box sizes individually determinted to encompass each target binding"
+           Unclear how this is done - box size is set to 20 Å x 20 Å x 20 Å instead which is a common default
+
+        """
+        # Get the average coordinates of the reference ligand atoms
+        ref_mol = Chem.MolFromPDBFile(self.reference_ligand)
+        ref_conformer = ref_mol.GetConformer()
+        ref_coords = ref_conformer.GetPositions()
+        ref_center = tuple(np.mean(ref_coords, axis=0))
+
+        # Set the box center and size
+        self.box_center = ref_center
+        self.box_size = (20.0, 20.0, 20.0)

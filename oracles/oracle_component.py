@@ -14,7 +14,7 @@ from oracles.reward_shaping.function_parameters import RewardShapingFunctionPara
 # physics-based oracle (e.g., docking) output extra information (e.g., docking poses)
 # flag these so that the number of oracle calls can be used for prefixing the output files
 # TODO: Pharmacophore and Shape Matching, DFT, and MD oracles are not implemented yet
-PHYSICS_ORACLES = ["dockstream"]
+PHYSICS_ORACLES = ["dockstream", "quickvina2_gpu"]
 
 class OracleComponent(ABC):
     """
