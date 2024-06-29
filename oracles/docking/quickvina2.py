@@ -38,8 +38,8 @@ class DockingVina(object):
         elif target == 'braf':
             self.box_center = (84.194,6.949,-7.081)
             self.box_size = (22.032,19.211,14.106)
-        self.vina_program = '/home/<your path>/Desktop/saturn/oracles/docking/docking_grids/qvina02'
-        self.receptor_file = f'/home/<your path>/Desktop/saturn/oracles/docking/docking_grids/{target}.pdbqt'
+        self.vina_program = '/home/jeguo/saturn-dev/oracles/docking/docking_grids/qvina02'
+        self.receptor_file = f'/home/jeguo/saturn-dev/oracles/docking/docking_grids/{target}.pdbqt'
         self.exhaustiveness = 1
         self.num_sub_proc = 10
         self.num_cpu_dock = 5

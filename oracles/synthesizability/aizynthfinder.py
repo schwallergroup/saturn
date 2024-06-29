@@ -55,10 +55,11 @@ class AiZynthFinder(OracleComponent):
         # 1. Chunk the SMILES into max_worker batches
         smiles_chunks = np.array_split(smiles, self.max_workers)
         # Ensure "str" type
-        smiles_chunks = [np.array(chunk.tolist()) for chunk in smiles_chunks]  # List[List[str]]
+        smiles_chunks = [np.array(chunk.tolist()) for chunk in smiles_chunks]  # List[np.ndarray[str]]
 
         # 2. Multi-threaded execution
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+        workers = self.max_workers if len(smiles) > self.max_workers else 1
+        with ThreadPoolExecutor(max_workers=workers) as executor:
             results = executor.map(self._compute_property, smiles_chunks)
             results = list(results)
             # Flatten the results
@@ -98,16 +99,28 @@ class AiZynthFinder(OracleComponent):
         ])
 
         # 3. Parse the output
-        df = pd.read_json(output_file, orient="table")
-        is_solved = np.array(df["is_solved"]).astype(int)
-        # If solved, extract the number_of_steps - otherwise, set to 99
-        # This is safe because one would always want to minimize the number of steps
-        steps = [steps if solved else 99 for steps, solved in zip(df["number_of_steps"], df["is_solved"])]
+        try:
+            df = pd.read_json(output_file, orient="table")
+            is_solved = np.array(df["is_solved"]).astype(int)
+            # If solved, extract the number_of_steps - otherwise, set to 99
+            # This is safe because one would always want to minimize the number of steps
+            steps = [steps if solved else 99 for steps, solved in zip(df["number_of_steps"], df["is_solved"])]
+        except Exception as e:
+            print(f"Error in parsing AiZynthFinder output: {e}")
+            is_solved = np.zeros(len(smiles))
+            steps = np.zeros(len(smiles))
+            steps.fill(99)
 
         # 4. Delete the temporary folder and AiZynthFinder output
         shutil.rmtree(temp_dir)
 
-        return is_solved if not self.optimize_path_length else np.array(steps)
+        # 5. Prepare and/or return the output
+        if self.optimize_path_length:
+            return np.array(steps)
+        else:
+            # Even if the path length is not being optimized, the output is still the number of steps so that this information is tracked 
+            # HACK: Path length is only meaningful if a route is solved. If not solved, set the path length = 99 to -99 to work the no_transformation_binary Reward Shaping function
+            return np.array([steps if solved else -99 for steps, solved in zip(steps, is_solved)])
 
     def _download_public_data(self):
         """
