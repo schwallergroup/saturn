@@ -21,7 +21,7 @@ class RewardShapingFunction:
 
         assert self.transformation_function in [
             "no_transformation", 
-            "no_transformation_binary",
+            "binary",
             "step", 
             "sigmoid", 
             "reverse_sigmoid", 
@@ -35,7 +35,7 @@ class RewardShapingFunction:
         try:
             if self.transformation_function == "no_transformation":
                 return raw_property_values
-            elif self.transformation_function == "no_transformation_binary":
+            elif self.transformation_function == "binary":
                 # Binary reward shaping, 1 if property value >= 1 else 0
                 return np.array([1 if value >= 1 else 0 for value in raw_property_values])
             elif self.transformation_function == "step":
