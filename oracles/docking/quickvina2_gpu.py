@@ -159,9 +159,8 @@ class QuickVina2_GPU(OracleComponent):
 
         * Centroids are the average position of the reference ligand atoms
 
-        * "Box sizes individually determinted to encompass each target binding"
+        * "Box sizes individually determined to encompass each target binding"
            Unclear how this is done - box size is set to 20 Å x 20 Å x 20 Å instead which is a common default
-
         """
         # Get the average coordinates of the reference ligand atoms
         ref_mol = Chem.MolFromPDBFile(self.reference_ligand)

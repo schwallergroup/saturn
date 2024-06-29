@@ -90,12 +90,9 @@ class AiZynthFinder(OracleComponent):
             "-n",
             self.env_name,
             "aizynthcli",
-            "--config",
-            self.config_path,
-            "--smiles",
-            os.path.join(temp_dir, "smiles.smi"),
-            "--output",
-            output_file
+            "--config", self.config_path,
+            "--smiles", os.path.join(temp_dir, "smiles.smi"),
+            "--output", output_file
         ])
 
         # 3. Parse the output
