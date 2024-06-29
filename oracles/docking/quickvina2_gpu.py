@@ -34,6 +34,8 @@ class QuickVina2_GPU(OracleComponent):
         # QuickVina2-GPU-2.1 binary
         self.binary = self.parameters.specific_parameters.get("binary", None)
         assert self.binary is not None, "Please provide the path to the QuickVina2-GPU binary."
+        # Ensure the binary is executable for the user
+        subprocess.run(["chmod", "u+x", self.binary])
 
         # Force-field for ligand energy minimization
         force_field_id = self.parameters.specific_parameters.get("force_field", "uff").lower()
@@ -77,7 +79,8 @@ class QuickVina2_GPU(OracleComponent):
         Execute QuickVina2-GPU-2.1 as a subprocess.
         """
         # 1. Make temporary files to store the input and output
-        temp_input_dir = tempfile.mkdtemp()
+        temp_input_sdf_dir = tempfile.mkdtemp()
+        temp_input_pdbqt_dir = tempfile.mkdtemp()
         temp_output_dir = tempfile.mkdtemp()
 
         # 2. Convert RDKit Mols to *canonical* SMILES
@@ -93,20 +96,38 @@ class QuickVina2_GPU(OracleComponent):
         # 5. Generate 1 (lowest energy) conformer using RDKit ETKDG and force-field (UFF or MMFF94) minimize
         for idx, mol in enumerate(mols):
             # Generate conformer
-            AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+            AllChem.EmbedMolecule(mol)
             # Minimize conformer
             self.force_field(mol)
-            # Write out the minimized conformer in PDBQT format
-            pdbqt_file = os.path.join(temp_input_dir, f"ligand_{idx+1}.pdbqt")
-            writer = Chem.PDBWriter(pdbqt_file)
+            # Write out the minimized conformer in SDF format
+            sdf_file = os.path.join(temp_input_sdf_dir, f"ligand_{idx+1}.sdf")
+            writer = Chem.SDWriter(sdf_file)
             writer.write(mol)
+            writer.flush()
+            writer.close()
+            # Convert PDB to PDBQT with OpenBabel
+            pdbqt_file = os.path.join(temp_input_pdbqt_dir, f"ligand_{idx+1}.pdbqt")
+            subprocess.run([
+                "obabel",
+                sdf_file,
+                "-opdbqt",
+                "-O",
+                pdbqt_file
+            ])
 
         # 6. Run QuickVina2-GPU-2.1
         # TODO: Could be paralellized but GPU docking should be fast enough as large libraries are not expected
+        # Subprocess call should occur in the directory of the binary due to needing to read kernel files
+        # Based on this GitHub issue: https://github.com/DeltaGroupNJUPT/Vina-GPU/issues/12
+            
+        # Change directory to the binary directory
+        current_dir = os.getcwd()
+        os.chdir(os.path.dirname(self.binary))
+
         subprocess.run([
-            self.binary,
+            "./QuickVina2-GPU-2-1",
             "--receptor", self.receptor,
-            "--ligand_directory", temp_input_dir,
+            "--ligand_directory", temp_input_pdbqt_dir,
             "--output_directory", temp_output_dir,
             # Exhaustiveness
             "--thread", str(self.thread),
@@ -120,7 +141,10 @@ class QuickVina2_GPU(OracleComponent):
             "--seed", "0"
         ])
 
-        # 7. Copy the docking output
+        # Change back to the original directory
+        os.chdir(current_dir)
+
+        # 7. Copy and save the docking output
         subprocess.run([
             "cp", 
             "-r", 
@@ -132,7 +156,7 @@ class QuickVina2_GPU(OracleComponent):
         docking_scores = []
         docked_output = os.listdir(temp_output_dir)
         # Sort by ligand order - this is important to ensure rewards are assigned correctly
-        docked_output = sorted(docked_output, key=lambda x: int(x.split("_")[-1].split(".")[0]))
+        docked_output = sorted(docked_output, key=lambda x: int(x.split("_")[1]))
         for file in docked_output:
             with open(os.path.join(temp_output_dir, file), "r") as f:
                 for line in f.readlines():
@@ -146,7 +170,8 @@ class QuickVina2_GPU(OracleComponent):
         assert len(docking_scores) == len(mols), f"Mismatch between the number of docking scores and input molecules at oracle calls: {oracle_calls}."
        
         # 9. Delete the temporary folders
-        shutil.rmtree(temp_input_dir)
+        shutil.rmtree(temp_input_sdf_dir)
+        shutil.rmtree(temp_input_pdbqt_dir)
         shutil.rmtree(temp_output_dir)
 
         return np.array(docking_scores)
