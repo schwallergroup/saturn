@@ -105,7 +105,7 @@ class QuickVina2_GPU(OracleComponent):
             writer.write(mol)
             writer.flush()
             writer.close()
-            # Convert PDB to PDBQT with OpenBabel
+            # Convert SDF to PDBQT with OpenBabel
             pdbqt_file = os.path.join(temp_input_pdbqt_dir, f"ligand_{idx+1}.pdbqt")
             subprocess.run([
                 "obabel",
