@@ -8,6 +8,8 @@ Workflow Overview:
 * Generate 1 (lowest energy) conformer using RDKit ETKDG and minimize using RDKit UFF
 * Convert conformer to PDBQT file
 * Dock using QuickVina2-GPU version 2.1
+
+# ETKDG: https://pubs.acs.org/doi/10.1021/acs.jcim.5b00654
 """
 import os
 import subprocess
@@ -56,6 +58,9 @@ class QuickVina2_GPU(OracleComponent):
         # Setup docking box
         self._setup_docking_box()
 
+        # Ligand embedding parameter - use ETKDG
+        self.ETKDG = AllChem.ETKDG()
+
         # Output directory
         output_dir = self.parameters.specific_parameters.get("results_dir", None)
         assert output_dir is not None, "Please provide the path to the output directory."
@@ -95,10 +100,14 @@ class QuickVina2_GPU(OracleComponent):
 
         # 5. Generate 1 (lowest energy) conformer using RDKit ETKDG and force-field (UFF or MMFF94) minimize
         for idx, mol in enumerate(mols):
-            # Generate conformer
-            AllChem.EmbedMolecule(mol)
-            # Minimize conformer
-            self.force_field(mol)
+        # Skip molecules that fail to embed
+            try:
+                # Generate conformer with ETKDG
+                AllChem.EmbedMolecule(mol, self.ETKDG)
+                # Minimize conformer
+                self.force_field(mol)
+            except ValueError:
+                continue
             # Write out the minimized conformer in SDF format
             sdf_file = os.path.join(temp_input_sdf_dir, f"ligand_{idx+1}.sdf")
             writer = Chem.SDWriter(sdf_file)
@@ -107,16 +116,17 @@ class QuickVina2_GPU(OracleComponent):
             writer.close()
             # Convert SDF to PDBQT with OpenBabel
             pdbqt_file = os.path.join(temp_input_pdbqt_dir, f"ligand_{idx+1}.pdbqt")
-            subprocess.run([
+            output = subprocess.run([
                 "obabel",
                 sdf_file,
                 "-opdbqt",
                 "-O",
                 pdbqt_file
-            ])
+            ], capture_output=True)
 
         # 6. Run QuickVina2-GPU-2.1
         # TODO: Could be paralellized but GPU docking should be fast enough as large libraries are not expected
+            
         # Subprocess call should occur in the directory of the binary due to needing to read kernel files
         # Based on this GitHub issue: https://github.com/DeltaGroupNJUPT/Vina-GPU/issues/12
             
@@ -124,7 +134,7 @@ class QuickVina2_GPU(OracleComponent):
         current_dir = os.getcwd()
         os.chdir(os.path.dirname(self.binary))
 
-        subprocess.run([
+        output = subprocess.run([
             "./QuickVina2-GPU-2-1",
             "--receptor", self.receptor,
             "--ligand_directory", temp_input_pdbqt_dir,
@@ -139,7 +149,7 @@ class QuickVina2_GPU(OracleComponent):
             # Fix seed
             # TODO: Expose parameter to user
             "--seed", "0"
-        ])
+        ], capture_output=True)
 
         # Change back to the original directory
         os.chdir(current_dir)
@@ -153,28 +163,28 @@ class QuickVina2_GPU(OracleComponent):
         ])
 
         # 8. Parse the docking scores
-        docking_scores = []
+        docking_scores = np.zeros(len(mols), dtype=float)
         docked_output = os.listdir(temp_output_dir)
         # Sort by ligand order - this is important to ensure rewards are assigned correctly
         docked_output = sorted(docked_output, key=lambda x: int(x.split("_")[1]))
+        # NOTE: docking_scores is populated below - ligands that failed to embed would already have an assigned score = 0.0
         for file in docked_output:
+            ligand_idx = int(file.split("_")[1]) - 1
             with open(os.path.join(temp_output_dir, file), "r") as f:
                 for line in f.readlines():
                     # Extract the docking score
                     if "REMARK VINA RESULT" in line:
                         try:
-                            docking_scores.append(float(line.split()[3]))
+                            docking_scores[ligand_idx](float(line.split()[3]))
                         except Exception:
-                            docking_scores.append(0.0)
-
-        assert len(docking_scores) == len(mols), f"Mismatch between the number of docking scores and input molecules at oracle calls: {oracle_calls}."
+                            docking_scores[ligand_idx] = 0.0
        
         # 9. Delete the temporary folders
         shutil.rmtree(temp_input_sdf_dir)
         shutil.rmtree(temp_input_pdbqt_dir)
         shutil.rmtree(temp_output_dir)
 
-        return np.array(docking_scores)
+        return docking_scores
 
     def _setup_docking_box(self):
         """
@@ -191,8 +201,8 @@ class QuickVina2_GPU(OracleComponent):
         ref_mol = Chem.MolFromPDBFile(self.reference_ligand)
         ref_conformer = ref_mol.GetConformer()
         ref_coords = ref_conformer.GetPositions()
-        ref_center = tuple(np.mean(ref_coords, axis=0))
+        ref_center = tuple(np.mean(ref_coords, axis=0)) 
 
         # Set the box center and size
-        self.box_center = ref_center
+        self.box_center = ref_center  # Tuple[float, float, float]
         self.box_size = (20.0, 20.0, 20.0)

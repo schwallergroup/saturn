@@ -84,7 +84,7 @@ class AiZynthFinder(OracleComponent):
                 f.write(f"{smile}\n")
 
         # 2. Run AiZynthFinder
-        subprocess.run([
+        output = subprocess.run([
             "conda",
             "run",
             "-n",
@@ -93,7 +93,7 @@ class AiZynthFinder(OracleComponent):
             "--config", self.config_path,
             "--smiles", os.path.join(temp_dir, "smiles.smi"),
             "--output", output_file
-        ])
+        ], capture_output=True)
 
         # 3. Parse the output
         try:
