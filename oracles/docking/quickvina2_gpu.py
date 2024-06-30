@@ -163,10 +163,8 @@ class QuickVina2_GPU(OracleComponent):
         ])
 
         # 8. Parse the docking scores
-        docking_scores = np.zeros(len(mols), dtype=float)
+        docking_scores = np.zeros(len(mols))
         docked_output = os.listdir(temp_output_dir)
-        # Sort by ligand order - this is important to ensure rewards are assigned correctly
-        docked_output = sorted(docked_output, key=lambda x: int(x.split("_")[1]))
         # NOTE: docking_scores is populated below - ligands that failed to embed would already have an assigned score = 0.0
         for file in docked_output:
             ligand_idx = int(file.split("_")[1]) - 1
@@ -175,7 +173,7 @@ class QuickVina2_GPU(OracleComponent):
                     # Extract the docking score
                     if "REMARK VINA RESULT" in line:
                         try:
-                            docking_scores[ligand_idx](float(line.split()[3]))
+                            docking_scores[ligand_idx] = (float(line.split()[3]))
                         except Exception:
                             docking_scores[ligand_idx] = 0.0
        
