@@ -58,8 +58,8 @@ Afterwards, running:
 will display NVIDIA information.
 
 
-Experiment 1: Optimizing only docking score
--------------------------------------------
+Experiment 1: Optimizing only docking score leads to unreasonable molecules
+---------------------------------------------------------------------------
 
 This experiment illustrates how the QuickVina2-GPU-2.1 oracle can be exploited.
 

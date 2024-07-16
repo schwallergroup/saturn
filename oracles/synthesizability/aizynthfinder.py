@@ -27,27 +27,44 @@ class AiZynthFinder(OracleComponent):
         # AiZynthFinder environment path
         self.env_name = self.parameters.specific_parameters.get("env_name", None)
         assert self.env_name is not None, "Please provide the Conda environment name with AiZynthFinder installed."
+
         # Path to AiZynthFinder configuration file
         self.config_path = self.parameters.specific_parameters.get("config_path", None)
         assert self.config_path is not None, "Please provide the path to an AiZynthFinder configuration file."
+
         # Whether to optimize for path length
         self.optimize_path_length = self.parameters.specific_parameters.get("optimize_path_length", False)
+
         # Whether to parallelize AiZynthFinder execution
         self.parallelize = self.parameters.specific_parameters.get("parallelize", True) # Defaults to True
         self.max_workers = self.parameters.specific_parameters.get("max_workers", 4)  # Default to 4 workers
+
         # Download default AiZynthFinder models and stock databases
         self._download_public_data()
 
+        # Output directory
+        output_dir = self.parameters.specific_parameters.get("results_dir", None)
+        assert output_dir not in [None, ""], "Please provide the path to the output directory."
+        os.makedirs(output_dir, exist_ok=True)
+        self.output_dir = output_dir
+
+        # Store the current AiZynthFinder output for saving
+        self.aizynth_output = pd.DataFrame()
+
     def __call__(
         self, 
-        mols: np.ndarray[Mol]
+        mols: np.ndarray[Mol],
+        oracle_calls: int
     ) -> np.ndarray[int]:
+        # Reset output storage
+        self.aizynth_output = pd.DataFrame()
         smiles = np.vectorize(Chem.MolToSmiles)(mols)
-        return self._parallelized_compute_property(smiles) if self.parallelize else self._compute_property(smiles)
+        return self._parallelized_compute_property(smiles, oracle_calls) if self.parallelize else self._compute_property(smiles, oracle_calls)
     
     def _parallelized_compute_property(
         self, 
-        smiles: np.ndarray[str]
+        smiles: np.ndarray[str],
+        oracle_calls: int
     ) -> np.ndarray[int]:
         """
         Thread Parallelized execution of AiZynthFinder on the SMILES batch.
@@ -60,18 +77,22 @@ class AiZynthFinder(OracleComponent):
         # 2. Multi-threaded execution
         workers = self.max_workers if len(smiles) > self.max_workers else 1
         with ThreadPoolExecutor(max_workers=workers) as executor:
-            results = executor.map(self._compute_property, smiles_chunks)
+            results = executor.map(self._compute_property, smiles_chunks, [oracle_calls] * len(smiles_chunks))
             results = list(results)
             # Flatten the results
             output = np.array([])
             for result in results:
                 output = np.concatenate((output, result))
 
+        # 3. Save the output
+        self.aizynth_output.to_csv(os.path.join(self.output_dir, f"aizynth_output_{oracle_calls}.csv"), index=False)
+
         return output
     
     def _compute_property(
         self, 
-        smiles: np.ndarray[str]
+        smiles: np.ndarray[str],
+        oracle_calls: int
     ) -> np.ndarray[int]:
         """
         Execute AiZynthFinder on the SMILES batch.
@@ -102,6 +123,12 @@ class AiZynthFinder(OracleComponent):
             # If solved, extract the number_of_steps - otherwise, set to 99
             # This is safe because one would always want to minimize the number of steps
             steps = [steps if solved else 99 for steps, solved in zip(df["number_of_steps"], df["is_solved"])]
+            # Concatenate the output
+            self.aizynth_output = pd.concat([self.aizynth_output, df], ignore_index=True)
+            # In case AiZynthFinder is not being parallelized, directly save output
+            if not self.parallelize:
+                assert len(self.aizynth_output) == len(smiles), "AiZynthFinder output length mismatch."
+                self.aizynth_output.to_csv(os.path.join(self.output_dir, f"aizynth_output_{oracle_calls}.csv"), index=False)
         except Exception as e:
             print(f"Error in parsing AiZynthFinder output: {e}")
             is_solved = np.zeros(len(smiles))
@@ -116,7 +143,7 @@ class AiZynthFinder(OracleComponent):
             return np.array(steps)
         else:
             # Even if the path length is not being optimized, the output is still the number of steps so that this information is tracked 
-            # HACK: Path length is only meaningful if a route is solved. If not solved, set the path length = 99 to -99 
+            # HACK: Path length is only meaningful if a route is solved. If not solved, set the path length = -99 
             #       to work with the "binary" Reward Shaping function which sets reward = 1 if path >= 1, 0 otherwise
             return np.array([steps if solved else -99 for steps, solved in zip(steps, is_solved)])
 
@@ -136,4 +163,3 @@ class AiZynthFinder(OracleComponent):
             "download_public_data",
             os.path.dirname(self.config_path)
         ])
-        

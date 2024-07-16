@@ -63,7 +63,7 @@ class QuickVina2_GPU(OracleComponent):
 
         # Output directory
         output_dir = self.parameters.specific_parameters.get("results_dir", None)
-        assert output_dir is not None, "Please provide the path to the output directory."
+        assert output_dir not in [None, ""], "Please provide the path to the output directory."
         os.makedirs(output_dir, exist_ok=True)
         self.output_dir = output_dir
 
@@ -72,7 +72,6 @@ class QuickVina2_GPU(OracleComponent):
         mols: np.ndarray[Mol],
         oracle_calls: int
     ) -> np.ndarray[float]:
-        # FIXME: Bad practice as the function signature is not the same as the parent class abstract method
         return self._compute_property(mols, oracle_calls)
     
     def _compute_property(
@@ -106,7 +105,7 @@ class QuickVina2_GPU(OracleComponent):
                 AllChem.EmbedMolecule(mol, self.ETKDG)
                 # Minimize conformer
                 self.force_field(mol)
-            except Exception:
+            except ValueError:
                 continue
             # Write out the minimized conformer in SDF format
             sdf_file = os.path.join(temp_input_sdf_dir, f"ligand_{idx+1}.sdf")
