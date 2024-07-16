@@ -105,7 +105,7 @@ class QuickVina2_GPU(OracleComponent):
                 AllChem.EmbedMolecule(mol, self.ETKDG)
                 # Minimize conformer
                 self.force_field(mol)
-            except ValueError:
+            except Exception:
                 continue
             # Write out the minimized conformer in SDF format
             sdf_file = os.path.join(temp_input_sdf_dir, f"ligand_{idx+1}.sdf")
