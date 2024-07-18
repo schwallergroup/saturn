@@ -1,5 +1,7 @@
 # Saturn: Sample-efficient Generative Molecular Design using Memory Manipulation
 
+For the synthesizability experiments, see [here](https://github.com/schwallergroup/saturn/tree/synth/experimental_reproduction/synthesizability)
+
 <img src="saturn.jpeg" alt="Saturn Logo" width="300"/>
 
 `Saturn` is a language model based molecular generative design framework that is focused on **sample-efficient *de novo* small molecule design**. 
