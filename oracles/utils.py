@@ -28,9 +28,11 @@ from oracles.structural.smarts_alerts import SMARTSAlert
 
 # Synthesizability
 from oracles.synthesizability.sa_score import SAScore
+from oracles.synthesizability.aizynthfinder import AiZynthFinder
 
 # Docking
 from oracles.docking.dockstream import DockStream
+from oracles.docking.quickvina2_gpu import QuickVina2_GPU
 
 # xTB electronic properties
 from oracles.xtb.chemical_potential import ChemicalPotential
@@ -91,9 +93,13 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
     # Synthesizability
     elif name == "sa_score":
         return SAScore(oracle_component_parameters)
+    elif name == "aizynthfinder":
+        return AiZynthFinder(oracle_component_parameters)
     # Docking
     elif name == "dockstream":
         return DockStream(oracle_component_parameters)
+    elif name == "quickvina2_gpu":
+        return QuickVina2_GPU(oracle_component_parameters)
     # xTB electronic properties
     elif name == "chemical_potential":
         return ChemicalPotential(oracle_component_parameters)
