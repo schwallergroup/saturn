@@ -45,6 +45,7 @@ The `Mamba` architecture code was adapted from the following sources:
 References
 ----------
 1. [Saturn Pre-print](https://arxiv.org/abs/2405.17066)
-2. [Augmented Memory](https://pubs.acs.org/doi/10.1021/jacsau.4c00066)
-3. [Beam Enumeration](https://arxiv.org/abs/2309.13957)
-4. [GraphGA](https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc05372c)
+2. [Saturn Synthesizability Extension Pre-print](https://arxiv.org/abs/2407.12186v1) - code is on the [synth branch](https://github.com/schwallergroup/saturn/tree/synth)
+3. [Augmented Memory](https://pubs.acs.org/doi/10.1021/jacsau.4c00066)
+4. [Beam Enumeration](https://arxiv.org/abs/2309.13957)
+5. [GraphGA](https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc05372c)
