@@ -1,5 +1,7 @@
 # Instructions for Reproducing the Synthesizability Experiments 
 
+[Pre-print](https://arxiv.org/abs/2407.12186v1)
+
 The **Saturn** environment can be installed via:
 
 `source setup.sh`
