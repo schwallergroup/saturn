@@ -24,6 +24,10 @@ from diversity_filter.dataclass import DiversityFilterParameters
 from oracles.oracle import Oracle
 from oracles.dataclass import OracleConfiguration
 
+# Scoring
+from scoring.scorer import Scorer
+from scoring.dataclass import ScoringConfiguration
+
 parser = argparse.ArgumentParser(description="Run Saturn.")
 parser.add_argument(
     "config", 
@@ -88,6 +92,22 @@ if __name__ == "__main__":
 
         # 3. Run Goal-Directed Generation via Reinforcement Learning
         reinforcement_learning_agent.run()
+
+    elif running_mode in ["scoring", "scorer"]:
+        # 1. Construct the Oracle
+        oracle = Oracle(OracleConfiguration(**config["oracle"]))
+
+        # 2. Construct the Scorer
+        scorer = Scorer(
+            config["logging"]["logging_path"],
+            oracle=oracle,
+            # FIXME: Currently required because the Oracle takes as input a Diversity Filter - remove this dependency
+            diversity_filter_configuration=DiversityFilterParameters(**config["goal_directed_generation"]["diversity_filter"]),
+            configuration=ScoringConfiguration(**config["scoring"])
+        )
+
+        # 3. Run Scoring
+        scorer.run()
 
     else:
         raise ValueError(f"Running mode: {running_mode} is not implemented.")
