@@ -17,7 +17,8 @@
           "config_path": "<path to saturn directory>/experimental_reproduction/synthesizability/aizynthfinder/config.yml",
           "optimize_path_length": false,
           "parallelize": true,
-          "max_workers": 4
+          "max_workers": 4,
+          "results_dir": "<path to saturn directory>/experimental_reproduction/synthesizability/exp_2_all_mpo_aizynth_results"
         },
         "reward_shaping_function_parameters": {
           "transformation_function": "binary"

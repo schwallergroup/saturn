@@ -29,6 +29,7 @@ from oracles.structural.smarts_alerts import SMARTSAlert
 # Synthesizability
 from oracles.synthesizability.sa_score import SAScore
 from oracles.synthesizability.aizynthfinder import AiZynthFinder
+from oracle.synthesizability.syntheseus import Syntheseus
 
 # Docking
 from oracles.docking.dockstream import DockStream
@@ -95,6 +96,8 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return SAScore(oracle_component_parameters)
     elif name == "aizynthfinder":
         return AiZynthFinder(oracle_component_parameters)
+    elif name == "syntheseus":
+        return Syntheseus(oracle_component_parameters)
     # Docking
     elif name == "dockstream":
         return DockStream(oracle_component_parameters)

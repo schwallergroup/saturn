@@ -12,25 +12,24 @@ import uuid  # For generating temporary file names
 from concurrent.futures import ThreadPoolExecutor
 
 
-class AiZynthFinder(OracleComponent):
+
+class Syntheseus(OracleComponent):
     """
-    Wrapper around AiZynthFinder which is a retrosynthesis software.
+    Wrapper around Syntheseus which itself is a wrapper around various retrosynthesis models and search algorithms.
 
     References:
-    1. https://pubs.rsc.org/en/content/articlelanding/2020/sc/c9sc04944d
-    2. https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00472-1
-    3. https://jcheminf.biomedcentral.com/articles/10.1186/s13321-024-00860-x
+    1. https://arxiv.org/abs/2310.19796
     """
     def __init__(self, parameters: OracleComponentParameters):
         super().__init__(parameters)
 
-        # AiZynthFinder environment name
+        # Syntheseus environment path
         self.env_name = self.parameters.specific_parameters.get("env_name", None)
         assert self.env_name is not None, "Please provide the Conda environment name with AiZynthFinder installed."
 
-        # Path to AiZynthFinder configuration file
-        self.config_path = self.parameters.specific_parameters.get("config_path", None)
-        assert self.config_path is not None, "Please provide the path to an AiZynthFinder configuration file."
+        # Path to Syntheseus directory
+        self.syntheseus_dir = self.parameters.specific_parameters.get("syntheseus_dir", None)
+        assert self.config_path is not None, "Please provide the path to the Syntheseus directory (after cloning)."
 
         # Whether to optimize for path length
         self.optimize_path_length = self.parameters.specific_parameters.get("optimize_path_length", False)
@@ -39,8 +38,9 @@ class AiZynthFinder(OracleComponent):
         self.parallelize = self.parameters.specific_parameters.get("parallelize", True) # Defaults to True
         self.max_workers = self.parameters.specific_parameters.get("max_workers", 4)  # Default to 4 workers
 
-        # Download default AiZynthFinder models and stock databases
-        self._download_public_data()
+        # Load building blocks
+        self.building_blocks_file = self.parameters.specific_parameters.get("building_blocks_file", None)
+        assert self.building_blocks_file is not None, "Please provide the path to the building blocks file."
 
         # Output directory
         output_dir = self.parameters.specific_parameters.get("results_dir", None)
@@ -146,20 +146,3 @@ class AiZynthFinder(OracleComponent):
             # HACK: Path length is only meaningful if a route is solved. If not solved, set the path length = -99 
             #       to work with the "binary" Reward Shaping function which sets reward = 1 if path >= 1, 0 otherwise
             return np.array([steps if solved else -99 for steps, solved in zip(steps, is_solved)])
-
-    def _download_public_data(self):
-        """
-        Download default AiZynthFinder models and stock databases.
-        """
-        # Check if the data is already downloaded
-        if os.path.exists(os.path.join(os.path.dirname(self.config_path), "zinc_stock.hdf5")):
-            return
-    
-        subprocess.run([
-            "conda",
-            "run",
-            "-n",
-            self.env_name,
-            "download_public_data",
-            os.path.dirname(self.config_path)
-        ])
