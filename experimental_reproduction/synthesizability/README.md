@@ -31,7 +31,7 @@ AiZynthFinder
 QuickVina2-GPU-2.1
 ------------------
 **Install `Boost`**
-1. `sudo apt-get install libboost-all-dev`
+1. `sudo apt-get install libboost-all-dev` (***requires sudo permissions***)
 2. Download [Boost](https://www.boost.org/users/history/version_1_85_0.html): `wget https://archives.boost.io/release/1.85.0/source/boost_1_85_0.tar.gz`
 3. `tar -xzf boost_1_85_0.tar.gz`
 4. `cd boost_1_85_0`
