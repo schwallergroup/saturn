@@ -91,7 +91,9 @@ if args.chemistry_filter:
     pool = set()
     for smiles in entire_pool.keys():
         if size_largest_ring(smiles) <= 6 and not has_unpaired_electrons(smiles):
-            pool.add(entire_pool[smiles])
+            # Flatten stereochemistry and then canonacalize
+            processed_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(smiles), isomericSmiles=False, canonical=True)
+            pool.add(processed_smiles)
             if len(pool) == 4:
                 break
     smiles = pool
