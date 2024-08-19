@@ -84,6 +84,7 @@ class AiZynthFinder(OracleComponent):
             for result in results:
                 output = np.concatenate((output, result))
 
+        assert len(output) == len(smiles), "AiZynthFinder output length mismatch."
         # 3. Save the output
         self.aizynth_output.to_csv(os.path.join(self.output_dir, f"aizynth_output_{oracle_calls}.csv"), index=False)
 
