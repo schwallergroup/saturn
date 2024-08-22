@@ -1,6 +1,7 @@
 import os
 import subprocess
 import tempfile
+import json
 import yaml
 import shutil
 import pandas as pd
@@ -52,17 +53,19 @@ class Syntheseus(OracleComponent):
         os.makedirs(output_dir, exist_ok=True)
         self.output_dir = output_dir
 
-        # Store the current Syntheseus output for saving
-        self.syntheseus_output = pd.DataFrame()
+        # HACK: Save the SMILES order of the given batch to use as a mapping to serve Syntheseus route output
+        #       This is necessary because if Syntheseus is parallelized, then the SMILES batch is chunked
+        #       The order is lost as the count would start from 0 for each chunk
+        self.smiles = None
 
     def __call__(
         self, 
         mols: np.ndarray[Mol],
         oracle_calls: int
     ) -> np.ndarray[int]:
-        # Reset output storage
-        self.syntheseus_output = pd.DataFrame()
         smiles = np.vectorize(Chem.MolToSmiles)(mols)
+        # Save SMILES order - overwrites the previous batch's SMILES
+        self.smiles = smiles
         return self._parallelized_compute_property(smiles, oracle_calls) if self.parallelize else self._compute_property(smiles, oracle_calls)
     
     def _parallelized_compute_property(
@@ -89,9 +92,6 @@ class Syntheseus(OracleComponent):
                 output = np.concatenate((output, result))
 
         assert len(output) == len(smiles), "Syntheseus output length mismatch."
-        # 3. Save the output
-        self.aizynth_output.to_csv(os.path.join(self.output_dir, f"aizynth_output_{oracle_calls}.csv"), index=False)
-
         return output
     
     def _compute_property(
@@ -102,16 +102,15 @@ class Syntheseus(OracleComponent):
         """
         Execute Syntheseus on the SMILES batch.
         """
-        # TODO:
-        # 3. Then write the config.yml file
-        # 4. Then parse the output by model string matching to get the correct directory
-        # 5. Then clean up
+        # 1. Get the indices of the SMILES given the *generative model's* batch order
+        save_indices = np.where(np.isin(self.smiles, smiles))[0]
+        # Convenience for parsing so that the "first" molecule in the batch is at index 1 instead of 0
+        save_indices += 1
 
-
-        # 1. Make a temporary directory to store the SMILES and output results
+        # 2. Make a temporary directory to store the SMILES and output results
         temp_dir = tempfile.mkdtemp()
 
-        # 2. Write the SMILES to the temporary directory
+        # 3. Write the SMILES to the temporary directory
         with open(os.path.join(temp_dir, "smiles.smi"), "w") as f:
             # Syntheseus does not accept empty lines
             for idx, s in enumerate(smiles):
@@ -120,49 +119,78 @@ class Syntheseus(OracleComponent):
                 else:
                     f.write(f"{s}")
 
-        # 3. Write the config.yml to the temporary directory
+        # 4. Write the config.yml to the temporary directory
         self._write_config(temp_dir)
 
-        # 4. Run Syntheseus
+        # 5. Run Syntheseus
         output = subprocess.run([
             "conda",
             "run",
             "-n",
             self.env_name,
+            "syntheseus",
             "search",
             "--config", os.path.join(temp_dir, "config.yml")
         ], capture_output=True)
 
-        # 5. Parse the output
+        # 6. Parse the output
+        is_solved = np.zeros(len(smiles))
+        steps = np.zeros(len(smiles))
+        steps.fill(99)
         try:
-            df = pd.read_json(output_file, orient="table")
-            is_solved = np.array(df["is_solved"]).astype(int)
-            # If solved, extract the number_of_steps - otherwise, set to 99
-            # This is safe because one would always want to minimize the number of steps
-            steps = [steps if solved else 99 for steps, solved in zip(df["number_of_steps"], df["is_solved"])]
-            # Concatenate the output
-            self.aizynth_output = pd.concat([self.aizynth_output, df], ignore_index=True)
-            # In case AiZynthFinder is not being parallelized, directly save output
-            if not self.parallelize:
-                assert len(self.aizynth_output) == len(smiles), "AiZynthFinder output length mismatch."
-                self.aizynth_output.to_csv(os.path.join(self.output_dir, f"aizynth_output_{oracle_calls}.csv"), index=False)
+            # Syntheseus output is tagged by the reaction model name
+            output_results_dir = [folder for folder in os.listdir(os.path.join(temp_dir)) if self.reaction_model in folder][0]
+            output_files = [file for file in os.listdir(os.path.join(temp_dir, output_results_dir)) if not file.endswith(".json")]
+            # *Important* to sort by ascending integer order so the molecules to output mapping is correct
+            output_files = sorted(output_files, key=lambda x: int(x))
+            # Loop through the results for each query SMILES and extract the number of model calls 
+            # required to solve. This is the number of reaction steps 
+            for idx, mol_results in enumerate(output_files):
+                # Load the JSON file
+                with open(os.path.join(temp_dir, output_results_dir, mol_results, "stats.json"), "r") as f:
+                    stats = json.load(f)
+                # Extract the number of steps
+                num_rxn_steps = stats["soln_time_rxn_model_calls"]
+                is_solved[idx] = 1 if num_rxn_steps != np.inf else 0
+                steps[idx] = int(num_rxn_steps) if num_rxn_steps != np.inf else 99
+
+            # HACK: In case a molecule is in the building blocks stock, Syntheseus returns 0. 
+            #       Set these to 1 to work with Binary Reward Shaping
+            steps[steps == 0] = 1
+
+            # 7. Copy the output to the output directory
+            for mol_results, save_index in zip(output_files, save_indices):
+                # Make output folder tagged by the oracle calls
+                os.makedirs(os.path.join(self.output_dir, f"output_{oracle_calls}"), exist_ok=True)
+                subprocess.run([
+                    "cp",
+                    "-r",
+                    os.path.join(temp_dir, output_results_dir, mol_results),
+                    os.path.join(self.output_dir, f"output_{oracle_calls}", f"mol_{save_index}")
+                ])
+            
         except Exception as e:
-            print(f"Error in parsing AiZynthFinder output: {e}")
+            print(f"Error in parsing Syntheseus output: {e}")
             is_solved = np.zeros(len(smiles))
             steps = np.zeros(len(smiles))
             steps.fill(99)
 
-        # 4. Delete the temporary folder and AiZynthFinder output
+        # 8. Delete the temporary directory and Syntheseus output
         shutil.rmtree(temp_dir)
 
-        # 5. Prepare and/or return the output
+        # 9. Prepare and/or return the output
         if self.optimize_path_length:
-            return np.array(steps)
+            if not self.parallelize:
+                assert len(steps) == len(smiles), "Syntheseus output length mismatch."
+            return steps
         else:
             # Even if the path length is not being optimized, the output is still the number of steps so that this information is tracked 
             # HACK: Path length is only meaningful if a route is solved. If not solved, set the path length = -99 
             #       to work with the "binary" Reward Shaping function which sets reward = 1 if path >= 1, 0 otherwise
-            return np.array([steps if solved else -99 for steps, solved in zip(steps, is_solved)])
+            output = np.array([rxn_steps if solved else -99 for rxn_steps, solved in zip(steps, is_solved)])
+            if not self.parallelize:
+                assert len(output) == len(smiles), "Syntheseus output length mismatch."
+            return output
 
     def _write_config(self, dir_path: str) -> None:
         """

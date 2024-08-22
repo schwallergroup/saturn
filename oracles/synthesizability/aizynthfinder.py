@@ -146,7 +146,7 @@ class AiZynthFinder(OracleComponent):
             # Even if the path length is not being optimized, the output is still the number of steps so that this information is tracked 
             # HACK: Path length is only meaningful if a route is solved. If not solved, set the path length = -99 
             #       to work with the "binary" Reward Shaping function which sets reward = 1 if path >= 1, 0 otherwise
-            return np.array([steps if solved else -99 for steps, solved in zip(steps, is_solved)])
+            return np.array([rxn_steps if solved else -99 for rxn_steps, solved in zip(steps, is_solved)])
 
     def _download_public_data(self):
         """
