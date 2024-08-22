@@ -102,8 +102,8 @@ class AiZynthFinder(OracleComponent):
         temp_dir = tempfile.mkdtemp()
         output_file = os.path.join(temp_dir, f"output_{uuid.uuid4().hex}.json.gz")
         with open(os.path.join(temp_dir, "smiles.smi"), "w") as f:
-            for smile in smiles:
-                f.write(f"{smile}\n")
+            for s in smiles:
+                f.write(f"{s}\n")
 
         # 2. Run AiZynthFinder
         output = subprocess.run([

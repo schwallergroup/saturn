@@ -29,7 +29,7 @@ from oracles.structural.smarts_alerts import SMARTSAlert
 # Synthesizability
 from oracles.synthesizability.sa_score import SAScore
 from oracles.synthesizability.aizynthfinder import AiZynthFinder
-from oracle.synthesizability.syntheseus import Syntheseus
+from oracles.synthesizability.syntheseus import Syntheseus
 
 # Docking
 from oracles.docking.dockstream import DockStream

@@ -13,7 +13,7 @@ from oracles.reward_shaping.function_parameters import RewardShapingFunctionPara
 # Physics-based oracle (e.g. docking) and retrosynthesis tools (e.g. AiZynthFinder) output extra
 # information. Flag these so that the number of oracle calls can be used for prefixing the output files
 # TODO: Pharmacophore and Shape Matching, DFT, and MD oracles are not implemented yet
-FLAGGED_ORACLES = ["dockstream", "quickvina2_gpu", "aizynthfinder"]
+FLAGGED_ORACLES = ["dockstream", "quickvina2_gpu", "aizynthfinder", "syntheseus"]
 
 class OracleComponent(ABC):
     """
