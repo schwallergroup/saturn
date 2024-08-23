@@ -10,7 +10,6 @@ from oracles.oracle_component import OracleComponent
 from oracles.dataclass import OracleComponentParameters
 from rdkit import Chem
 from rdkit.Chem import Mol
-import uuid  # For generating temporary file names
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -35,6 +34,7 @@ class Syntheseus(OracleComponent):
 
         # Whether to parallelize Syntheseus execution
         self.parallelize = self.parameters.specific_parameters.get("parallelize", True) # Defaults to True
+        # NOTE: Initial testing shows that thread parallelization does not speed up Syntheseus execution
         self.max_workers = self.parameters.specific_parameters.get("max_workers", 4)  # Default to 4 workers
 
         # Reaction model
@@ -90,7 +90,7 @@ class Syntheseus(OracleComponent):
             output = np.array([])
             for result in results:
                 output = np.concatenate((output, result))
-
+                
         assert len(output) == len(smiles), "Syntheseus output length mismatch."
         return output
     
@@ -201,7 +201,7 @@ class Syntheseus(OracleComponent):
             "inventory_smiles_file": self.building_blocks_file,
             "search_targets_file": os.path.join(dir_path, "smiles.smi"),
             "model_class": self.reaction_model,
-            'time_limit_s': self.time_limit_s,
+            "time_limit_s": self.time_limit_s,
             # Only return 1 result for now - this implies that if 1 solution is found, Syntheseus stops
             # NOTE: In retrosynthesis, it can be very useful to return multiple routes (unless a model's top-1 accuracy is 100%) 
             #       but we do this for simplicity at the moment, i.e., so long as *a* route is found, consider the molecule solved

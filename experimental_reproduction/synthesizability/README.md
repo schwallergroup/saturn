@@ -42,7 +42,7 @@ QuickVina2-GPU-2.1
 3. `vim Makefile` and change paths
 4. `make clean`
 5. `make source`
-6. Test the installation was successful by running `./QuickVina2-GPU-2-1 --config input_file_example/2bm2_config.txt` (change the paths in `input_file_example/2bm2_config.txt` first)
+6. Test the installation was successful by running `./QuickVina2-GPU-2-1 --config input_file_example/2bm2_config.txt` (change the `receptor` and `opencl_binary_path` paths in `input_file_example/2bm2_config.txt` first)
 7. Re-install for faster implementation: `make clean` followed by `make`
 
 **Install `clinfo`**
