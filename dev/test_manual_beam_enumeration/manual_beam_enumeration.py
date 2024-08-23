@@ -115,16 +115,23 @@ if args.chemistry_filter:
 
     def has_unpaired_electrons(smiles: str) -> bool:
         """
-        Returns whether any atom has unpaired electrons - catches radical and charged atoms
+        Returns whether any atom has unpaired electrons - catches radicals and some charged atoms.
         """
         mol = Chem.MolFromSmiles(smiles)
         return any(atom.GetNumRadicalElectrons() > 0 for atom in mol.GetAtoms())
 
+    def is_charged(smiles: str) -> bool:
+        """
+        Returns whether any atom has a charge.
+        """
+        mol = Chem.MolFromSmiles(smiles)
+        return any(atom.GetFormalCharge() != 0 for atom in mol.GetAtoms())
+
     entire_pool = beam_enumeration.entire_pool
     pool = set()
     for smiles in entire_pool.keys():
-        if ring_filter(smiles) and not has_unpaired_electrons(smiles):
-            # Flatten stereochemistry and then canonacalize
+        if ring_filter(smiles) and not has_unpaired_electrons(smiles) and not is_charged(smiles):
+            # Flatten stereochemistry and then canonicalize
             processed_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(smiles), isomericSmiles=False, canonical=True)
             pool.add(processed_smiles)
             if len(pool) == 4:
