@@ -27,7 +27,7 @@ class Syntheseus(OracleComponent):
 
         # Syntheseus environment path
         self.env_name = self.parameters.specific_parameters.get("env_name", None)
-        assert self.env_name is not None, "Please provide the Conda environment name with AiZynthFinder installed."
+        assert self.env_name is not None, "Please provide the Conda environment name with Syntheseus installed."
 
         # Whether to optimize for path length
         self.optimize_path_length = self.parameters.specific_parameters.get("optimize_path_length", False)
