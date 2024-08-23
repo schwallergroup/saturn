@@ -33,7 +33,7 @@ class Syntheseus(OracleComponent):
         self.optimize_path_length = self.parameters.specific_parameters.get("optimize_path_length", False)
 
         # Whether to parallelize Syntheseus execution
-        self.parallelize = self.parameters.specific_parameters.get("parallelize", True) # Defaults to True
+        self.parallelize = self.parameters.specific_parameters.get("parallelize", False) # Defaults to False
         # NOTE: Initial testing shows that thread parallelization does not speed up Syntheseus execution
         self.max_workers = self.parameters.specific_parameters.get("max_workers", 4)  # Default to 4 workers
 
