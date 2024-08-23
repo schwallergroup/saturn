@@ -33,8 +33,7 @@ class Syntheseus(OracleComponent):
         self.optimize_path_length = self.parameters.specific_parameters.get("optimize_path_length", False)
 
         # Whether to parallelize Syntheseus execution
-        self.parallelize = self.parameters.specific_parameters.get("parallelize", False) # Defaults to False
-        # NOTE: Initial testing shows that thread parallelization does not speed up Syntheseus execution
+        self.parallelize = self.parameters.specific_parameters.get("parallelize", True) # Defaults to True
         self.max_workers = self.parameters.specific_parameters.get("max_workers", 4)  # Default to 4 workers
 
         # Reaction model
@@ -220,12 +219,16 @@ class Syntheseus(OracleComponent):
         """
         Syntheseus expects proper capitalization of the model names. Parse user input and return the correct model name.
         """
+        # NOTE: Assumes the user is not providing their own trained model.
+        #       The default behaviour in Syntheseus is then to download a trained model by the authors.
+        #       These models are stored in .cache/torch/syntheseus by default.
         assert model_name is not None, "Please provide the reaction model name."
         if model_name in ["retroknn", "RetroKNN"]:
             return "RetroKNN"
         elif model_name in ["rootaligned", "RootAligned"]:
             return "RootAligned"
-        elif model_name in ["graph2edits", "Graph2Edits"]:
+        elif model_name in ["graph2edits", "Graph2Edits", "graph2edit", "Graph2Edit"]:
             return "Graph2Edits"
         else:
+            # TODO: Could include all the models in Syntheseus 
             raise ValueError(f"Model name {model_name} not recognized or not supported yet.")
