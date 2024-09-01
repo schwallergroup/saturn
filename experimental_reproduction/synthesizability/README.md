@@ -26,6 +26,18 @@ AiZynthFinder
 1. Clone the [repository](https://github.com/MolecularAI/aizynthfinder)
 2. Follow the installation instructions in the repository's README.md
 
+
+Syntheseus
+-------------
+1. Clone the [repository](https://github.com/microsoft/syntheseus)
+2. Created the conda full environment: `conda env create -f environment_full.yml`
+3. Activate the environment: `conda activate syntheseus-full`
+4. Install the package: `pip install -e ".[all]"`
+
+**Potential Issues:**
+1. **graphviz.backend.execute.ExecutableNotFound**:`sudo apt-get install graphviz` (***requires sudo permissions***)
+2. **RetroKNN incompatible torch_scatter version**: `conda install pytorch-scatter -c pyg -c conda-forge` (***check cuda version***)
+
 QuickVina2-GPU-2.1
 ------------------
 **Install `Boost`**
@@ -73,4 +85,12 @@ Configuration files are provided for both `All MPO` and `Double MPO` objective f
 Experiment 3: Directly optimizing AiZynthFinder starting from an unsuitable training distribution
 --------------------------------------------------------------------------------------------------
 
-This experiment uses essentially the same configuration files as Experiment 2. The only paths that need to be changed are the `prior` and `agent`.
+This experiment uses essentially the same configuration files as Experiment 2. The only paths that need to be changed are the `prior` and `agent` to the `"purged" models`.
+
+
+Experiment 4: Directly optimizing *any* Retrosynthesis Model
+--------------------------------------------------------------------------------------------------
+
+This experiment uses a similar configuration file to Experiment 2. The only difference is that the `AiZynthFinder` oracle is replaced with a `Syntheseus` oracle. The `building_blocks_file` and other relevant arguments need to be specified.
+
+**Note**: To run different retrosynthesis models, change the `reaction_model` argument in the `Syntheseus` oracle. The current supported models are `RetroKNN`, `Graph2Edits`, and `RootAligned`.
