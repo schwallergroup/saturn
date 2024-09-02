@@ -1,8 +1,8 @@
+from typing import Dict, Union
 import os
 import subprocess
 import tempfile
 import json
-import pickle
 import yaml
 import shutil
 import numpy as np
@@ -47,8 +47,13 @@ class Syntheseus(OracleComponent):
         # Enforced building blocks
         self.enforce_blocks = self.parameters.specific_parameters.get("enforce_blocks", False)  # Whether to enforce synthetic routes cross a set of reference building blocks
         if self.enforce_blocks:
+            # Path to the script that extracts the SMILES and depth from the Syntheseus route pickle file
+            self.route_extraction_script_path = self.parameters.specific_parameters.get("route_extraction_script_path", None)
+            assert self.route_extraction_script_path is not None, "The run specifies to enforce building blocks, please provide the path to the script that extracts the SMILES and depth from the Syntheseus route pickle file."
+
             self.enforced_building_blocks_file = self.parameters.specific_parameters.get("enforced_building_blocks_file", None)
             assert self.enforced_building_blocks_file is not None, "The run specifies to enforce building blocks, please provide the path to the building blocks file."
+
             self.enforce_start = self.parameters.specific_parameters.get("enforce_start", False)  # Whether to enforce that the reference building blocks appear in the root nodes
 
         # Search time limit
@@ -162,27 +167,42 @@ class Syntheseus(OracleComponent):
                 steps[idx] = int(num_rxn_steps) if num_rxn_steps != np.inf else 99
 
                 # If the molecule is solved *and* the user specified to enforce that a set of building blocks appears in the synthesis graph
-                if self.enforce_blocks and is_solved[idx] == 1:
-                    # Load the solved route
-                    # NOTE: We set Syntheseus to terminate after 1 route is found, so the index is always 0
-                    with open(os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"), "rb") as f:
-                        route = pickle.load(f)
+                if self.enforce_blocks and int(is_solved[idx]) == 1:
+                    # Read the route data from the pickle file
+                    # HACK: This (temporary) solution enables reading the pickled data *without* installing Syntheseus into the Saturn environment
+                    extraction_result = subprocess.run([
+                        "conda", 
+                        "run", 
+                        "-n",
+                        self.env_name, 
+                        "python", 
+                        self.route_extraction_script_path, 
+                        # NOTE: We set Syntheseus to terminate after 1 route is found, so the index is always 0
+                        os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl")
+                    ], capture_output=True, text=True)
+
+                    # Check for errors
+                    assert extraction_result.returncode == 0, f"Error during Syntheseus route data extraction: {extraction_result.stderr}"
+                    route = json.loads(extraction_result.stdout)
 
                     match = False
                     max_depth = self._get_max_depth(route)
-                    for node in route:
-                        attributes = dir(node)
-                        # If the user specified to enforce that the starting building block must appear in the *root* node
+                    for node, node_data in route.items():
+                        # If the user specified to enforce that the starting building block must appear in the *root* nodes
                         if self.enforce_start:
-                            if "depth" in attributes:
-                                if node.depth == max_depth:
-                                    canonical_smiles = canonicalize_smiles(node.mol.smiles)
-                                    match = self._match_stock(canonical_smiles)
-                        # Otherwise, just check if *any* node has a matching SMILES in the enforced building blocks file
-                        else:
-                            if "mol" in attributes:
-                                canonical_smiles = canonicalize_smiles(node.mol.smiles)
+                            if node_data["depth"] == max_depth:
+                                canonical_smiles = canonicalize_smiles(node_data["smiles"])
                                 match = self._match_stock(canonical_smiles)
+                                # TODO: for now, if even 1 *root* node is in the building blocks stock, consider this a success. There can be a parameter later to enforce *all* root nodes
+
+                        # Otherwise, just check if *any* node has a matching SMILES in the enforced building blocks file
+                        # NOTE: this means that the enforced building blocks appear *somewhere* in the synthesis graph
+                        else:
+                            canonical_smiles = canonicalize_smiles(node_data["smiles"])
+                            match = self._match_stock(canonical_smiles)
+
+                        if match:
+                            break
 
                     is_solved[idx] = is_solved[idx] if match else 0
                     steps[idx] = steps[idx] if match else 99
@@ -226,22 +246,21 @@ class Syntheseus(OracleComponent):
             return output
 
     @staticmethod
-    def _get_max_depth(route: set) -> int:
+    def _get_max_depth(route: Dict[str, Union[str, int]]) -> int:
         """
         Get the maximum depth of the synthesis graph.
         """
         max_depth = 0
-        for node in route:
-            attributes = dir(node)
-            if "depth" in attributes:
-                max_depth = max(max_depth, node.depth)
+        for node, node_data in route.items():
+            max_depth = max(max_depth, node_data["depth"])
         return max_depth
 
     def _match_stock(self, query_smiles: str) -> bool:
         """
         Check if the query SMILES is in the building blocks stock.
         """
-        with open(self.building_blocks_file, "r") as f:
+        # NOTE: Assumes the building blocks file is already *canonicalized*
+        with open(self.enforced_building_blocks_file, "r") as f:
             for smiles in f.readlines():
                 if query_smiles == smiles.strip():
                     return True
