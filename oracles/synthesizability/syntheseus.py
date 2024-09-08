@@ -10,7 +10,8 @@ from oracles.oracle_component import OracleComponent
 from oracles.dataclass import OracleComponentParameters
 from rdkit import Chem
 from rdkit.Chem import Mol
-from utils.chemistry_utils import canonicalize_smiles
+from rdkit.DataStructs import BulkTanimotoSimilarity
+from utils.chemistry_utils import canonicalize_smiles, construct_morgan_fingerprints_batch_from_file, construct_morgan_fingerprint
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -45,7 +46,7 @@ class Syntheseus(OracleComponent):
         assert self.building_blocks_file is not None, "Please provide the path to the building blocks file."
 
         # Enforced building blocks
-        self.enforce_blocks = self.parameters.specific_parameters.get("enforce_blocks", False)  # Whether to enforce synthetic routes cross a set of reference building blocks
+        self.enforce_blocks = self.parameters.specific_parameters.get("enforce_blocks", False)  # Whether to enforce synthetic routes cross a set of reference blocks
         if self.enforce_blocks:
             # Path to the script that extracts the SMILES and depth from the Syntheseus route pickle file
             self.route_extraction_script_path = self.parameters.specific_parameters.get("route_extraction_script_path", None)
@@ -54,7 +55,11 @@ class Syntheseus(OracleComponent):
             self.enforced_building_blocks_file = self.parameters.specific_parameters.get("enforced_building_blocks_file", None)
             assert self.enforced_building_blocks_file is not None, "The run specifies to enforce building blocks, please provide the path to the building blocks file."
 
-            self.enforce_start = self.parameters.specific_parameters.get("enforce_start", False)  # Whether to enforce that the reference building blocks appear in the root nodes
+            self.enforce_start = self.parameters.specific_parameters.get("enforce_start", False)  # Whether to enforce that the reference blocks appear in the root nodes
+
+            self.use_tanimoto_similarity = self.parameters.specific_parameters.get("use_tanimoto_similarity", True)  # Whether to use Tanimoto similarity as metric of "matching" to reference blocks
+            if self.use_tanimoto_similarity:
+                self.reference_blocks_fps = construct_morgan_fingerprints_batch_from_file(self.enforced_building_blocks_file)
 
         # Search time limit
         self.time_limit_s = self.parameters.specific_parameters.get("time_limit_s", 180)  # Default to 3 minutes per molecule
@@ -149,6 +154,7 @@ class Syntheseus(OracleComponent):
         is_solved = np.zeros(len(smiles))
         steps = np.zeros(len(smiles))
         steps.fill(99)
+        tan_sims = np.zeros(len(smiles))
         try:
             # Syntheseus output is tagged by the reaction model name
             output_results_dir = [folder for folder in os.listdir(os.path.join(temp_dir)) if self.reaction_model in folder][0]
@@ -185,27 +191,42 @@ class Syntheseus(OracleComponent):
                     assert extraction_result.returncode == 0, f"Error during Syntheseus route data extraction: {extraction_result.stderr}"
                     route = json.loads(extraction_result.stdout)
 
-                    match = False
-                    max_depth = self._get_max_depth(route)
-                    for node, node_data in route.items():
-                        # If the user specified to enforce that the starting building block must appear in the *root* nodes
-                        if self.enforce_start:
-                            if node_data["depth"] == max_depth:
+                    # Check whether to match by Tanimoto similarity
+                    if self.use_tanimoto_similarity:
+                        max_tan_sim = 0.0
+                        max_depth = self._get_max_depth(route)
+                        for node, node_data in route.items():
+                            if self.enforce_start:
+                                if node_data["depth"] == max_depth:
+                                    max_tan_sim = max(max_tan_sim, self._get_max_stock_similarity(node_data["smiles"]))
+                            else:
+                                max_tan_sim = max(max_tan_sim, self._get_max_stock_similarity(node_data["smiles"]))
+
+                        tan_sims[idx] = max_tan_sim
+
+                    # Otherwise, match *exactly*
+                    else:
+                        is_matched = False
+                        max_depth = self._get_max_depth(route)
+                        for node, node_data in route.items():
+                            # If the user specified to enforce that the starting building block must appear in the *root* nodes
+                            if self.enforce_start:
+                                if node_data["depth"] == max_depth:
+                                    canonical_smiles = canonicalize_smiles(node_data["smiles"])
+                                    is_matched = self._match_stock(canonical_smiles)
+                                    # TODO: for now, if even 1 *root* node is in the building blocks stock, consider this a success. There can be a parameter later to enforce *all* root nodes
+
+                            # Otherwise, just check if *any* node has a matching SMILES in the enforced building blocks file
+                            # NOTE: this means that the enforced building blocks appear *somewhere* in the synthesis graph
+                            else:
                                 canonical_smiles = canonicalize_smiles(node_data["smiles"])
-                                match = self._match_stock(canonical_smiles)
-                                # TODO: for now, if even 1 *root* node is in the building blocks stock, consider this a success. There can be a parameter later to enforce *all* root nodes
+                                is_matched = self._match_stock(canonical_smiles)
 
-                        # Otherwise, just check if *any* node has a matching SMILES in the enforced building blocks file
-                        # NOTE: this means that the enforced building blocks appear *somewhere* in the synthesis graph
-                        else:
-                            canonical_smiles = canonicalize_smiles(node_data["smiles"])
-                            match = self._match_stock(canonical_smiles)
+                            if is_matched:
+                                break
 
-                        if match:
-                            break
-
-                    is_solved[idx] = is_solved[idx] if match else 0
-                    steps[idx] = steps[idx] if match else 99
+                        is_solved[idx] = is_solved[idx] if is_matched else 0
+                        steps[idx] = steps[idx] if is_matched else 99
 
             # HACK: In case a molecule is in the building blocks stock, Syntheseus returns 0. 
             #       Set these to 1 to work with Binary Reward Shaping
@@ -232,7 +253,11 @@ class Syntheseus(OracleComponent):
         shutil.rmtree(temp_dir)
 
         # 9. Prepare and/or return the output
-        if self.optimize_path_length:
+        if self.use_tanimoto_similarity:
+            if not self.parallelize:
+                assert len(tan_sims) == len(smiles), "Syntheseus output length mismatch."
+            return tan_sims
+        elif self.optimize_path_length:
             if not self.parallelize:
                 assert len(steps) == len(smiles), "Syntheseus output length mismatch."
             return steps
@@ -265,6 +290,13 @@ class Syntheseus(OracleComponent):
                 if query_smiles == smiles.strip():
                     return True
         return False
+
+    def _get_max_stock_similarity(self, query_smiles: str) -> float:
+        """
+        Get the max Tanimoto similarity of the query SMILES to the building blocks stock.
+        """
+        query_fp = construct_morgan_fingerprint(query_smiles)
+        return np.max([BulkTanimotoSimilarity(query_fp, self.reference_blocks_fps)])
 
     def _write_config(self, dir_path: str) -> None:
         """

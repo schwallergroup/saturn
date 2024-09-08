@@ -190,7 +190,7 @@ class Oracle:
         is_hallucinated_batch: bool
     ) -> Tuple[np.ndarray[str], np.ndarray[float], np.ndarray[str]]:
         """
-        Checks if there are any Cached rewards in a sampled batch of SMILES. 
+        Checks if there are any Cached rewards in a sampled batch of SMILES.
         Also updates trackers for repeated SMILES. If Oracle repeats are permitted, directly return.
         """
         if not self.allow_oracle_repeats:
