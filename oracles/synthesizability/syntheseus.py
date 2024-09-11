@@ -1,4 +1,4 @@
-from typing import Dict, Union
+from typing import Dict, Union, Set
 import os
 import subprocess
 import tempfile
@@ -12,6 +12,7 @@ from rdkit import Chem
 from rdkit.Chem import Mol
 from rdkit.DataStructs import BulkTanimotoSimilarity
 from utils.chemistry_utils import canonicalize_smiles, construct_morgan_fingerprints_batch_from_file, construct_morgan_fingerprint
+from utils.CONSTANTS import FUNCTIONAL_GROUPS
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -60,6 +61,7 @@ class Syntheseus(OracleComponent):
             self.use_tanimoto_similarity = self.parameters.specific_parameters.get("use_tanimoto_similarity", True)  # Whether to use Tanimoto similarity as metric of "matching" to reference blocks
             if self.use_tanimoto_similarity:
                 self.reference_blocks_fps = construct_morgan_fingerprints_batch_from_file(self.enforced_building_blocks_file)
+                self.reference_blocks_functional_groups = self._extract_functional_groups()
 
         # Search time limit
         self.time_limit_s = self.parameters.specific_parameters.get("time_limit_s", 180)  # Default to 3 minutes per molecule
@@ -198,9 +200,11 @@ class Syntheseus(OracleComponent):
                         for node, node_data in route.items():
                             if self.enforce_start:
                                 if node_data["depth"] == max_depth:
-                                    max_tan_sim = max(max_tan_sim, self._get_max_stock_similarity(node_data["smiles"]))
+                                    if self._match_functional_groups(node_data["smiles"]):
+                                        max_tan_sim = max(max_tan_sim, self._get_max_stock_similarity(node_data["smiles"]))
                             else:
-                                max_tan_sim = max(max_tan_sim, self._get_max_stock_similarity(node_data["smiles"]))
+                                if self._match_functional_groups(node_data["smiles"]):
+                                    max_tan_sim = max(max_tan_sim, self._get_max_stock_similarity(node_data["smiles"]))
 
                         tan_sims[idx] = max_tan_sim
 
@@ -341,3 +345,37 @@ class Syntheseus(OracleComponent):
         else:
             # TODO: Support all the models in Syntheseus 
             raise ValueError(f"Model name {model_name} not recognized or not supported yet.")
+
+    # Experimental 
+    def _extract_functional_groups(self) -> Set[str]:
+        """
+        Extract the functional groups from the reference blocks' SMILES.
+        """
+        matched_groups = set()
+
+        # Read the building blocks file
+        with open(self.enforced_building_blocks_file, "r") as f:
+            for smiles in f.readlines():
+                for _, smarts in FUNCTIONAL_GROUPS.items():
+                    pattern = Chem.MolFromSmarts(smarts)
+                    if Chem.MolFromSmiles(smiles).HasSubstructMatch(pattern):
+                        matched_groups.add(smarts)
+        return matched_groups
+
+    def _match_functional_groups(self, query_smiles: str) -> bool:
+        """
+        Check if the query SMILES matches *all* of the functional groups.
+        """
+        query_mol = Chem.MolFromSmiles(query_smiles)
+        query_functional_groups = set()
+        for _, smarts in FUNCTIONAL_GROUPS.items():
+            pattern = Chem.MolFromSmarts(smarts)
+            if query_mol.HasSubstructMatch(pattern):
+                query_functional_groups.add(smarts)
+
+        # Check that at least 75% of the query functional groups are present in the reference functional groups
+        count = 0
+        for fg in query_functional_groups:
+            if fg in self.reference_blocks_functional_groups:
+                count += 1
+        return count >= int(len(query_functional_groups) * 0.75)
