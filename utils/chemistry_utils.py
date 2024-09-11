@@ -79,7 +79,7 @@ def construct_morgan_fingerprints_batch(smiles_batch: np.ndarray[str]):
     fps = [construct_morgan_fingerprint(smiles) for smiles in smiles_batch]
     return fps
 
-def construct_morgan_fingerprints_batch_from_file(file_path: str):
+def construct_morgan_fingerprints_batch_from_file(file_path: str) -> List[np.ndarray[int]]:
     with open(file_path, "r") as f:
         smiles_batch = f.readlines()
     return construct_morgan_fingerprints_batch(smiles_batch)

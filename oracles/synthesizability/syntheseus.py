@@ -1,4 +1,4 @@
-from typing import Dict, Union, Set
+from typing import Dict, Union
 import os
 import subprocess
 import tempfile
@@ -10,9 +10,8 @@ from oracles.oracle_component import OracleComponent
 from oracles.dataclass import OracleComponentParameters
 from rdkit import Chem
 from rdkit.Chem import Mol
-from rdkit.DataStructs import BulkTanimotoSimilarity
-from utils.chemistry_utils import canonicalize_smiles, construct_morgan_fingerprints_batch_from_file, construct_morgan_fingerprint
-from utils.CONSTANTS import FUNCTIONAL_GROUPS
+from utils.chemistry_utils import canonicalize_smiles, construct_morgan_fingerprints_batch_from_file
+from oracles.synthesizability.utils.utils import match_stock, get_max_stock_similarity, extract_functional_groups, matched_fuzzy_substructure, matched_functional_groups
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -60,8 +59,11 @@ class Syntheseus(OracleComponent):
 
             self.use_tanimoto_similarity = self.parameters.specific_parameters.get("use_tanimoto_similarity", True)  # Whether to use Tanimoto similarity as metric of "matching" to reference blocks
             if self.use_tanimoto_similarity:
-                self.reference_blocks_fps = construct_morgan_fingerprints_batch_from_file(self.enforced_building_blocks_file)
-                self.reference_blocks_functional_groups = self._extract_functional_groups()
+                self.enforced_building_blocks_mols = [Chem.MolFromSmiles(line.strip()) for line in open(self.enforced_building_blocks_file, "r").readlines()]
+                self.enforced_building_blocks_fps = construct_morgan_fingerprints_batch_from_file(self.enforced_building_blocks_file)
+                self.enforced_building_blocks_functional_groups = extract_functional_groups(self.enforced_building_blocks_file)
+                self.enforce_functional_groups = self.parameters.specific_parameters.get("enforce_functional_groups", True)
+                self.enforce_fuzzy_substructure = self.parameters.specific_parameters.get("enforce_fuzzy_substructure", True) 
 
         # Search time limit
         self.time_limit_s = self.parameters.specific_parameters.get("time_limit_s", 180)  # Default to 3 minutes per molecule
@@ -193,18 +195,45 @@ class Syntheseus(OracleComponent):
                     assert extraction_result.returncode == 0, f"Error during Syntheseus route data extraction: {extraction_result.stderr}"
                     route = json.loads(extraction_result.stdout)
 
+                    # Check if the generated molecule (at depth = 0) has a fuzzy substructure match to the enforced building blocks
+                    if self.enforce_fuzzy_substructure:
+                        for node, node_data in route.items():
+                            if node_data["depth"] == 0:
+                                if not matched_fuzzy_substructure(
+                                    generated_smiles=canonicalize_smiles(node_data["smiles"]), 
+                                    enforced_blocks=self.enforced_building_blocks_mols
+                                ):
+                                    is_solved[idx] = 0
+                                    steps[idx] = 99
+                                    break
+                        continue
+
                     # Check whether to match by Tanimoto similarity
                     if self.use_tanimoto_similarity:
                         max_tan_sim = 0.0
                         max_depth = self._get_max_depth(route)
                         for node, node_data in route.items():
+                            # Skip root node because this is the generated molecule
+                            if node_data["depth"] == 0:
+                                continue
+                            # If the user specified that enforced building blocks must appear in the *leaf* nodes
                             if self.enforce_start:
-                                if node_data["depth"] == max_depth:
-                                    if self._match_functional_groups(node_data["smiles"]):
-                                        max_tan_sim = max(max_tan_sim, self._get_max_stock_similarity(node_data["smiles"]))
-                            else:
-                                if self._match_functional_groups(node_data["smiles"]):
-                                    max_tan_sim = max(max_tan_sim, self._get_max_stock_similarity(node_data["smiles"]))
+                                # Skip nodes that are not at max depth (leaf nodes)
+                                if not node_data["depth"] == max_depth:
+                                    continue
+                            # Check whether there is sufficient functional groups overlap between the query and enforced building blocks
+                            if self.enforce_functional_groups:
+                                if not matched_functional_groups(
+                                    query_smiles=canonicalize_smiles(node_data["smiles"]), 
+                                    enforced_blocks_functional_groups=self.enforced_building_blocks_functional_groups
+                                ):
+                                    continue
+
+                            # At this point, depending on the user's specifications, the current node may be a combination of the following:
+                            #   1. The generated molecule (root node) has a fuzzy substructure match to the enforced building blocks
+                            #   2. The current node is a leaf node (depth = 0)
+                            #   3. The current node has sufficient functional groups overlap with the enforced building blocks
+                            max_tan_sim = max(max_tan_sim, get_max_stock_similarity(node_data["smiles"], self.enforced_building_blocks_fps))
 
                         tan_sims[idx] = max_tan_sim
 
@@ -213,19 +242,19 @@ class Syntheseus(OracleComponent):
                         is_matched = False
                         max_depth = self._get_max_depth(route)
                         for node, node_data in route.items():
-                            # If the user specified to enforce that the starting building block must appear in the *root* nodes
+                            # Skip root node because this is the generated molecule
+                            if node_data["depth"] == 0:
+                                continue
+                            # If the user specified that enforced building blocks must appear in the *leaf* nodes
                             if self.enforce_start:
-                                if node_data["depth"] == max_depth:
-                                    canonical_smiles = canonicalize_smiles(node_data["smiles"])
-                                    is_matched = self._match_stock(canonical_smiles)
-                                    # TODO: for now, if even 1 *root* node is in the building blocks stock, consider this a success. There can be a parameter later to enforce *all* root nodes
-
+                                if not node_data["depth"] == max_depth:
+                                    continue
                             # Otherwise, just check if *any* node has a matching SMILES in the enforced building blocks file
                             # NOTE: this means that the enforced building blocks appear *somewhere* in the synthesis graph
-                            else:
-                                canonical_smiles = canonicalize_smiles(node_data["smiles"])
-                                is_matched = self._match_stock(canonical_smiles)
-
+                            is_matched = match_stock(
+                                query_smiles=canonicalize_smiles(node_data["smiles"]), 
+                                enforced_building_blocks_file=self.enforced_building_blocks_file
+                            )
                             if is_matched:
                                 break
 
@@ -274,34 +303,6 @@ class Syntheseus(OracleComponent):
                 assert len(output) == len(smiles), "Syntheseus output length mismatch."
             return output
 
-    @staticmethod
-    def _get_max_depth(route: Dict[str, Union[str, int]]) -> int:
-        """
-        Get the maximum depth of the synthesis graph.
-        """
-        max_depth = 0
-        for node, node_data in route.items():
-            max_depth = max(max_depth, node_data["depth"])
-        return max_depth
-
-    def _match_stock(self, query_smiles: str) -> bool:
-        """
-        Check if the query SMILES is in the building blocks stock.
-        """
-        # NOTE: Assumes the building blocks file is already *canonicalized*
-        with open(self.enforced_building_blocks_file, "r") as f:
-            for smiles in f.readlines():
-                if query_smiles == smiles.strip():
-                    return True
-        return False
-
-    def _get_max_stock_similarity(self, query_smiles: str) -> float:
-        """
-        Get the max Tanimoto similarity of the query SMILES to the building blocks stock.
-        """
-        query_fp = construct_morgan_fingerprint(query_smiles)
-        return np.max([BulkTanimotoSimilarity(query_fp, self.reference_blocks_fps)])
-
     def _write_config(self, dir_path: str) -> None:
         """
         Syntheseus can take as input a yaml file for easy execution. Write this yaml file.
@@ -326,6 +327,16 @@ class Syntheseus(OracleComponent):
             yaml.dump(config, f, default_flow_style=False)
 
     @staticmethod
+    def _get_max_depth(route: Dict[str, Union[str, int]]) -> int:
+        """
+        Get the maximum depth of the synthesis graph.
+        """
+        max_depth = 0
+        for node, node_data in route.items():
+            max_depth = max(max_depth, node_data["depth"])
+        return max_depth
+
+    @staticmethod
     def _parse_model_name(model_name: str) -> str:
         """
         Syntheseus expects proper capitalization of the model names. Parse user input and return the correct model name.
@@ -345,37 +356,3 @@ class Syntheseus(OracleComponent):
         else:
             # TODO: Support all the models in Syntheseus 
             raise ValueError(f"Model name {model_name} not recognized or not supported yet.")
-
-    # Experimental 
-    def _extract_functional_groups(self) -> Set[str]:
-        """
-        Extract the functional groups from the reference blocks' SMILES.
-        """
-        matched_groups = set()
-
-        # Read the building blocks file
-        with open(self.enforced_building_blocks_file, "r") as f:
-            for smiles in f.readlines():
-                for _, smarts in FUNCTIONAL_GROUPS.items():
-                    pattern = Chem.MolFromSmarts(smarts)
-                    if Chem.MolFromSmiles(smiles).HasSubstructMatch(pattern):
-                        matched_groups.add(smarts)
-        return matched_groups
-
-    def _match_functional_groups(self, query_smiles: str) -> bool:
-        """
-        Check if the query SMILES matches *all* of the functional groups.
-        """
-        query_mol = Chem.MolFromSmiles(query_smiles)
-        query_functional_groups = set()
-        for _, smarts in FUNCTIONAL_GROUPS.items():
-            pattern = Chem.MolFromSmarts(smarts)
-            if query_mol.HasSubstructMatch(pattern):
-                query_functional_groups.add(smarts)
-
-        # Check that at least 75% of the query functional groups are present in the reference functional groups
-        count = 0
-        for fg in query_functional_groups:
-            if fg in self.reference_blocks_functional_groups:
-                count += 1
-        return count >= int(len(query_functional_groups) * 0.75)
