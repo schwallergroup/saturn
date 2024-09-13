@@ -30,6 +30,7 @@ from oracles.structural.smarts_alerts import SMARTSAlert
 
 # Synthesizability
 from oracles.synthesizability.sa_score import SAScore
+from oracles.synthesizability.rxnmapper_atom_counts import RXNMapperAtomCounts
 from oracles.synthesizability.aizynthfinder import AiZynthFinder
 from oracles.synthesizability.syntheseus import Syntheseus
 
@@ -100,6 +101,8 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
     # Synthesizability
     elif name == "sa_score":
         return SAScore(oracle_component_parameters)
+    elif name == "rxnmapper_atom_counts":
+        return RXNMapperAtomCounts(oracle_component_parameters)
     elif name == "aizynthfinder":
         return AiZynthFinder(oracle_component_parameters)
     elif name == "syntheseus":
