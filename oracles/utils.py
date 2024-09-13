@@ -24,6 +24,8 @@ from oracles.physchem.tpsa import tPSA
 
 # Structural
 from oracles.structural.matching_substructure import MatchingSubstructure
+from oracles.structural.fuzzy_matching_structure import FuzzyMatchingSubstructure
+from oracles.structural.matching_structure_atom_count import MatchingSubstructureAtomCount
 from oracles.structural.smarts_alerts import SMARTSAlert
 
 # Synthesizability
@@ -89,6 +91,10 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
     # Structural
     elif name == "matching_substructure":
         return MatchingSubstructure(oracle_component_parameters)
+    elif name == "fuzzy_matching_substructure":
+        return FuzzyMatchingSubstructure(oracle_component_parameters)
+    elif name == "matching_substructure_atom_count":
+        return MatchingSubstructureAtomCount(oracle_component_parameters)
     elif name == "smarts_alerts":
         return SMARTSAlert(oracle_component_parameters)
     # Synthesizability
