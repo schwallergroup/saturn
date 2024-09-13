@@ -34,7 +34,6 @@ def run_rxnmapper(
             enforced_mol = Chem.MolFromSmiles(enforced_smiles)
             pseudo_rxn = f"{enforced_smiles}>>{gen_smiles}"
             mapped_result = rxn_mapper.get_attention_guided_atom_maps([pseudo_rxn])[0]["mapped_rxn"]
-            print(mapped_result)
 
             precusor, product = mapped_result.split(">>")[0], mapped_result.split(">>")[1]
             precusor_labels, product_labels = extract_atom_labels(precusor), extract_atom_labels(product)
