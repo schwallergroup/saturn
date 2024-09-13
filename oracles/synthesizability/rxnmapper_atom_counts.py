@@ -47,7 +47,7 @@ class RXNMapperAtomCounts(OracleComponent):
             for s in smiles:
                 f.write(f"{s}\n")
 
-        # HACK: This (temporary) solution enables running rxnmapepr *without* installing it into the Saturn environment
+        # HACK: This (temporary) solution enables running rxnmapper *without* installing it into the Saturn environment
         output = subprocess.run([
             "conda", 
             "run", 
