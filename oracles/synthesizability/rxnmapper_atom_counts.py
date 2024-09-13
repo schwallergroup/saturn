@@ -64,9 +64,11 @@ class RXNMapperAtomCounts(OracleComponent):
         # Check for errors
         assert output.returncode == 0, f"Error during rxnmapper execution: {output.stderr}"
         results = output.stdout
-
-        print(results)
+        
+        # Parse results
+        results = results.replace("[", "").replace("]", "").split()
 
         # Clean up the temporary directory
         shutil.rmtree(temp_dir)
-        exit()
+
+        return np.array(results, dtype=np.float32)

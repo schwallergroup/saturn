@@ -43,7 +43,7 @@ def run_rxnmapper(
 
         out.append(max_fraction_mapped_atoms)
 
-    return np.array(out, dtype=np.float32)
+    return np.array(out)
 
 if __name__ == "__main__":
     generated_smiles_path = sys.argv[1] 

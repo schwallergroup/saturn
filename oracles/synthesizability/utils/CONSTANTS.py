@@ -4,7 +4,7 @@ FUNCTIONAL_GROUPS = {
     "Allenic Carbon": "[$([CX2](=C)=C)]",
     "Vinylic Carbon": "[$([CX3]=[CX3])]",
     # Alkynes
-    "cetylenic Carbon": "[$([CX2]#C)]",
+    "Acetylenic Carbon": "[$([CX2]#C)]",
     # Carbonyl-containing
     "Ketone": "[CX3H1](=O)[#6]",
     "Aldehyde": "[CX3H1](=O)[#6]",
@@ -41,7 +41,7 @@ FUNCTIONAL_GROUPS = {
     "Sulfide": "[#16X2H0]",
     "Sulfone": "[$([#16X4](=[OX1])=[OX1]),$([#16X4+2]([OX1-])[OX1-])]",  # Permissive
     "Sulfoxide": "[$([#16X3]=[OX1]),$([#16X3+][OX1-])]",  # Permissive
-    "Sulfate": "[$([#16X4](=[OX1])(=[OX1])([OX2H,OX1H0-])[OX2][#6]),$([#16X4+2]([OX1-])([OX1-])",
+    "Sulfate": "[$([#16X4](=[OX1])(=[OX1])([OX2H,OX1H0-])[OX2][#6]),$([#16X4+2]([OX1-])([OX1-])([OX2H,OX1H0-])[OX2][#6])]",
     "Sulfamic Acid": "[$([#16X4]([NX3])(=[OX1])(=[OX1])[OX2H,OX1H0-]),$([#16X4+2]([NX3])([OX1-])([OX1-])[OX2H,OX1H0-])]",
     # Halide
     "Halide attached to Carbon": "[#6][F,Cl,Br,I]"
