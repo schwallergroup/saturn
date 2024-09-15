@@ -197,6 +197,7 @@ class Syntheseus(OracleComponent):
 
                     # Check if the generated molecule (at depth = 0) has a fuzzy substructure match to the enforced building blocks
                     if self.enforce_fuzzy_substructure:
+                        fuzzy_substructure_match = True
                         for node, node_data in route.items():
                             if node_data["depth"] == 0:
                                 if not matched_fuzzy_substructure(
@@ -205,8 +206,10 @@ class Syntheseus(OracleComponent):
                                 ):
                                     is_solved[idx] = 0
                                     steps[idx] = 99
+                                    fuzzy_substructure_match = False
                                     break
-                        continue
+                        if not fuzzy_substructure_match:
+                            continue
 
                     # Check whether to match by Tanimoto similarity
                     if self.use_tanimoto_similarity:

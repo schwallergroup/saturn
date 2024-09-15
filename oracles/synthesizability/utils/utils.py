@@ -82,7 +82,7 @@ def matched_functional_groups(
     threshold: float = 0.75
 ) -> bool:
     """
-    Check if the query SMILES matches threshold %of the functional groups.
+    Check if the query SMILES matches threshold % of the functional groups.
     """
     query_mol = Chem.MolFromSmiles(query_smiles)
     query_functional_groups = set()
