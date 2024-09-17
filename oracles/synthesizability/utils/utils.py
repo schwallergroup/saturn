@@ -1,4 +1,4 @@
-from typing import List, Set
+from typing import List, Union, Dict, Set
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem import Mol
@@ -61,20 +61,31 @@ def matched_fuzzy_substructure(
             return True
     return False
 
-def extract_functional_groups(enforced_building_blocks_file: str) -> Set[str]:
+def extract_functional_groups(smiles: Union[str, List[str]]) -> Union[List[str], Dict[str, List[str]]]:
     """
-    Extract the functional groups from the reference blocks' SMILES.
+    Extract the functional groups present in the given SMILES or SMILES list.
     """
-    matched_groups = set()
-
-    # Read the building blocks file
-    with open(enforced_building_blocks_file, "r") as f:
-        for smiles in f.readlines():
-            for _, smarts in FUNCTIONAL_GROUPS.items():
-                pattern = Chem.MolFromSmarts(smarts)
-                if Chem.MolFromSmiles(smiles).HasSubstructMatch(pattern):
-                    matched_groups.add(smarts)
-    return matched_groups
+    if isinstance(smiles, str):
+        mol = Chem.MolFromSmiles(smiles)
+        functional_groups_present = []
+        for fg_name, fg_smarts in FUNCTIONAL_GROUPS.items():
+            pattern = Chem.MolFromSmarts(fg_smarts)
+            if mol.HasSubstructMatch(pattern):
+                functional_groups_present.append(fg_name)
+        return functional_groups_present
+    elif isinstance(smiles, list):
+        mols = [Chem.MolFromSmiles(s) for s in smiles]
+        functional_groups_present = {}
+        for smiles, mol in zip(smiles, mols):
+            current_fg_present = []
+            for fg_name, fg_smarts in FUNCTIONAL_GROUPS.items():
+                pattern = Chem.MolFromSmarts(fg_smarts)
+                if mol.HasSubstructMatch(pattern):
+                    current_fg_present.append(fg_name)
+            functional_groups_present[smiles] = current_fg_present
+        return functional_groups_present
+    else:
+        raise ValueError("Invalid input type for smiles. Please provide a single SMILES or a list of SMILES.")
 
 def matched_functional_groups(
     query_smiles: str, 
@@ -97,3 +108,38 @@ def matched_functional_groups(
         if fg in enforced_blocks_functional_groups:
             count += 1
     return count > int(len(query_functional_groups) * threshold)
+
+def functional_groups_overlap(
+    query_smiles: str, 
+    enforced_blocks_functional_groups: Dict[str, List[str]], 
+) -> float:
+    """
+    Calculate the *mean* of the max fraction of overlap between the query SMILES and each enforced blocks' functional groups.
+    """
+    max_fraction_overlaps = []
+    query_functional_groups = set(extract_functional_groups(query_smiles))
+    for _, fgs in enforced_blocks_functional_groups.items():
+        fgs_set = set(fgs)
+        overlap = len(query_functional_groups.intersection(fgs_set)) / len(fgs_set)
+        max_fraction_overlaps.append(overlap)
+
+    return sum(max_fraction_overlaps) / len(max_fraction_overlaps)
+
+def tango_reward(
+    query_smiles: str, 
+    enforce_blocks_fps: List[np.ndarray[int]],
+    enforced_blocks_functional_groups: Dict[str, List[str]]
+) -> float:
+    """
+    Calculate the linear combination of the max stock similarity and the mean of the max functional groups overlap.
+    """
+    tanimoto_similarity = get_max_stock_similarity(
+        query_smiles=query_smiles, 
+        enforced_building_blocks_fps=enforce_blocks_fps
+    )
+    fg_overlap = functional_groups_overlap(
+        query_smiles=query_smiles, 
+        enforced_blocks_functional_groups=enforced_blocks_functional_groups
+    )
+    # Divide by 2 so Reward is in [0,1]
+    return (tanimoto_similarity / 2) + (fg_overlap / 2)

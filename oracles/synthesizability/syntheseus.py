@@ -11,7 +11,7 @@ from oracles.dataclass import OracleComponentParameters
 from rdkit import Chem
 from rdkit.Chem import Mol
 from utils.chemistry_utils import canonicalize_smiles, construct_morgan_fingerprints_batch_from_file
-from oracles.synthesizability.utils.utils import match_stock, get_max_stock_similarity, extract_functional_groups, matched_fuzzy_substructure, matched_functional_groups
+from oracles.synthesizability.utils.utils import match_stock, get_max_stock_similarity, extract_functional_groups, functional_groups_overlap, tango_reward, matched_fuzzy_substructure, matched_functional_groups
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -57,22 +57,21 @@ class Syntheseus(OracleComponent):
 
             self.enforce_start = self.parameters.specific_parameters.get("enforce_start", False)  # Whether to enforce that the reference blocks appear in the root nodes
 
-            self.use_tanimoto_similarity = self.parameters.specific_parameters.get("use_tanimoto_similarity", True)  # Whether to use Tanimoto similarity as metric of "matching" to reference blocks
-            if self.use_tanimoto_similarity:
+            self.use_dense_reward = self.parameters.specific_parameters.get("use_dense_reward", True)  # Whether to use a Dense Reward formulation
+            if self.use_dense_reward:
                 self.enforced_building_blocks_mols = [Chem.MolFromSmiles(line.strip()) for line in open(self.enforced_building_blocks_file, "r").readlines()]
                 self.enforced_building_blocks_fps = construct_morgan_fingerprints_batch_from_file(self.enforced_building_blocks_file)
-                self.enforced_building_blocks_functional_groups = extract_functional_groups(self.enforced_building_blocks_file)
-                self.enforce_functional_groups = self.parameters.specific_parameters.get("enforce_functional_groups", True)
-                self.enforce_fuzzy_substructure = self.parameters.specific_parameters.get("enforce_fuzzy_substructure", True) 
+                self.enforced_building_blocks_functional_groups = extract_functional_groups([smiles for smiles in open(self.enforced_building_blocks_file, "r").readlines()])  # Dict[str, List[str]] (SMILES: Functional Groups)
+                self.reward_type = self.parameters.specific_parameters.get("reward_type", "tango")
+                assert self.reward_type in ["tanimoto_similarity", "functional_groups", "tango"], "Please provide a valid reward type from ['tanimoto_similarity', 'functional_groups', 'tango']."
 
         # Search time limit
         self.time_limit_s = self.parameters.specific_parameters.get("time_limit_s", 180)  # Default to 3 minutes per molecule
 
         # Output directory
-        output_dir = self.parameters.specific_parameters.get("results_dir", None)
-        assert output_dir not in [None, ""], "Please provide the path to the output directory."
-        os.makedirs(output_dir, exist_ok=True)
-        self.output_dir = output_dir
+        self.output_dir = self.parameters.specific_parameters.get("results_dir", None)
+        assert self.output_dir not in [None, ""], "Please provide the path to the output directory."
+        os.makedirs(self.output_dir, exist_ok=True)
 
         # HACK: Save the SMILES order of the given batch to use as a mapping to serve Syntheseus route output
         #       This is necessary because if Syntheseus is parallelized, then the SMILES batch is chunked
@@ -158,7 +157,7 @@ class Syntheseus(OracleComponent):
         is_solved = np.zeros(len(smiles))
         steps = np.zeros(len(smiles))
         steps.fill(99)
-        tan_sims = np.zeros(len(smiles))
+        node_rewards = np.zeros(len(smiles))
         try:
             # Syntheseus output is tagged by the reaction model name
             output_results_dir = [folder for folder in os.listdir(os.path.join(temp_dir)) if self.reaction_model in folder][0]
@@ -195,25 +194,9 @@ class Syntheseus(OracleComponent):
                     assert extraction_result.returncode == 0, f"Error during Syntheseus route data extraction: {extraction_result.stderr}"
                     route = json.loads(extraction_result.stdout)
 
-                    # Check if the generated molecule (at depth = 0) has a fuzzy substructure match to the enforced building blocks
-                    if self.enforce_fuzzy_substructure:
-                        fuzzy_substructure_match = True
-                        for node, node_data in route.items():
-                            if node_data["depth"] == 0:
-                                if not matched_fuzzy_substructure(
-                                    generated_smiles=canonicalize_smiles(node_data["smiles"]), 
-                                    enforced_blocks=self.enforced_building_blocks_mols
-                                ):
-                                    is_solved[idx] = 0
-                                    steps[idx] = 99
-                                    fuzzy_substructure_match = False
-                                    break
-                        if not fuzzy_substructure_match:
-                            continue
-
                     # Check whether to match by Tanimoto similarity
-                    if self.use_tanimoto_similarity:
-                        max_tan_sim = 0.0
+                    if self.use_dense_reward:
+                        max_reward = 0.0
                         max_depth = self._get_max_depth(route)
                         for node, node_data in route.items():
                             # Skip root node because this is the generated molecule
@@ -224,21 +207,29 @@ class Syntheseus(OracleComponent):
                                 # Skip nodes that are not at max depth (leaf nodes)
                                 if not node_data["depth"] == max_depth:
                                     continue
-                            # Check whether there is sufficient functional groups overlap between the query and enforced building blocks
-                            if self.enforce_functional_groups:
-                                if not matched_functional_groups(
-                                    query_smiles=canonicalize_smiles(node_data["smiles"]), 
+                            # Compute the specified node reward
+                            #   1. Max Tanimoto similarity to the enforced building blocks
+                            #   2. Mean Functional Groups overlap to the enforced building blocks
+                            #   3. Linear combination of Max Tanimoto similarity and Mean Functional Groups overlap
+                            if self.reward_type == "tanimoto_similarity":
+                                reward = get_max_stock_similarity(
+                                    query_smiles=canonicalize_smiles(node_data["smiles"]),
+                                    enforced_building_blocks_fps=self.enforced_building_blocks_fps
+                                )
+                            elif self.reward_type == "functional_groups":
+                                reward = functional_groups_overlap(
+                                    query_smiles=canonicalize_smiles(node_data["smiles"]),
                                     enforced_blocks_functional_groups=self.enforced_building_blocks_functional_groups
-                                ):
-                                    continue
-
-                            # At this point, depending on the user's specifications, the current node may be a combination of the following:
-                            #   1. The generated molecule (root node) has a fuzzy substructure match to the enforced building blocks
-                            #   2. The current node is a leaf node (depth = 0)
-                            #   3. The current node has sufficient functional groups overlap with the enforced building blocks
-                            max_tan_sim = max(max_tan_sim, get_max_stock_similarity(node_data["smiles"], self.enforced_building_blocks_fps))
-
-                        tan_sims[idx] = max_tan_sim
+                                )
+                            elif self.reward_type == "tango":
+                                reward = tango_reward(
+                                    query_smiles=canonicalize_smiles(node_data["smiles"]),
+                                    enforce_blocks_fps=self.enforced_building_blocks_fps,
+                                    enforced_blocks_functional_groups=self.enforced_building_blocks_functional_groups
+                                )
+                            max_reward = max(max_reward, reward)
+                        
+                        node_rewards[idx] = max_reward
 
                     # Otherwise, match *exactly*
                     else:
@@ -284,15 +275,16 @@ class Syntheseus(OracleComponent):
             is_solved = np.zeros(len(smiles))
             steps = np.zeros(len(smiles))
             steps.fill(99)
+            node_rewards = np.zeros(len(smiles))
 
         # 8. Delete the temporary directory and Syntheseus output
         shutil.rmtree(temp_dir)
 
         # 9. Prepare and/or return the output
-        if self.use_tanimoto_similarity:
+        if self.use_dense_reward:
             if not self.parallelize:
-                assert len(tan_sims) == len(smiles), "Syntheseus output length mismatch."
-            return tan_sims
+                assert len(node_rewards) == len(smiles), "Syntheseus output length mismatch."
+            return node_rewards
         elif self.optimize_path_length:
             if not self.parallelize:
                 assert len(steps) == len(smiles), "Syntheseus output length mismatch."
