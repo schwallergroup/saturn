@@ -5,7 +5,6 @@ Adapted from https://github.com/MolecularAI/Reinvent/input.py.
 """
 import json
 import argparse
-import torch
 from utils.utils import set_seed_everywhere
 
 # Distribution Learning
@@ -59,9 +58,9 @@ if __name__ == "__main__":
     if running_mode == "distribution_learning":
         # 1. Construct the Distribution Learning Trainer
         distribution_learning_trainer = DistributionLearningTrainer(
-            config["logging"]["logging_path"],
-            config["logging"]["model_checkpoints_dir"],
-            DistributionLearningConfiguration(
+            logging_path=config["logging"]["logging_path"],
+            model_checkpoints_dir=config["logging"]["model_checkpoints_dir"],
+            configuration=DistributionLearningConfiguration(
                 seed,
                 model_architecture,
                 **config["distribution_learning"]["parameters"])
@@ -75,8 +74,9 @@ if __name__ == "__main__":
 
         # 2. Construct the Reinforcement Learning Agent
         reinforcement_learning_agent = ReinforcementLearningAgent(
-            config["logging"]["logging_path"],
-            config["logging"]["model_checkpoints_dir"],
+            logging_frequency=config["logging"]["logging_frequency"],
+            logging_path=config["logging"]["logging_path"],
+            model_checkpoints_dir=config["logging"]["model_checkpoints_dir"],
             oracle=oracle,
             configuration=GoalDirectedGenerationConfiguration(
                 seed,

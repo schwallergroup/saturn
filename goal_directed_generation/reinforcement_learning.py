@@ -29,7 +29,8 @@ class ReinforcementLearningAgent:
     RL agent for goal-directed generation.
     """
     def __init__(
-        self, 
+        self,
+        logging_frequency: int,
         logging_path: str,
         model_checkpoints_dir: str,
         oracle: Oracle,
@@ -94,6 +95,8 @@ class ReinforcementLearningAgent:
         self.model_checkpoints_dir = model_checkpoints_dir
         os.makedirs(self.model_checkpoints_dir, exist_ok=True)
         self.logging_path = logging_path
+        self.logging_frequency = logging_frequency
+        self.logging_multiple = 1
         # Set up logging
         setup_logging(logging_path)
   
@@ -190,6 +193,13 @@ class ReinforcementLearningAgent:
                     augmented_memory_loss = self.compute_loss(randomized_buffer_smiles, randomized_buffer_rewards)
                     loss = torch.cat((loss, augmented_memory_loss), 0)
                     self.backpropagate(loss)
+
+            # 16. Intermediate results write-out
+            if self.oracle.calls > self.logging_frequency * self.logging_multiple:
+                logging.info(f"Logging intermediate results at {self.oracle.calls} oracle calls.")
+                self.write_out_results()
+                self.agent.save(os.path.join(self.model_checkpoints_dir, f"{self.agent.model_architecture}_{self.oracle.calls}_agent.ckpt"))
+                self.logging_multiple += 1
 
         logging.info(f"Budget reached - final oracle calls: {self.oracle.calls}/{self.oracle.budget}")
         self.write_out_results()
