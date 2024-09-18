@@ -61,7 +61,9 @@ class Syntheseus(OracleComponent):
             if self.use_dense_reward:
                 self.enforced_building_blocks_mols = [Chem.MolFromSmiles(line.strip()) for line in open(self.enforced_building_blocks_file, "r").readlines()]
                 self.enforced_building_blocks_fps = construct_morgan_fingerprints_batch_from_file(self.enforced_building_blocks_file)
-                self.enforced_building_blocks_functional_groups = extract_functional_groups([smiles for smiles in open(self.enforced_building_blocks_file, "r").readlines()])  # Dict[str, List[str]] (SMILES: Functional Groups)
+                self.enforced_building_blocks_functional_groups = extract_functional_groups(
+                    [canonicalize_smiles(smiles.strip()) for smiles in open(self.enforced_building_blocks_file, "r").readlines()]
+                )  # Dict[str, List[str]] (SMILES: Functional Groups)
                 self.reward_type = self.parameters.specific_parameters.get("reward_type", "tango")
                 assert self.reward_type in ["tanimoto_similarity", "functional_groups", "tango"], "Please provide a valid reward type from ['tanimoto_similarity', 'functional_groups', 'tango']."
 
@@ -77,6 +79,9 @@ class Syntheseus(OracleComponent):
         #       This is necessary because if Syntheseus is parallelized, then the SMILES batch is chunked
         #       The order is lost as the count would start from 0 for each chunk
         self.smiles = None
+
+        # Temporary
+        self.matched_generated_smiles = dict()
 
     def __call__(
         self, 
@@ -177,6 +182,10 @@ class Syntheseus(OracleComponent):
 
                 # If the molecule is solved *and* the user specified to enforce that a set of building blocks appears in the synthesis graph
                 if self.enforce_blocks and int(is_solved[idx]) == 1:
+
+                    if oracle_calls not in self.matched_generated_smiles:
+                        self.matched_generated_smiles[oracle_calls] = []
+
                     # Read the route data from the pickle file
                     # HACK: This (temporary) solution enables reading the pickled data *without* installing Syntheseus into the Saturn environment
                     extraction_result = subprocess.run([
@@ -201,6 +210,7 @@ class Syntheseus(OracleComponent):
                         for node, node_data in route.items():
                             # Skip root node because this is the generated molecule
                             if node_data["depth"] == 0:
+                                generated_smiles = canonicalize_smiles(node_data["smiles"])
                                 continue
                             # If the user specified that enforced building blocks must appear in the *leaf* nodes
                             if self.enforce_start:
@@ -228,7 +238,17 @@ class Syntheseus(OracleComponent):
                                     enforced_blocks_functional_groups=self.enforced_building_blocks_functional_groups
                                 )
                             max_reward = max(max_reward, reward)
-                        
+
+                            # Check if exact match
+                            is_matched = match_stock(
+                                query_smiles=canonicalize_smiles(node_data["smiles"]),
+                                enforced_building_blocks_file=self.enforced_building_blocks_file
+                            )
+                            if is_matched:
+                                self.matched_generated_smiles[oracle_calls].append(generated_smiles)
+                            with open(os.path.join(self.output_dir, "matched_generated_smiles.json"), "w") as f:
+                                json.dump(self.matched_generated_smiles, f, indent=4)
+
                         node_rewards[idx] = max_reward
 
                     # Otherwise, match *exactly*
