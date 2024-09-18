@@ -114,16 +114,16 @@ def functional_groups_overlap(
     enforced_blocks_functional_groups: Dict[str, List[str]], 
 ) -> float:
     """
-    Calculate the *mean* of the max fraction of overlap between the query SMILES and each enforced blocks' functional groups.
+    Calculate the *mean* of the fraction of overlap between the query SMILES and each enforced blocks' functional groups.
     """
-    max_fraction_overlaps = []
+    fraction_overlaps = []
     query_functional_groups = set(extract_functional_groups(query_smiles))
     for _, fgs in enforced_blocks_functional_groups.items():
         fgs_set = set(fgs)
         overlap = len(query_functional_groups.intersection(fgs_set)) / len(fgs_set)
-        max_fraction_overlaps.append(overlap)
+        fraction_overlaps.append(overlap)
 
-    return sum(max_fraction_overlaps) / len(max_fraction_overlaps)
+    return sum(fraction_overlaps) / len(fraction_overlaps)
 
 def tango_reward(
     query_smiles: str, 
