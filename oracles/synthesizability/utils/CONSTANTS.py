@@ -11,6 +11,7 @@ FUNCTIONAL_GROUPS = {
     "Carboxylic Acid": "[CX3](=O)[OX2H1]",
     "Acyl Halide": "[CX3](=[OX1])[F,Cl,Br,I]",
     "Amide": "[NX3][CX3](=[OX1])[#6]",
+    "Urea (Carbamide)": "[NX3][CX3](=[OX1])[NX3]",
     "Ester and Anhydride": "[#6][CX3](=O)[OX2H0][#6]",
     "Carbamate": "[NX3,NX4+][CX3](=[OX1])[OX2,OX1-]",
     # Ether
@@ -18,7 +19,11 @@ FUNCTIONAL_GROUPS = {
     "Epoxide": "C1OC1",
     # Amino-groups
     "Primary Amine (and not Amide)": "[NX3;H2;!$(NC=[!#6]);!$(NC#[!#6])][#6]",
-    "Two Primary Amines or Secondary Amine": "[NX3;H2,H1;!$(NC=O)].[NX3;H2,H1;!$(NC=O)]",
+    "Two Primary Amines": "[NX3;H2,H1;!$(NC=O)].[NX3;H2,H1;!$(NC=O)]",
+    "Secondary Amine and not Amide": "[NX3;H2,H1;!$(NC=O)]",
+    "Secondary Amine": "[NX3;H2,H1]",
+    "Tertiary Amine and not Amide": "[NX3;H0;!$(NC=O)]",
+    "Tertiary Amine": "[NX3;H0]",
     # Imine
     "Substituted or Unsubstituted Imine": "[$([CX3]([#6])[#6]),$([CX3H][#6])]=[$([NX2][#6]),$([NX2H])]",
     # Imide
