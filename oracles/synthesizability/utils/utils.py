@@ -125,13 +125,36 @@ def functional_groups_overlap(
 
     return sum(fraction_overlaps) / len(fraction_overlaps)
 
+def fuzzy_matching_substructure(
+    query_smiles: str, 
+    enforced_blocks_functional_groups: Dict[str, List[str]], 
+) -> float:
+    """
+    Calculate the *max* substructure overlap between the query SMILES and each enforced block.
+    """
+    query_mol = Chem.MolFromSmiles(query_smiles)
+    enforced_blocks_mols = [Chem.MolFromSmiles(smiles) for smiles in enforced_blocks_functional_groups.keys()]
+    max_mcs_atoms = 0
+    for block_mol in enforced_blocks_mols:
+        # Perform MCS (find Maximum Common Substructure)
+        mcs_result = rdFMCS.FindMCS(
+                mols=[query_mol, block_mol], 
+                matchChiralTag=True, 
+                bondCompare=rdFMCS.BondCompare.CompareOrderExact, 
+                ringCompare=rdFMCS.RingCompare.StrictRingFusion, 
+                completeRingsOnly=True
+            ) 
+        max_mcs_atoms = max(max_mcs_atoms, (mcs_result.numAtoms / block_mol.GetNumAtoms()))
+    return max_mcs_atoms
+    
 def tango_reward(
     query_smiles: str, 
     enforce_blocks_fps: List[np.ndarray[int]],
-    enforced_blocks_functional_groups: Dict[str, List[str]]
+    enforced_blocks_functional_groups: Dict[str, List[str]],
+    reward_type: str,
 ) -> float:
     """
-    Calculate the linear combination of the max stock similarity and the mean of the max functional groups overlap.
+    Calculate all TANGO rewards.
     """
     tanimoto_similarity = get_max_stock_similarity(
         query_smiles=query_smiles, 
@@ -141,5 +164,16 @@ def tango_reward(
         query_smiles=query_smiles, 
         enforced_blocks_functional_groups=enforced_blocks_functional_groups
     )
-    # Divide by 2 so Reward is in [0,1]
-    return (tanimoto_similarity / 2) + (fg_overlap / 2)
+    fms_overlap = fuzzy_matching_substructure(
+        query_smiles=query_smiles, 
+        enforced_blocks_functional_groups=enforced_blocks_functional_groups
+    )
+    if reward_type == "tango_fg":
+        # Divide by 2 so Reward is in [0,1]
+        return (tanimoto_similarity / 2) + (fg_overlap / 2)
+    elif reward_type == "tango_fms":
+        # Divide by 2 so Reward is in [0,1]
+        return (tanimoto_similarity / 2) + (fms_overlap / 2)
+    elif reward_type == "tango_all":
+        # Divide by 3 so Reward is in [0,1]
+        return (tanimoto_similarity / 3) + (fg_overlap / 3) + (fms_overlap / 3)
