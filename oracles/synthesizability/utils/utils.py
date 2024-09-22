@@ -152,10 +152,15 @@ def tango_reward(
     enforce_blocks_fps: List[np.ndarray[int]],
     enforced_blocks_functional_groups: Dict[str, List[str]],
     reward_type: str,
+    tango_weights: Dict[str, float]
 ) -> float:
     """
     Calculate all TANGO rewards.
     """
+    tanimoto_weight = tango_weights["tanimoto"]
+    fg_weight = tango_weights["fg"]
+    fms_weight = tango_weights["fms"]
+
     tanimoto_similarity = get_max_stock_similarity(
         query_smiles=query_smiles, 
         enforced_building_blocks_fps=enforce_blocks_fps
@@ -169,11 +174,11 @@ def tango_reward(
         enforced_blocks_functional_groups=enforced_blocks_functional_groups
     )
     if reward_type == "tango_fg":
-        # Divide by 2 so Reward is in [0,1]
-        return (tanimoto_similarity / 2) + (fg_overlap / 2)
+        assert tanimoto_weight + fg_weight == 1, "TANGO-FG weights must sum to 1."
+        return (tanimoto_similarity * tanimoto_weight) + (fg_overlap * fg_weight)
     elif reward_type == "tango_fms":
-        # Divide by 2 so Reward is in [0,1]
-        return (tanimoto_similarity / 2) + (fms_overlap / 2)
+        assert tanimoto_weight + fms_weight == 1, "TANGO-FMS weights must sum to 1."
+        return (tanimoto_similarity * tanimoto_weight) + (fms_overlap * fms_weight)
     elif reward_type == "tango_all":
-        # Divide by 3 so Reward is in [0,1]
-        return (tanimoto_similarity / 3) + (fg_overlap / 3) + (fms_overlap / 3)
+        assert abs((tanimoto_weight + fg_weight + fms_weight) - 1) < 1e-3, "TANGO-All weights must sum to 1 within a few decimal points."
+        return (tanimoto_similarity * tanimoto_weight) + (fg_overlap * fg_weight) + (fms_overlap * fms_weight)

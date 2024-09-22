@@ -67,6 +67,9 @@ class Syntheseus(OracleComponent):
                 self.reward_type = self.parameters.specific_parameters.get("reward_type", "tango_fms")
                 assert self.reward_type in ["tanimoto_similarity", "functional_groups", "fuzzy_ms", "tango_fg", "tango_fms", "tango_all"], \
                     "Please provide a valid reward type from ['tanimoto_similarity', 'functional_groups', 'fuzzy_ms', 'tango_fg', 'tango_fms', 'tango_all']."
+                if "tango" in self.reward_type:
+                    self.tango_weights = self.parameters.specific_parameters.get("tango_weights", None)
+                    assert self.tango_weights is not None, "Please provide TANGO weights."
 
         # Search time limit
         self.time_limit_s = self.parameters.specific_parameters.get("time_limit_s", 180)  # Default to 3 minutes per molecule
@@ -245,7 +248,8 @@ class Syntheseus(OracleComponent):
                                     query_smiles=canonicalize_smiles(node_data["smiles"]),
                                     enforce_blocks_fps=self.enforced_building_blocks_fps,
                                     enforced_blocks_functional_groups=self.enforced_building_blocks_functional_groups,
-                                    reward_type=self.reward_type
+                                    reward_type=self.reward_type,
+                                    tango_weights=self.tango_weights
                                 )
 
                             max_reward = max(max_reward, reward)
