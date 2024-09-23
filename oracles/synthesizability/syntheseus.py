@@ -212,9 +212,13 @@ class Syntheseus(OracleComponent):
                         max_reward = 0.0
                         max_depth = self._get_max_depth(route)
                         for node, node_data in route.items():
-                            # Skip root node because this is the generated molecule
+                            # First extract the generated molecule
                             if node_data["depth"] == 0:
                                 generated_smiles = canonicalize_smiles(node_data["smiles"])
+                                break
+                        for node, node_data in route.items():
+                            # Skip root node because this is the generated molecule
+                            if node_data["depth"] == 0:
                                 continue
                             # If the user specified that enforced building blocks must appear in the *leaf* nodes
                             if self.enforce_start:
