@@ -14,6 +14,8 @@ from utils.chemistry_utils import canonicalize_smiles, construct_morgan_fingerpr
 from oracles.synthesizability.utils.utils import match_stock, extract_functional_groups, get_node_reward
 from concurrent.futures import ThreadPoolExecutor
 
+from oracles.synthesizability.utils.enforced_blocks_df.dataclass import EnforcedBlocksDiversityFilterParameters
+from oracles.synthesizability.utils.enforced_blocks_df.enforced_blocks_diversity_filter import EnforcedBlocksDiversityFilter
 
 
 class Syntheseus(OracleComponent):
@@ -70,6 +72,15 @@ class Syntheseus(OracleComponent):
                 if "tango" in self.reward_type:
                     self.tango_weights = self.parameters.specific_parameters.get("tango_weights", None)
                     assert self.tango_weights is not None, "Please provide TANGO weights."
+
+                # Enforced blocks diversity filter
+                if self.parameters.specific_parameters.get("use_enforced_blocks_diversity_filter"):
+                    self.enforced_blocks_diversity_filter = EnforcedBlocksDiversityFilter(
+                        EnforcedBlocksDiversityFilterParameters(
+                            enforced_building_blocks_file=self.enforced_building_blocks_file,
+                            bucket_size=self.parameters.specific_parameters.get("bucket_size", 300)
+                        )
+                    )
 
         # Search time limit
         self.time_limit_s = self.parameters.specific_parameters.get("time_limit_s", 180)  # Default to 3 minutes per molecule
@@ -235,13 +246,17 @@ class Syntheseus(OracleComponent):
                             )
                             max_reward = max(max_reward, node_reward)
                             # Check if exact match
-                            is_matched = match_stock(
+                            is_matched, matched_block_smiles = match_stock(
                                 query_smiles=canonicalize_smiles(node_data["smiles"]),
                                 enforced_building_blocks_file=self.enforced_building_blocks_file
                             )
                             if is_matched:
                                 if generated_smiles not in self.matched_generated_smiles[oracle_calls]:
                                     self.matched_generated_smiles[oracle_calls].append(generated_smiles)
+                                    # Penalize first and then update the enforced blocks diversity filter
+                                    max_reward = self.enforced_blocks_diversity_filter.penalize_reward(matched_block_smiles, max_reward)
+                                    self.enforced_blocks_diversity_filter.update(matched_block_smiles)
+
                             with open(os.path.join(self.output_dir, "matched_generated_smiles.json"), "w") as f:
                                 json.dump(self.matched_generated_smiles, f, indent=4)
 
@@ -261,7 +276,7 @@ class Syntheseus(OracleComponent):
                                     continue
                             # Otherwise, just check if *any* node has a matching SMILES in the enforced building blocks file
                             # NOTE: this means that the enforced building blocks appear *somewhere* in the synthesis graph
-                            is_matched = match_stock(
+                            is_matched, matched_block_smiles = match_stock(
                                 query_smiles=canonicalize_smiles(node_data["smiles"]), 
                                 enforced_building_blocks_file=self.enforced_building_blocks_file
                             )

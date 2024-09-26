@@ -1,4 +1,4 @@
-from typing import List, Union, Dict, Set
+from typing import List, Union, Dict, Set, Tuple
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem import Mol
@@ -11,15 +11,16 @@ from oracles.synthesizability.utils.CONSTANTS import FUNCTIONAL_GROUPS
 def match_stock(
     query_smiles: str, 
     enforced_building_blocks_file: str
-) -> bool:
+) -> Tuple[bool, str]:
     """
     Check if the query SMILES is in the building blocks stock.
     """
     with open(enforced_building_blocks_file, "r") as f:
         for smiles in f.readlines():
-            if query_smiles == canonicalize_smiles(smiles.strip()):
-                return True
-    return False
+            canonicalized_block_smiles = canonicalize_smiles(smiles.strip())
+            if query_smiles == canonicalized_block_smiles:
+                return True, canonicalized_block_smiles
+    return False, None
 
 def get_max_stock_similarity(
     query_smiles: str, 
@@ -199,7 +200,7 @@ def get_node_reward(
         4. TANGO-FG: *Max* Tanimoto similarity + *Mean* Functional Groups overlap
         5. TANGO-FMS: *Max* Tanimoto similarity + *Max* Fuzzy Matching Substructure
         6. TANGO-All: *Max* Tanimoto similarity + *Mean* Functional Groups overlap + *Max* Fuzzy Matching Substructure
-        
+
     """
     if reward_type == "tanimoto_similarity":
         reward = get_max_stock_similarity(
