@@ -182,3 +182,46 @@ def tango_reward(
     elif reward_type == "tango_all":
         assert abs((tanimoto_weight + fg_weight + fms_weight) - 1) < 1e-3, "TANGO-All weights must sum to 1 within a few decimal points."
         return (tanimoto_similarity * tanimoto_weight) + (fg_overlap * fg_weight) + (fms_overlap * fms_weight)
+
+def get_node_reward(
+    reward_type: str,
+    query_smiles: str,
+    enforce_blocks_fps: List[np.ndarray[int]],
+    enforced_blocks_functional_groups: Dict[str, List[str]],
+    tango_weights: Dict[str, float]
+) -> float:
+    """
+    Calculate the reward for a given node:
+
+        1. *Max* Tanimoto similarity to the enforced building blocks
+        2. *Mean* Functional Groups overlap to the enforced building blocks
+        3. *Max* Fuzzy Matching Substructure to the enforced building blocks
+        4. TANGO-FG: *Max* Tanimoto similarity + *Mean* Functional Groups overlap
+        5. TANGO-FMS: *Max* Tanimoto similarity + *Max* Fuzzy Matching Substructure
+        6. TANGO-All: *Max* Tanimoto similarity + *Mean* Functional Groups overlap + *Max* Fuzzy Matching Substructure
+        
+    """
+    if reward_type == "tanimoto_similarity":
+        reward = get_max_stock_similarity(
+            query_smiles=query_smiles,
+            enforced_building_blocks_fps=enforce_blocks_fps
+        )
+    elif reward_type == "functional_groups":
+        reward = functional_groups_overlap(
+            query_smiles=query_smiles,
+            enforced_blocks_functional_groups=enforced_blocks_functional_groups
+        )
+    elif reward_type == "fuzzy_ms":
+        reward = fuzzy_matching_substructure(
+            query_smiles=query_smiles,
+            enforced_blocks_functional_groups=enforced_blocks_functional_groups
+        )
+    elif "tango" in reward_type:
+        reward = tango_reward(
+            query_smiles=query_smiles,
+            enforce_blocks_fps=enforce_blocks_fps,
+            enforced_blocks_functional_groups=enforced_blocks_functional_groups,
+            reward_type=reward_type,
+            tango_weights=tango_weights
+        )
+    return reward

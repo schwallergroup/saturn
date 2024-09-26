@@ -11,7 +11,7 @@ from oracles.dataclass import OracleComponentParameters
 from rdkit import Chem
 from rdkit.Chem import Mol
 from utils.chemistry_utils import canonicalize_smiles, construct_morgan_fingerprints_batch_from_file
-from oracles.synthesizability.utils.utils import match_stock, get_max_stock_similarity, extract_functional_groups, functional_groups_overlap, fuzzy_matching_substructure, tango_reward, matched_fuzzy_substructure, matched_functional_groups
+from oracles.synthesizability.utils.utils import match_stock, extract_functional_groups, get_node_reward
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -226,37 +226,14 @@ class Syntheseus(OracleComponent):
                                 if not node_data["depth"] == max_depth:
                                     continue
                             # Compute the specified node reward
-                            #   1. *Max* Tanimoto similarity to the enforced building blocks
-                            #   2. *Mean* Functional Groups overlap to the enforced building blocks
-                            #   3. *Max* Fuzzy Matching Substructure to the enforced building blocks
-                            #   4. TANGO-FG: *Max* Tanimoto similarity + *Mean* Functional Groups overlap
-                            #   5. TANGO-FMS: *Max* Tanimoto similarity + *Max* Fuzzy Matching Substructure
-                            #   6. TANGO-All: *Max* Tanimoto similarity + *Mean* Functional Groups overlap + *Max* Fuzzy Matching Substructure
-                            if self.reward_type == "tanimoto_similarity":
-                                reward = get_max_stock_similarity(
-                                    query_smiles=canonicalize_smiles(node_data["smiles"]),
-                                    enforced_building_blocks_fps=self.enforced_building_blocks_fps
-                                )
-                            elif self.reward_type == "functional_groups":
-                                reward = functional_groups_overlap(
-                                    query_smiles=canonicalize_smiles(node_data["smiles"]),
-                                    enforced_blocks_functional_groups=self.enforced_building_blocks_functional_groups
-                                )
-                            elif self.reward_type == "fuzzy_ms":
-                                reward = fuzzy_matching_substructure(
-                                    query_smiles=canonicalize_smiles(node_data["smiles"]),
-                                    enforced_blocks_functional_groups=self.enforced_building_blocks_functional_groups
-                                )
-                            elif "tango" in self.reward_type:
-                                reward = tango_reward(
-                                    query_smiles=canonicalize_smiles(node_data["smiles"]),
-                                    enforce_blocks_fps=self.enforced_building_blocks_fps,
-                                    enforced_blocks_functional_groups=self.enforced_building_blocks_functional_groups,
-                                    reward_type=self.reward_type,
-                                    tango_weights=self.tango_weights
-                                )
-
-                            max_reward = max(max_reward, reward)
+                            node_reward = get_node_reward(
+                                reward_type=self.reward_type,
+                                query_smiles=canonicalize_smiles(node_data["smiles"]),
+                                enforce_blocks_fps=self.enforced_building_blocks_fps,
+                                enforced_blocks_functional_groups=self.enforced_building_blocks_functional_groups,
+                                tango_weights=self.tango_weights
+                            )
+                            max_reward = max(max_reward, node_reward)
                             # Check if exact match
                             is_matched = match_stock(
                                 query_smiles=canonicalize_smiles(node_data["smiles"]),
