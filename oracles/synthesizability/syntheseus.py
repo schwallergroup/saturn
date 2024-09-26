@@ -225,7 +225,7 @@ class Syntheseus(OracleComponent):
                                 # Skip nodes that are not at max depth (leaf nodes)
                                 if not node_data["depth"] == max_depth:
                                     continue
-                            # Compute the specified node reward
+                            # Compute the node's reward
                             node_reward = get_node_reward(
                                 reward_type=self.reward_type,
                                 query_smiles=canonicalize_smiles(node_data["smiles"]),
