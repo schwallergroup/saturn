@@ -61,24 +61,25 @@ class Syntheseus(OracleComponent):
 
             self.use_dense_reward = self.parameters.specific_parameters.get("use_dense_reward", True)  # Whether to use a Dense Reward formulation
             if self.use_dense_reward:
+                # Enforced building blocks
                 self.enforced_building_blocks_mols = [Chem.MolFromSmiles(line.strip()) for line in open(self.enforced_building_blocks_file, "r").readlines()]
                 self.enforced_building_blocks_fps = construct_morgan_fingerprints_batch_from_file(self.enforced_building_blocks_file)
                 self.enforced_building_blocks_functional_groups = extract_functional_groups(
                     [canonicalize_smiles(smiles.strip()) for smiles in open(self.enforced_building_blocks_file, "r").readlines()]
                 )  # Dict[str, List[str]] (SMILES: Functional Groups)
-                self.reward_type = self.parameters.specific_parameters.get("reward_type", "tango_fms")
-                assert self.reward_type in ["tanimoto_similarity", "functional_groups", "fuzzy_ms", "tango_fg", "tango_fms", "tango_all"], \
-                    "Please provide a valid reward type from ['tanimoto_similarity', 'functional_groups', 'fuzzy_ms', 'tango_fg', 'tango_fms', 'tango_all']."
+
+                # Dense Reward Function
+                self.reward_type = self.parameters.specific_parameters.get("reward_type", None)
                 if "tango" in self.reward_type:
                     self.tango_weights = self.parameters.specific_parameters.get("tango_weights", None)
                     assert self.tango_weights is not None, "Please provide TANGO weights."
 
-                # Enforced blocks diversity filter
+                # Enforced building blocks diversity filter
                 if self.parameters.specific_parameters.get("use_enforced_blocks_diversity_filter"):
                     self.enforced_blocks_diversity_filter = EnforcedBlocksDiversityFilter(
                         EnforcedBlocksDiversityFilterParameters(
                             enforced_building_blocks_file=self.enforced_building_blocks_file,
-                            bucket_size=self.parameters.specific_parameters.get("bucket_size", 300)
+                            bucket_size=self.parameters.specific_parameters.get("bucket_size", 100)
                         )
                     )
 

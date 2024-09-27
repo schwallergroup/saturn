@@ -202,17 +202,17 @@ def get_node_reward(
         6. TANGO-All: *Max* Tanimoto similarity + *Mean* Functional Groups overlap + *Max* Fuzzy Matching Substructure
 
     """
-    if reward_type == "tanimoto_similarity":
+    if reward_type in ["tan_sim", "tanimoto_similarity"]:
         reward = get_max_stock_similarity(
             query_smiles=query_smiles,
             enforced_building_blocks_fps=enforce_blocks_fps
         )
-    elif reward_type == "functional_groups":
+    elif reward_type in ["fg", "functional_groups"]:
         reward = functional_groups_overlap(
             query_smiles=query_smiles,
             enforced_blocks_functional_groups=enforced_blocks_functional_groups
         )
-    elif reward_type == "fuzzy_ms":
+    elif reward_type in ["fms", "fuzzy_ms", "fuzzy_matching_substructure"]:
         reward = fuzzy_matching_substructure(
             query_smiles=query_smiles,
             enforced_blocks_functional_groups=enforced_blocks_functional_groups
@@ -225,4 +225,6 @@ def get_node_reward(
             reward_type=reward_type,
             tango_weights=tango_weights
         )
+    else:
+        raise ValueError(f"Invalid reward type: {reward_type}")
     return reward
