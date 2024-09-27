@@ -218,22 +218,23 @@ class Syntheseus(OracleComponent):
                     assert extraction_result.returncode == 0, f"Error during Syntheseus route data extraction: {extraction_result.stderr}"
                     route = json.loads(extraction_result.stdout)
 
-                    # Check whether to match by Tanimoto similarity
+                    # Check whether to use dense reward
                     if self.use_dense_reward:
                         max_reward = 0.0
                         max_depth = self._get_max_depth(route)
+                        # Loop through the nodes in the route to ensure the root node (generated molecule) is tracked
                         for node, node_data in route.items():
                             # First extract the generated molecule
                             if node_data["depth"] == 0:
                                 generated_smiles = canonicalize_smiles(node_data["smiles"])
                                 break
+                        # Loop through the nodes again, this time computing the reward for each node
                         for node, node_data in route.items():
                             # Skip root node because this is the generated molecule
                             if node_data["depth"] == 0:
                                 continue
-                            # If the user specified that enforced building blocks must appear in the *leaf* nodes
+                            # If the user specified that enforced building blocks must appear in the nodes at max depth (starting-material)
                             if self.enforce_start:
-                                # Skip nodes that are not at max depth (leaf nodes)
                                 if not node_data["depth"] == max_depth:
                                     continue
                             # Compute the node's reward
@@ -245,22 +246,22 @@ class Syntheseus(OracleComponent):
                                 tango_weights=self.tango_weights
                             )
                             max_reward = max(max_reward, node_reward)
-                            # Check if exact match
+                            # Check if the node exactly matches an enforced building block
                             is_matched, matched_block_smiles = match_stock(
                                 query_smiles=canonicalize_smiles(node_data["smiles"]),
                                 enforced_building_blocks_file=self.enforced_building_blocks_file
                             )
                             if is_matched:
-                                if generated_smiles not in self.matched_generated_smiles[oracle_calls]:
-                                    self.matched_generated_smiles[oracle_calls].append(generated_smiles)
-                                    # Penalize first and then update the enforced blocks diversity filter
-                                    max_reward = self.enforced_blocks_diversity_filter.penalize_reward(matched_block_smiles, max_reward)
-                                    self.enforced_blocks_diversity_filter.update(matched_block_smiles)
-
-                            with open(os.path.join(self.output_dir, "matched_generated_smiles.json"), "w") as f:
-                                json.dump(self.matched_generated_smiles, f, indent=4)
+                                self.matched_generated_smiles[oracle_calls].append(generated_smiles)
+                                # Penalize first and then update the enforced blocks diversity filter
+                                max_reward = self.enforced_blocks_diversity_filter.penalize_reward(matched_block_smiles, max_reward)
+                                self.enforced_blocks_diversity_filter.update(matched_block_smiles)
+                                break
 
                         node_rewards[idx] = max_reward
+
+                        with open(os.path.join(self.output_dir, "matched_generated_smiles.json"), "w") as f:
+                            json.dump(self.matched_generated_smiles, f, indent=4)
 
                     # Otherwise, match *exactly*
                     else:
@@ -283,7 +284,7 @@ class Syntheseus(OracleComponent):
                             if is_matched:
                                 break
 
-                        is_solved[idx] = is_solved[idx] if is_matched else 0
+                        is_solved[idx] = int(is_matched)
                         steps[idx] = steps[idx] if is_matched else 99
 
             # HACK: In case a molecule is in the building blocks stock, Syntheseus returns 0. 
@@ -324,7 +325,7 @@ class Syntheseus(OracleComponent):
             # Even if the path length is not being optimized, the output is still the number of steps so that this information is tracked 
             # HACK: Path length is only meaningful if a route is solved. If not solved, set the path length = -99 
             #       to work with the "binary" Reward Shaping function which sets reward = 1 if path >= 1, 0 otherwise
-            output = np.array([rxn_steps if solved else -99 for rxn_steps, solved in zip(steps, is_solved)])
+            output = np.array([rxn_steps if solved else -99 for rxn_steps, solved in zip(steps, is_solved)], dtype=np.float32)
             if not self.parallelize:
                 assert len(output) == len(smiles), "Syntheseus output length mismatch."
             return output
