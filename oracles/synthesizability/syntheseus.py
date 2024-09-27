@@ -75,7 +75,8 @@ class Syntheseus(OracleComponent):
                     assert self.tango_weights is not None, "Please provide TANGO weights."
 
                 # Enforced building blocks diversity filter
-                if self.parameters.specific_parameters.get("use_enforced_blocks_diversity_filter"):
+                self.use_enforced_blocks_diversity_filter = self.parameters.specific_parameters.get("use_enforced_blocks_diversity_filter", False)
+                if self.use_enforced_blocks_diversity_filter:
                     self.enforced_blocks_diversity_filter = EnforcedBlocksDiversityFilter(
                         EnforcedBlocksDiversityFilterParameters(
                             enforced_building_blocks_file=self.enforced_building_blocks_file,
@@ -255,8 +256,9 @@ class Syntheseus(OracleComponent):
                             if is_matched:
                                 self.matched_generated_smiles[oracle_calls].append(generated_smiles)
                                 # Penalize first and then update the enforced blocks diversity filter
-                                max_reward = self.enforced_blocks_diversity_filter.penalize_reward(matched_block_smiles, max_reward)
-                                self.enforced_blocks_diversity_filter.update(matched_block_smiles)
+                                if self.use_enforced_blocks_diversity_filter:
+                                    max_reward = self.enforced_blocks_diversity_filter.penalize_reward(matched_block_smiles, max_reward)
+                                    self.enforced_blocks_diversity_filter.update(matched_block_smiles)
                                 break
 
                         node_rewards[idx] = max_reward
