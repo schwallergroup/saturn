@@ -71,9 +71,9 @@ def get_bemis_murcko_scaffold(smiles: str) -> str:
     else:
         return ""
 
-def construct_morgan_fingerprint(smiles: str):
+def construct_morgan_fingerprint(smiles: str, radius: int = 2, nBits: int = 1024):
     mol = Chem.MolFromSmiles(smiles)
-    return GetMorganFingerprintAsBitVect(mol, radius=3, nBits=2048)
+    return GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=nBits)
 
 def construct_morgan_fingerprints_batch(smiles_batch: np.ndarray[str]):
     fps = [construct_morgan_fingerprint(smiles) for smiles in smiles_batch]
