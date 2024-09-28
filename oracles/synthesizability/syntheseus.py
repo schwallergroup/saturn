@@ -70,9 +70,9 @@ class Syntheseus(OracleComponent):
 
                 # Dense Reward Function
                 self.reward_type = self.parameters.specific_parameters.get("reward_type", None)
-                if "tango" in self.reward_type:
-                    self.tango_weights = self.parameters.specific_parameters.get("tango_weights", None)
-                    assert self.tango_weights is not None, "Please provide TANGO weights."
+                self.tango_weights = self.parameters.specific_parameters.get("tango_weights", None)
+                # FIXME: Tanimoto, FMS, and FG do not require tango_weights but the node_reward function currently expects this argument
+                assert self.tango_weights is not None, "Please provide TANGO weights."
 
                 # Enforced building blocks diversity filter
                 self.use_enforced_blocks_diversity_filter = self.parameters.specific_parameters.get("use_enforced_blocks_diversity_filter", False)
