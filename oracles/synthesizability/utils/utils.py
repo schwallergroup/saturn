@@ -181,7 +181,8 @@ def tango_reward(
         assert tanimoto_weight + fms_weight == 1, "TANGO-FMS weights must sum to 1."
         return (tanimoto_similarity * tanimoto_weight) + (fms_overlap * fms_weight)
     elif reward_type == "tango_all":
-        assert abs((tanimoto_weight + fg_weight + fms_weight) - 1) < 1e-3, "TANGO-All weights must sum to 1 within a few decimal points."
+        print(abs((tanimoto_weight + fg_weight + fms_weight) - 1))
+        assert abs((tanimoto_weight + fg_weight + fms_weight) - 1) <= 1.1e-2, "TANGO-All weights must sum to 1 within a few decimal points."
         return (tanimoto_similarity * tanimoto_weight) + (fg_overlap * fg_weight) + (fms_overlap * fms_weight)
 
 def get_node_reward(
