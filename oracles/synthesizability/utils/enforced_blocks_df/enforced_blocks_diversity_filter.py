@@ -4,10 +4,11 @@ from oracles.synthesizability.utils.enforced_blocks_df.dataclass import Enforced
 
 class EnforcedBlocksDiversityFilter:
     """
-    Implements Diversity Filter as described in the paper: 
+    Similar to the Diversity Filter as described in the paper: 
     https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00473-0
 
     But for use in constrained synthesizability to penalize the same enforced block from being used multiple times.
+    The original Diversity Filter penalizes based on scaffold.
     """
     def __init__(
         self, 
@@ -17,6 +18,8 @@ class EnforcedBlocksDiversityFilter:
         # Track the number of times a given enforced block has been incoporated in a generated molecule
         self.enforced_blocks = [smiles.strip() for smiles in open(parameters.enforced_building_blocks_file, "r").readlines()]
         self.enforced_blocks = canonicalize_smiles_batch(self.enforced_blocks)
+        print(self.enforced_blocks)
+        exit()
         self.bucket_history = dict()
         self.bucket_size = parameters.bucket_size
 

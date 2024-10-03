@@ -47,6 +47,9 @@ class Syntheseus(OracleComponent):
         self.building_blocks_file = self.parameters.specific_parameters.get("building_blocks_file", None)
         assert self.building_blocks_file is not None, "Please provide the path to the building blocks file."
 
+        # Whether to use a Dense Reward formulation
+        self.use_dense_reward = self.parameters.specific_parameters.get("use_dense_reward", False)  # Whether to use a Dense Reward formulation
+
         # Enforced building blocks
         self.enforce_blocks = self.parameters.specific_parameters.get("enforce_blocks", False)  # Whether to enforce synthetic routes cross a set of reference blocks
         if self.enforce_blocks:
@@ -59,7 +62,6 @@ class Syntheseus(OracleComponent):
 
             self.enforce_start = self.parameters.specific_parameters.get("enforce_start", False)  # Whether to enforce that the reference blocks appear in the root nodes
 
-            self.use_dense_reward = self.parameters.specific_parameters.get("use_dense_reward", True)  # Whether to use a Dense Reward formulation
             if self.use_dense_reward:
                 # Enforced building blocks
                 self.enforced_building_blocks_mols = [Chem.MolFromSmiles(line.strip()) for line in open(self.enforced_building_blocks_file, "r").readlines()]
