@@ -14,8 +14,6 @@ from utils.chemistry_utils import canonicalize_smiles, construct_morgan_fingerpr
 from oracles.synthesizability.utils.utils import match_stock, extract_functional_groups, get_node_reward
 from concurrent.futures import ThreadPoolExecutor
 
-from oracles.synthesizability.utils.enforced_blocks_df.dataclass import EnforcedBlocksDiversityFilterParameters
-from oracles.synthesizability.utils.enforced_blocks_df.enforced_blocks_diversity_filter import EnforcedBlocksDiversityFilter
 
 
 class Syntheseus(OracleComponent):
@@ -73,18 +71,8 @@ class Syntheseus(OracleComponent):
                 # Dense Reward Function
                 self.reward_type = self.parameters.specific_parameters.get("reward_type", None)
                 self.tango_weights = self.parameters.specific_parameters.get("tango_weights", None)
-                # FIXME: Tanimoto, FMS, and FG do not require tango_weights but the node_reward function currently expects this argument
+                # FIXME: FMS, Tanimoto, and FG do not require tango_weights but the node_reward function currently expects this argument
                 assert self.tango_weights is not None, "Please provide TANGO weights."
-
-                # Enforced building blocks diversity filter
-                self.use_enforced_blocks_diversity_filter = self.parameters.specific_parameters.get("use_enforced_blocks_diversity_filter", False)
-                if self.use_enforced_blocks_diversity_filter:
-                    self.enforced_blocks_diversity_filter = EnforcedBlocksDiversityFilter(
-                        EnforcedBlocksDiversityFilterParameters(
-                            enforced_building_blocks_file=self.enforced_building_blocks_file,
-                            bucket_size=self.parameters.specific_parameters.get("bucket_size", 100)
-                        )
-                    )
 
         # Search time limit
         self.time_limit_s = self.parameters.specific_parameters.get("time_limit_s", 180)  # Default to 3 minutes per molecule
@@ -257,10 +245,6 @@ class Syntheseus(OracleComponent):
                             )
                             if is_matched:
                                 self.matched_generated_smiles[oracle_calls].append(generated_smiles)
-                                # Penalize first and then update the enforced blocks diversity filter
-                                if self.use_enforced_blocks_diversity_filter:
-                                    max_reward = self.enforced_blocks_diversity_filter.penalize_reward(matched_block_smiles, max_reward)
-                                    self.enforced_blocks_diversity_filter.update(matched_block_smiles)
                                 break
 
                         node_rewards[idx] = max_reward
