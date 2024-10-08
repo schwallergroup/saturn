@@ -13,6 +13,7 @@ from rdkit.Chem import Mol
 from utils.chemistry_utils import canonicalize_smiles, construct_morgan_fingerprints_batch_from_file
 from oracles.synthesizability.utils.utils import match_stock, extract_functional_groups, get_node_reward
 from concurrent.futures import ThreadPoolExecutor
+from oracles.synthesizability.utils.CONSTANTS import DEFAULT_TANGO_WEIGHTS
 
 
 
@@ -70,9 +71,8 @@ class Syntheseus(OracleComponent):
 
                 # Dense Reward Function
                 self.reward_type = self.parameters.specific_parameters.get("reward_type", None)
-                self.tango_weights = self.parameters.specific_parameters.get("tango_weights", None)
-                # FIXME: FMS, Tanimoto, and FG do not require tango_weights but the node_reward function currently expects this argument
-                assert self.tango_weights is not None, "Please provide TANGO weights."
+                assert self.reward_type is not None, "Using Dense Reward for Syntheseus but no reward type was provided."
+                self.tango_weights = self.parameters.specific_parameters.get("tango_weights", DEFAULT_TANGO_WEIGHTS)
 
         # Search time limit
         self.time_limit_s = self.parameters.specific_parameters.get("time_limit_s", 180)  # Default to 3 minutes per molecule

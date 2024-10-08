@@ -51,3 +51,10 @@ FUNCTIONAL_GROUPS = {
     # Halide
     "Halide attached to Carbon": "[#6][F,Cl,Br,I]"
 }
+
+# Default TANGO weights for Dense Reward
+DEFAULT_TANGO_WEIGHTS = {
+    "tanimoto": 0.5,
+    "fg": 0.5,
+    "fms": 0.5
+}
