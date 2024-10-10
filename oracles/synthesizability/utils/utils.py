@@ -145,7 +145,19 @@ def fuzzy_matching_substructure(
                 ringCompare=rdFMCS.RingCompare.StrictRingFusion, 
                 completeRingsOnly=True
             ) 
-        max_mcs_atoms = max(max_mcs_atoms, (mcs_result.numAtoms / block_mol.GetNumAtoms()))
+        overlap = mcs_result.numAtoms / block_mol.GetNumAtoms()
+        if int(overlap) == 1:
+            if canonicalize_smiles(query_smiles) == canonicalize_smiles(Chem.MolToSmiles(block_mol)):
+                return 1.0
+            # Edge case where the overlap is 100% but the molecules are not identical.
+            # This can happen if the node molecule is larger than the enforced block, yet a signal should still be meaningful.
+            else:
+                asymmetric_overlap = mcs_result.numAtoms / query_mol.GetNumAtoms()
+                assert int(asymmetric_overlap) != 1, "Asymmetric FMS error"
+                return asymmetric_overlap
+        else:
+            max_mcs_atoms = max(max_mcs_atoms, overlap)
+
     return max_mcs_atoms
     
 def tango_reward(
