@@ -17,6 +17,17 @@
           "env_name": "syntheseus-full",
           "reaction_model": "retroknn",
           "building_blocks_file": "<path>/frag-reac-zinc-stock.smi",
+          "enforced_building_blocks_file": "N/A",
+          "enforce_blocks": false,
+          "enforce_start": false,
+          "use_dense_reward": false,
+          "reward_type": "tango_fms",
+          "tango_weights": {
+            "tanimoto": 0.50,
+            "fg": 0.5,
+            "fms": 0.50
+          },
+          "route_extraction_script_path": "/home/jeff/iclr_synth/saturn-dev/oracles/synthesizability/utils/extract_syntheseus_route_data.py",
           "time_limit_s": 180,
           "optimize_path_length": false,
           "parallelize": false,
