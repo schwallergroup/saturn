@@ -127,8 +127,8 @@ def functional_groups_overlap(
     return sum(fraction_overlaps) / len(fraction_overlaps)
 
 def fuzzy_matching_substructure(
-    query_smiles: str, 
-    enforced_blocks_functional_groups: Dict[str, List[str]], 
+    query_smiles: str,
+    enforced_blocks_functional_groups: Dict[str, List[str]],
 ) -> float:
     """
     Calculate the *max* substructure overlap between the query SMILES and each enforced block.
@@ -139,13 +139,23 @@ def fuzzy_matching_substructure(
     for block_mol in enforced_blocks_mols:
         # Perform MCS (find Maximum Common Substructure)
         mcs_result = rdFMCS.FindMCS(
-                mols=[query_mol, block_mol], 
-                matchChiralTag=True, 
-                bondCompare=rdFMCS.BondCompare.CompareOrderExact, 
-                ringCompare=rdFMCS.RingCompare.StrictRingFusion, 
+                mols=[query_mol, block_mol],
+                matchChiralTag=True,
+                bondCompare=rdFMCS.BondCompare.CompareOrderExact,
+                ringCompare=rdFMCS.RingCompare.StrictRingFusion,
                 completeRingsOnly=True
-            ) 
-        max_mcs_atoms = max(max_mcs_atoms, (mcs_result.numAtoms / block_mol.GetNumAtoms()))
+            )
+        overlap = mcs_result.numAtoms / block_mol.GetNumAtoms()
+        if int(overlap) == 1:
+            if canonicalize_smiles(query_smiles) == canonicalize_smiles(Chem.MolToSmiles(block_mol)):
+                return 1.0
+            # Edge case
+            else:
+                asymmetric_overlap = mcs_result.numAtoms / query_mol.GetNumAtoms()
+                assert int(asymmetric_overlap) != 1, "Asymmetric FMS error"
+                return asymmetric_overlap
+        else:
+            max_mcs_atoms = max(max_mcs_atoms, overlap)
     return max_mcs_atoms
     
 def tango_reward(
