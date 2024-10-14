@@ -66,7 +66,7 @@ will display NVIDIA information.
 Constrained Synthesizability Experiments
 ---------------------------------------------------------------------------
 
-All experiments can essentially be run with the same provided configuration file. The only arguments that need to be changed are the `building_blocks_file` and `enforced_building_blocks_file` in the `Syntheseus` oracle. The building block stocks used in the [pre-print](ArXiv link) can be found [here](<FigShare>).
+All experiments can essentially be run with the same provided configuration file. The only arguments that need to be changed are the `building_blocks_file` and `enforced_building_blocks_file` in the `Syntheseus` oracle. The building block stocks used in the [pre-print](ArXiv link) can be found [here](https://figshare.com/s/07867a1e1025c192e6a9).
 
 Toggling between `starting-material` and `intermediate` constraints can be done by changing the `enforce_start` (True denotes starting-material constraint) argument in the `Syntheseus` oracle.
 
