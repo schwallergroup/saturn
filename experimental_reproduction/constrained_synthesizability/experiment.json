@@ -16,8 +16,8 @@
         "specific_parameters": {
             "env_name": "syntheseus-full",
             "reaction_model": "megan",
-            "building_blocks_file": "<path to building blocks stock file>",
-            "enforced_building_blocks_file": "<path to enforced building blocks stock file>",
+            "building_blocks_file": "<path to building blocks stock file>/frag-reac-zinc-stock.smi",
+            "enforced_building_blocks_file": "<path to enforced building blocks stock file>/enforced_stock_100.smi",
             "enforce_blocks": true,
             "enforce_start": false,
             "use_dense_reward": true,
