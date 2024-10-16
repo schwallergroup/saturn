@@ -9,6 +9,7 @@ from oracles.dataclass import OracleComponentParameters
 from oracles.similarity.tanimoto_similarity import TanimotoSimilarity
 from oracles.similarity.jaccard_distance import JaccardDistance
 from oracles.similarity.jaccard_distance_dataset import JaccardDistanceDataset
+from oracles.similarity.tango import Tango
 
 # Physchem properties
 from oracles.physchem.aliphatic_rings import NumAliphaticRings
@@ -24,13 +25,19 @@ from oracles.physchem.tpsa import tPSA
 
 # Structural
 from oracles.structural.matching_substructure import MatchingSubstructure
+from oracles.structural.fuzzy_matching_structure import FuzzyMatchingSubstructure
+from oracles.structural.matching_structure_atom_count import MatchingSubstructureAtomCount
 from oracles.structural.smarts_alerts import SMARTSAlert
 
 # Synthesizability
 from oracles.synthesizability.sa_score import SAScore
+from oracles.synthesizability.rxnmapper_atom_counts import RXNMapperAtomCounts
+from oracles.synthesizability.aizynthfinder import AiZynthFinder
+from oracles.synthesizability.syntheseus import Syntheseus
 
 # Docking
 from oracles.docking.dockstream import DockStream
+from oracles.docking.quickvina2_gpu import QuickVina2_GPU
 
 # xTB electronic properties
 from oracles.xtb.chemical_potential import ChemicalPotential
@@ -60,6 +67,8 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return TanimotoSimilarity(oracle_component_parameters)
     elif name == "jaccard_distance":
         return JaccardDistance(oracle_component_parameters)
+    elif name == "tango":
+        return Tango(oracle_component_parameters)
     elif name == "jaccard_distance_dataset":
         return JaccardDistanceDataset(oracle_component_parameters)
     # Physchem properties
@@ -86,14 +95,26 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
     # Structural
     elif name == "matching_substructure":
         return MatchingSubstructure(oracle_component_parameters)
+    elif name == "fuzzy_matching_substructure":
+        return FuzzyMatchingSubstructure(oracle_component_parameters)
+    elif name == "matching_substructure_atom_count":
+        return MatchingSubstructureAtomCount(oracle_component_parameters)
     elif name == "smarts_alerts":
         return SMARTSAlert(oracle_component_parameters)
     # Synthesizability
     elif name == "sa_score":
         return SAScore(oracle_component_parameters)
+    elif name == "rxnmapper_atom_counts":
+        return RXNMapperAtomCounts(oracle_component_parameters)
+    elif name == "aizynthfinder":
+        return AiZynthFinder(oracle_component_parameters)
+    elif name == "syntheseus":
+        return Syntheseus(oracle_component_parameters)
     # Docking
     elif name == "dockstream":
         return DockStream(oracle_component_parameters)
+    elif name == "quickvina2_gpu":
+        return QuickVina2_GPU(oracle_component_parameters)
     # xTB electronic properties
     elif name == "chemical_potential":
         return ChemicalPotential(oracle_component_parameters)

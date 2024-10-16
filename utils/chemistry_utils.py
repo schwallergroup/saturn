@@ -1,11 +1,9 @@
 from typing import List
 import random
 import numpy as np
-import rdkit
 from rdkit import Chem
 from rdkit.Chem.rdmolops import RenumberAtoms
-from rdkit.Chem import AllChem
-from rdkit.Chem import DataStructs
+from rdkit.Chem.AllChem import GetMorganFingerprintAsBitVect
 from rdkit.Chem.Scaffolds.MurckoScaffold import GetScaffoldForMol
 
 def canonicalize_smiles(smiles: str) -> str:
@@ -72,3 +70,16 @@ def get_bemis_murcko_scaffold(smiles: str) -> str:
             return ""
     else:
         return ""
+
+def construct_morgan_fingerprint(smiles: str, radius: int = 2, nBits: int = 1024):
+    mol = Chem.MolFromSmiles(smiles)
+    return GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=nBits)
+
+def construct_morgan_fingerprints_batch(smiles_batch: np.ndarray[str]):
+    fps = [construct_morgan_fingerprint(smiles) for smiles in smiles_batch]
+    return fps
+
+def construct_morgan_fingerprints_batch_from_file(file_path: str) -> List[np.ndarray[int]]:
+    with open(file_path, "r") as f:
+        smiles_batch = f.readlines()
+    return construct_morgan_fingerprints_batch(smiles_batch)

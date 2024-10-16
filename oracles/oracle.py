@@ -190,7 +190,7 @@ class Oracle:
         is_hallucinated_batch: bool
     ) -> Tuple[np.ndarray[str], np.ndarray[float], np.ndarray[str]]:
         """
-        Checks if there are any Cached rewards in a sampled batch of SMILES. 
+        Checks if there are any Cached rewards in a sampled batch of SMILES.
         Also updates trackers for repeated SMILES. If Oracle repeats are permitted, directly return.
         """
         if not self.allow_oracle_repeats:
@@ -302,7 +302,7 @@ class Oracle:
 
     def write_out_oracle_history(self, path: str):
         """Write out the oracle history as a CSV."""
-        self.oracle_history.to_csv(os.path.join(path, "oracle_history.csv"))
+        self.oracle_history.to_csv(os.path.join(path, "oracle_history.csv"), index=False)
 
     def write_out_repeat_history(self, path: str):
         """Write out the repeated SMILES histories as JSON."""

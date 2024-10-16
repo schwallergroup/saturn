@@ -1,0 +1,128 @@
+{
+  "logging": {
+    "logging_frequency": 5000,
+    "logging_path": "<path to saturn directory>/experimental_reproduction/constrained_synthesizability/log.log",
+    "model_checkpoints_dir": "<path to saturn directory>/experimental_reproduction/constrained_synthesizability/checkpoints/"
+  },
+  "oracle": {
+    "budget": 10000,
+    "allow_oracle_repeats": false,
+    "aggregator": "product",
+    "components": [
+      {
+        "name": "syntheseus",
+        "weight": 1,
+        "preliminary_check": false,
+        "specific_parameters": {
+            "env_name": "syntheseus-full",
+            "reaction_model": "megan",
+            "building_blocks_file": "<path to building blocks stock file>/frag-reac-zinc-stock.smi",
+            "enforced_building_blocks_file": "<path to enforced building blocks stock file>/enforced_stock_100.smi",
+            "enforce_blocks": true,
+            "enforce_start": false,
+            "use_dense_reward": true,
+            "reward_type": "tango_fms",
+            "tango_weights": {
+                "tanimoto": 0.5,
+                "fg": 0.5,
+                "fms": 0.5
+            },
+            "route_extraction_script_path": "<path to saturn directory>/oracles/synthesizability/utils/extract_syntheseus_route_data.py",
+            "time_limit_s": 180,
+            "optimize_path_length": false,
+            "parallelize": false,
+            "max_workers": 4,
+            "results_dir": "<path to saturn directory>/experimental_reproduction/constrained_synthesizability/syntheseus_results"
+        },
+        "reward_shaping_function_parameters": {
+            "transformation_function": "no_transformation"
+        }
+      },
+      {
+        "name": "quickvina2_gpu",
+        "weight": 1,
+        "preliminary_check": false,
+        "specific_parameters": {
+          "binary": "<path to saturn directory>/experimental_reproduction/constrained_synthesizability/Vina-GPU-2.1/QuickVina2-GPU-2.1/QuickVina2-GPU-2-1",
+          "force_field": "uff",
+          "receptor": "<path to saturn directory>/experimental_reproduction/synthesizability/7uvu-2-monomers-pdbfixer.pdbqt",
+          "reference_ligand": "<path to saturn directory>/experimental_reproduction/synthesizability/7uvu-reference.pdb",
+          "thread": 8000,
+          "results_dir": "<path to saturn directory>/experimental_reproduction/constrained_synthesizability/docking_results"
+        },
+        "reward_shaping_function_parameters": {
+          "transformation_function": "reverse_sigmoid",
+          "parameters": {
+            "low": -16,
+            "high": 0,
+            "k": 0.15
+          }
+        }
+      },
+      {
+        "name": "qed",
+        "weight": 1,
+        "preliminary_check": false,
+        "specific_parameters": {},
+        "reward_shaping_function_parameters": {
+            "transformation_function": "no_transformation"
+        }
+      }
+    ]
+  },
+  "goal_directed_generation": {
+    "reinforcement_learning": {
+      "prior": "<path to saturn directory>/experimental_reproduction/checkpoint_models/pubchem-mamba-epoch-5.prior",
+      "agent": "<path to saturn directory>/experimental_reproduction/checkpoint_models/pubchem-mamba-epoch-5.prior",
+      "batch_size": 64,
+      "learning_rate": 0.0001,
+      "sigma": 128.0,
+      "augmented_memory": true,
+      "augmentation_rounds": 2,
+      "selective_memory_purge": true
+    },
+    "experience_replay": {
+      "memory_size": 100,
+      "sample_size": 10,
+      "smiles": []
+    },
+    "diversity_filter": {
+      "name": "IdenticalMurckoScaffold",
+      "bucket_size": 10
+    },
+    "hallucinated_memory": {
+      "execute_hallucinated_memory": false,
+      "hallucination_method": "ga",
+      "num_hallucinations": 100,
+      "num_selected": 5,
+      "selection_criterion": "random"
+    },
+    "beam_enumeration": {
+      "execute_beam_enumeration": false,
+      "beam_k": 2,
+      "beam_steps": 18,
+      "substructure_type": "structure",
+      "structure_min_size": 15,
+      "pool_size": 4,
+      "pool_saving_frequency": 1000,
+      "patience": 5,
+      "token_sampling_method": "topk",
+      "filter_patience_limit": 100000
+    }
+  },
+  "distribution_learning": {
+    "parameters": {
+      "agent": "<unused>",
+      "training_steps": 20,
+      "batch_size": 512,
+      "learning_rate": 0.0001,
+      "training_dataset_path": "cleaned-chembl-33.smi",
+      "train_with_randomization": true,
+      "transfer_learning": false
+    }
+  },
+  "running_mode": "goal_directed_generation",
+  "model_architecture": "mamba",
+  "device": "cuda",
+  "seed": 0
+}

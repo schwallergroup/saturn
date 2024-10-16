@@ -5,7 +5,6 @@ Adapted from https://github.com/MolecularAI/Reinvent/input.py.
 """
 import json
 import argparse
-import torch
 from utils.utils import set_seed_everywhere
 
 # Distribution Learning
@@ -23,6 +22,10 @@ from diversity_filter.dataclass import DiversityFilterParameters
 # Oracle (for Goal-Directed Generation)
 from oracles.oracle import Oracle
 from oracles.dataclass import OracleConfiguration
+
+# Scoring
+from scoring.scorer import Scorer
+from scoring.dataclass import ScoringConfiguration
 
 parser = argparse.ArgumentParser(description="Run Saturn.")
 parser.add_argument(
@@ -55,9 +58,9 @@ if __name__ == "__main__":
     if running_mode == "distribution_learning":
         # 1. Construct the Distribution Learning Trainer
         distribution_learning_trainer = DistributionLearningTrainer(
-            config["logging"]["logging_path"],
-            config["logging"]["model_checkpoints_dir"],
-            DistributionLearningConfiguration(
+            logging_path=config["logging"]["logging_path"],
+            model_checkpoints_dir=config["logging"]["model_checkpoints_dir"],
+            configuration=DistributionLearningConfiguration(
                 seed,
                 model_architecture,
                 **config["distribution_learning"]["parameters"])
@@ -71,8 +74,9 @@ if __name__ == "__main__":
 
         # 2. Construct the Reinforcement Learning Agent
         reinforcement_learning_agent = ReinforcementLearningAgent(
-            config["logging"]["logging_path"],
-            config["logging"]["model_checkpoints_dir"],
+            logging_frequency=config["logging"]["logging_frequency"],
+            logging_path=config["logging"]["logging_path"],
+            model_checkpoints_dir=config["logging"]["model_checkpoints_dir"],
             oracle=oracle,
             configuration=GoalDirectedGenerationConfiguration(
                 seed,
@@ -88,6 +92,22 @@ if __name__ == "__main__":
 
         # 3. Run Goal-Directed Generation via Reinforcement Learning
         reinforcement_learning_agent.run()
+
+    elif running_mode in ["scoring", "scorer"]:
+        # 1. Construct the Oracle
+        oracle = Oracle(OracleConfiguration(**config["oracle"]))
+
+        # 2. Construct the Scorer
+        scorer = Scorer(
+            config["logging"]["logging_path"],
+            oracle=oracle,
+            # FIXME: Currently required because the Oracle takes as input a Diversity Filter - remove this dependency
+            diversity_filter_configuration=DiversityFilterParameters(**config["goal_directed_generation"]["diversity_filter"]),
+            configuration=ScoringConfiguration(**config["scoring"])
+        )
+
+        # 3. Run Scoring
+        scorer.run()
 
     else:
         raise ValueError(f"Running mode: {running_mode} is not implemented.")

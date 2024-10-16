@@ -2,7 +2,6 @@
 This module contains the OracleComponent class, which is the base class for all oracles.
 Many individual OracleComponents are based on code from https://github.com/MolecularAI/reinvent-scoring/tree/main/reinvent_scoring/scoring/score_components.
 """
-
 from abc import ABC, abstractmethod
 from typing import Tuple
 from rdkit.Chem import Mol
@@ -11,10 +10,10 @@ from oracles.dataclass import OracleComponentParameters
 from oracles.reward_shaping.reward_shaping_function import RewardShapingFunction
 from oracles.reward_shaping.function_parameters import RewardShapingFunctionParameters
 
-# physics-based oracle (e.g., docking) output extra information (e.g., docking poses)
-# flag these so that the number of oracle calls can be used for prefixing the output files
+# Physics-based oracle (e.g. docking) and retrosynthesis tools (e.g. AiZynthFinder) output extra
+# information. Flag these so that the number of oracle calls can be used for prefixing the output files
 # TODO: Pharmacophore and Shape Matching, DFT, and MD oracles are not implemented yet
-PHYSICS_ORACLES = ["dockstream"]
+FLAGGED_ORACLES = ["dockstream", "quickvina2_gpu", "aizynthfinder", "syntheseus"]
 
 class OracleComponent(ABC):
     """
@@ -51,7 +50,7 @@ class OracleComponent(ABC):
             return raw_vina, qed_rewards, raw_sa, aggregated_rewards
         else:
             # Calculate the raw property values
-            raw_property_values = self(mols, oracle_calls) if self.name in PHYSICS_ORACLES else self(mols) 
+            raw_property_values = self(mols, oracle_calls) if self.name in FLAGGED_ORACLES else self(mols) 
             # Apply reward shaping
             # FIXME: in case raw_property_values of 0.0 are good, then there will be a problem when reward shaping
             rewards = self.reward_shaping_function(raw_property_values)

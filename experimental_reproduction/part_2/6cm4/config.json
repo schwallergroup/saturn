@@ -1,5 +1,6 @@
 {
   "logging": {
+    "logging_frequency": 10000,
     "logging_path": "<path to saturn directory>/experimental_reproduction/part_2/6cm4/log.log",
     "model_checkpoints_dir": "<path to saturn directory>/experimental_reproduction/part_2/6cm4"
   },
