@@ -135,7 +135,9 @@ def dense_reward_multiplier(
                     distance_factor = max(0, 0.5 - (deviation * 1.0))
 
                 # Check angle criterion
-                if interaction[4] >= interaction_criteria["angle_lower_bound"] and interaction[4] <= interaction_criteria["angle_upper_bound"]:
+                if distance_factor == 0:
+                    angle_factor = 0
+                elif interaction[4] >= interaction_criteria["angle_lower_bound"] and interaction[4] <= interaction_criteria["angle_upper_bound"]:
                     # Perfect reward
                     angle_factor = 0.5
                 elif interaction[4] < interaction_criteria["angle_lower_bound"]:
