@@ -1,26 +1,18 @@
-"""
-Workflow based on: https://arxiv.org/abs/2406.08506 Appendix C
-
-Workflow Overview:
-* Input canonical SMILES
-* Convert to RDKit Mol
-* Protonate
-* Generate 1 (lowest energy) conformer using RDKit ETKDG and minimize using RDKit UFF
-* Convert conformer to PDBQT file
-* Dock using QuickVina2-GPU version 2.1
-
-# ETKDG: https://pubs.acs.org/doi/10.1021/acs.jcim.5b00654
-"""
 from typing import Tuple
 import os
 import subprocess
 import tempfile
 import shutil
+import json
 import numpy as np
 from oracles.oracle_component import OracleComponent
 from oracles.dataclass import OracleComponentParameters
 from rdkit import Chem
 from rdkit.Chem import AllChem, Mol
+
+from oracles.docking.dataclass import ConstrainedDockingParameters
+from oracles.docking.utils.constrained_docking_utils import extract_hbind_interactions, match_interactions, dense_reward_multiplier, sdf2smiles
+
 
 
 class GNINA(OracleComponent):
@@ -34,11 +26,9 @@ class GNINA(OracleComponent):
     def __init__(self, parameters: OracleComponentParameters):
         super().__init__(parameters)
 
-        # QuickVina2-GPU-2.1 binary
+        # gnina binary
         self.binary = self.parameters.specific_parameters.get("binary", None)
-        assert self.binary is not None, "Please provide the path to the QuickVina2-GPU binary."
-        # Ensure the binary is executable for the user
-        subprocess.run(["chmod", "u+x", self.binary])
+        assert self.binary is not None, "Please provide the absolute path to the gnina binary."
 
         # Force-field for ligand energy minimization
         force_field_id = self.parameters.specific_parameters.get("force_field", "uff").lower()
@@ -53,14 +43,16 @@ class GNINA(OracleComponent):
         self.reference_ligand = self.parameters.specific_parameters.get("reference_ligand", None)
         assert self.reference_ligand is not None and self.reference_ligand.endswith(".pdb"), "Please provide the path to the reference ligand PDB file."
 
-        # Exhaustiveness (known as "Thread" in QuickVina2-GPU)
-        self.thread = self.parameters.specific_parameters.get("thread", 5000)  # Default to 5000 (same as source code default)
-
-        # Setup docking box
-        self._setup_docking_box()
-
-        # Ligand embedding parameter - use ETKDG
+        # Ligand embedding parameter - use ETKDG: https://pubs.acs.org/doi/10.1021/acs.jcim.5b00654
         self.ETKDG = AllChem.ETKDG()
+
+        # gnina parameters 
+        self.exhaustiveness = self.parameters.specific_parameters.get("exhaustiveness", 8)  # Default to 8
+        self.flexdist = self.parameters.specific_parameters.get("flexdist", 0)  # Allow flexible residues up to `flexdist` Angstroms from ligand. Default to 0
+
+        # Constrained docking parameters
+        self.constrained_docking_parameters = ConstrainedDockingParameters(**self.parameters.specific_parameters.get("constrained_docking", {}))
+        self.constrained_generated_smiles = dict()
 
         # Output directory
         output_dir = self.parameters.specific_parameters.get("results_dir", None)
@@ -79,26 +71,18 @@ class GNINA(OracleComponent):
         self, 
         mols: np.ndarray[Mol],
         oracle_calls: int
-    ) -> Tuple[np.ndarray[float], float]:
+    ) -> Tuple[np.ndarray[float], np.ndarray[float]]:
         """
-        Execute QuickVina2-GPU-2.1 as a subprocess.
+        Execute `gnina` as a subprocess.
         """
         # 1. Make temporary files to store the input and output
         temp_input_sdf_dir = tempfile.mkdtemp()
-        temp_input_pdbqt_dir = tempfile.mkdtemp()
         temp_output_dir = tempfile.mkdtemp()
 
-        # 2. Convert RDKit Mols to *canonical* SMILES
-        canonical_smiles = [Chem.MolToSmiles(mol, canonical=True) for mol in mols]
-
-        # 3. Convert back to RDKit Mols
-        # NOTE: This is likely redundant but is done to match the original workflow
-        mols = [Chem.MolFromSmiles(smiles) for smiles in canonical_smiles]
-
-        # 4. Protonate Mols
+        # 2. Protonate Mols
         mols = [Chem.AddHs(mol) for mol in mols]
 
-        # 5. Generate 1 (lowest energy) conformer using RDKit ETKDG and force-field (UFF or MMFF94) minimize
+        # 3. Generate 1 (lowest energy) conformer using RDKit ETKDG and force-field (UFF or MMFF94) minimize
         for idx, mol in enumerate(mols):
         # Skip molecules that fail to embed
             try:
@@ -114,47 +98,128 @@ class GNINA(OracleComponent):
             writer.write(mol)
             writer.flush()
             writer.close()
-            # Convert SDF to PDBQT with OpenBabel
-            pdbqt_file = os.path.join(temp_input_pdbqt_dir, f"ligand_{idx+1}.pdbqt")
-            output = subprocess.run([
-                "obabel",
-                sdf_file,
-                "-opdbqt",
-                "-O",
-                pdbqt_file
-            ], capture_output=True)
 
-        # 6. Run QuickVina2-GPU-2.1
+        # 3. Execute `gnina` and extract the raw docking scores
         # TODO: Could be paralellized but GPU docking should be fast enough as large libraries are not expected
-            
-        # Subprocess call should occur in the directory of the binary due to needing to read kernel files
-        # Based on this GitHub issue: https://github.com/DeltaGroupNJUPT/Vina-GPU/issues/12
-            
-        # Change directory to the binary directory
+        # Change directory to the `gnina` binary directory
         current_dir = os.getcwd()
         os.chdir(os.path.dirname(self.binary))
 
-        output = subprocess.run([
-            "./QuickVina2-GPU-2-1",
-            "--receptor", self.receptor,
-            "--ligand_directory", temp_input_pdbqt_dir,
-            "--output_directory", temp_output_dir,
-            # Exhaustiveness
-            "--thread", str(self.thread),
-            # Docking box
-            "--center_x", str(self.box_center[0]), "--center_y", str(self.box_center[1]), "--center_z", str(self.box_center[2]),
-            "--size_x", str(self.box_size[0]), "--size_y", str(self.box_size[1]), "--size_z", str(self.box_size[2]),
-            # Output only the lowest docking score pose
-            "--num_modes", "1",
-            # Fix seed
-            # TODO: Expose parameter to user
-            "--seed", "0"
-        ], capture_output=True)
+        # Sort the SDF files by ascending order to ensure the proper docking scores are assigned to the ligands
+        sdf_files = os.listdir(temp_input_sdf_dir)
+        sdf_files.sort(key=lambda x: int(x.split("_")[1].split(".")[0]))
 
-        # Change back to the original directory
+        docking_scores = np.zeros(len(sdf_files))
+        for idx, sdf in enumerate(sdf_files):
+            # NOTE: `gnina` by default keeps hydrogens which is important for `Hbind` interaction mapper
+            output = subprocess.run([
+                "./gnina", 
+                "-r", self.receptor, 
+                "-l", os.path.join(temp_input_sdf_dir, sdf), 
+                "--autobox_ligand", self.reference_ligand,
+                "--flexdist_ligand", self.reference_ligand,
+                "--flexdist", str(self.flexdist),
+                "-o", os.path.join(temp_output_dir, f"docked_pose_{idx+1}.sdf"), 
+                "--num_modes", "1",
+                "--exhaustiveness", str(self.exhaustiveness),
+                "--seed", str(0)
+            ], capture_output=True)
+
+            try:    
+                # Open the output SDF file and extract the minimized affinity using RDKit
+                suppl = Chem.SDMolSupplier(os.path.join(temp_output_dir, f"docked_pose_{idx+1}.sdf"))
+                mol = next(suppl)
+                if mol is not None and mol.HasProp("minimizedAffinity"):
+                    affinity = float(mol.GetProp("minimizedAffinity"))
+                    docking_scores[idx] = affinity
+                else:
+                    docking_scores[idx] = 0.0  # Set to 0.0 if affinity not found or molecule is None
+            # In case of docking fails
+            except Exception:
+                docking_scores[idx] = 0.0  # Set to 0.0 if affinity not found or molecule is None
+
+        # 4. Check for enforced interactions
+        # `Hbind` expects the receptor as .pdb so convert from .pdbqt to .pdb
+        output = subprocess.run([
+            "obabel",
+            "-ipdbqt", self.receptor,
+            "-O", os.path.join(temp_output_dir, "receptor.pdb")
+        ], capture_output=True)
+        assert output.returncode == 0, "Failed to convert receptor from .pdbqt to .pdb."
+
+        reward_multiplier = np.zeros(len(sdf_files))
+        if self.constrained_docking_parameters.enforce_interactions:
+            # Tracker
+            self.constrained_generated_smiles[oracle_calls] = []
+
+            # Change directory to the `Hbind` binary directory
+            os.chdir(self.constrained_docking_parameters.hbind_binary)
+
+            
+            for idx, sdf in enumerate(sdf_files):
+                try:
+                    # Obabel: Convert docked pose SDF to mol2
+                    output = subprocess.run([
+                        "obabel",
+                        "-isdf", os.path.join(temp_output_dir, f"docked_pose_{idx+1}.sdf"),
+                        "-O", os.path.join(temp_output_dir, f"temp_ligand_{idx+1}.mol2")
+                    ], capture_output=True)
+                    if not os.path.exists(os.path.join(temp_output_dir, f"temp_ligand_{idx+1}.mol2")):
+                        reward_multiplier[idx] = 0.0
+                        continue
+
+                    # Hbind: Interaction table
+                    output = subprocess.run([
+                        "./bin/hbind",
+                        "-p", os.path.join(temp_output_dir, "receptor.pdb"),
+                        "-l", os.path.join(temp_output_dir, f"temp_ligand_{idx+1}.mol2"),
+                        # Include salt-bridges
+                        "-s",
+                        # Print summary table
+                        "-t"
+                    ], capture_output=True)
+
+                    # Check for errors
+                    if output.returncode != 0:
+                        reward_multiplier[idx] = 0.0
+                        continue
+                        
+                    output = output.stdout.decode("utf-8")
+                    interactions = extract_hbind_interactions(output, "hbond")  # List[Tuple[str, float]
+
+                    # Binary constrained-docking reward
+                    if not self.constrained_docking_parameters.use_dense_reward:
+                        enforced_residues_found = match_interactions(
+                            interactions=interactions, 
+                            enforced_residues=self.constrained_docking_parameters.enforced_residues, 
+                            interaction_type="hbond"
+                        )
+                        reward_multiplier[idx] = 1.0 if len(enforced_residues_found) == len(self.constrained_docking_parameters.enforced_residues) else 0.0
+                    # Dense constrained-docking reward
+                    else:
+                        reward_multiplier[idx] = dense_reward_multiplier(
+                            interactions=interactions, 
+                            enforced_residues=self.constrained_docking_parameters.enforced_residues,
+                            interaction_type="hbond"
+                        )
+
+                    if reward_multiplier[idx] == 1.0:
+                        self.constrained_generated_smiles[oracle_calls].append(sdf2smiles(os.path.join(temp_output_dir, f"docked_pose_{idx+1}.sdf")))
+
+                except Exception:
+                    reward_multiplier[idx] = 0.0
+
+            with open(os.path.join(self.output_dir, "constrained_generated_smiles.json"), "w") as f:
+                json.dump(self.constrained_generated_smiles, f, indent=4)
+
+        # 5. Change back to the original directory
         os.chdir(current_dir)
 
-        # 7. Copy and save the docking output
+        # 6. Copy and save the docking output
+        # Remove the temporary files
+        os.remove(os.path.join(temp_output_dir, "receptor.pdb"))
+        for sdf in sdf_files:
+            os.remove(os.path.join(temp_output_dir, f"temp_ligand_{sdf.split('_')[1].split('.')[0]}.mol2"))
         subprocess.run([
             "cp", 
             "-r", 
@@ -162,45 +227,8 @@ class GNINA(OracleComponent):
             os.path.join(self.output_dir, f"results_{oracle_calls}")
         ])
 
-        # 8. Parse the docking scores
-        docking_scores = np.zeros(len(mols))
-        docked_output = os.listdir(temp_output_dir)
-        # NOTE: docking_scores is populated below - ligands that failed to embed would already have an assigned score = 0.0
-        for file in docked_output:
-            ligand_idx = int(file.split("_")[1]) - 1
-            with open(os.path.join(temp_output_dir, file), "r") as f:
-                for line in f.readlines():
-                    # Extract the docking score
-                    if "REMARK VINA RESULT" in line:
-                        try:
-                            docking_scores[ligand_idx] = (float(line.split()[3]))
-                        except Exception:
-                            docking_scores[ligand_idx] = 0.0
-       
-        # 9. Delete the temporary folders
+        # 7. Delete the temporary folders
         shutil.rmtree(temp_input_sdf_dir)
-        shutil.rmtree(temp_input_pdbqt_dir)
         shutil.rmtree(temp_output_dir)
 
-        return docking_scores
-
-    def _setup_docking_box(self):
-        """
-        Setup the docking box for the target receptor based on the reference ligand.
-
-        Follows the protocol from https://arxiv.org/abs/2406.08506 Appendix C:
-
-        * Centroids are the average position of the reference ligand atoms
-
-        * "Box sizes individually determined to encompass each target binding"
-           Unclear how this is done - box size is set to 20 Å x 20 Å x 20 Å instead which is a common default
-        """
-        # Get the average coordinates of the reference ligand atoms
-        ref_mol = Chem.MolFromPDBFile(self.reference_ligand)
-        ref_conformer = ref_mol.GetConformer()
-        ref_coords = ref_conformer.GetPositions()
-        ref_center = tuple(np.mean(ref_coords, axis=0)) 
-
-        # Set the box center and size
-        self.box_center = ref_center  # Tuple[float, float, float]
-        self.box_size = (20.0, 20.0, 20.0)
+        return docking_scores, reward_multiplier

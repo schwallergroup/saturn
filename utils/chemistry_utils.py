@@ -6,6 +6,8 @@ from rdkit.Chem.rdmolops import RenumberAtoms
 from rdkit.Chem.AllChem import GetMorganFingerprintAsBitVect
 from rdkit.Chem.Scaffolds.MurckoScaffold import GetScaffoldForMol
 
+
+
 def canonicalize_smiles(smiles: str) -> str:
     """
     Canonicalize a SMILES string based on RDKit convention.
