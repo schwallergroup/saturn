@@ -117,6 +117,7 @@ class GNINA(OracleComponent):
                 "-r", self.receptor, 
                 "-l", os.path.join(temp_input_sdf_dir, sdf), 
                 "--autobox_ligand", self.reference_ligand,
+                "--autobox_add", "4",
                 "--flexdist_ligand", self.reference_ligand,
                 "--flexdist", str(self.flexdist),
                 "-o", os.path.join(temp_output_dir, f"docked_pose_{idx+1}.sdf"), 
