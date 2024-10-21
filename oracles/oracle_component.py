@@ -14,6 +14,7 @@ from oracles.reward_shaping.function_parameters import RewardShapingFunctionPara
 # information. Flag these so that the number of oracle calls can be used for prefixing the output files
 # TODO: Pharmacophore and Shape Matching, DFT, and MD oracles are not implemented yet
 FLAGGED_ORACLES = ["dockstream", "quickvina2_gpu", "aizynthfinder", "syntheseus"]
+FLAGGED_AND_REWARD_MULTIPLIER_ORACLES = ["gnina"]
 
 class OracleComponent(ABC):
     """
@@ -48,6 +49,11 @@ class OracleComponent(ABC):
         if self.name == "geam":
             raw_vina, qed_rewards, raw_sa, aggregated_rewards = self(mols)
             return raw_vina, qed_rewards, raw_sa, aggregated_rewards
+        elif self.name in FLAGGED_AND_REWARD_MULTIPLIER_ORACLES:
+            raw_property_values, reward_multiplier = self(mols, oracle_calls)
+            # Reward multiplier is a number between 0 and 1 that is used to scale the reward while keeping the raw values unchanged for tracking
+            rewards = self.reward_shaping_function(raw_property_values) * reward_multiplier
+            return raw_property_values, rewards
         else:
             # Calculate the raw property values
             raw_property_values = self(mols, oracle_calls) if self.name in FLAGGED_ORACLES else self(mols) 
