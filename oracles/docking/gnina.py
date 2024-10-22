@@ -107,39 +107,44 @@ class GNINA(OracleComponent):
         current_dir = os.getcwd()
         os.chdir(os.path.dirname(self.binary))
 
-        # Sort the SDF files by ascending order to ensure the proper docking scores are assigned to the ligands
         sdf_files = os.listdir(temp_input_sdf_dir)
-        sdf_files.sort(key=lambda x: int(x.split("_")[1].split(".")[0]))
-
-        docking_scores = np.zeros(len(sdf_files))
-        for idx, sdf in enumerate(sdf_files):
-            # NOTE: `gnina` by default keeps hydrogens which is important for `Hbind` interaction mapper
-            output = subprocess.run([
-                "./gnina", 
-                "-r", self.receptor, 
-                "-l", os.path.join(temp_input_sdf_dir, sdf), 
-                "--autobox_ligand", self.reference_ligand,
-                "--autobox_add", "4",
-                "--flexdist_ligand", self.reference_ligand,
-                "--flexdist", str(self.flexdist),
-                "-o", os.path.join(temp_output_dir, f"docked_pose_{idx+1}.sdf"), 
-                "--num_modes", "1",
-                "--exhaustiveness", str(self.exhaustiveness),
-                "--seed", str(0)
-            ], capture_output=True)
-
-            try:    
+        docking_scores = np.zeros(len(mols))
+        for sdf in sdf_files:
+            # Index for docking score array
+            ligand_idx = int(sdf.split("_")[1].split(".")[0])
+            try:   
+                # NOTE: `gnina` by default keeps hydrogens which is important for `Hbind` interaction mapper
+                output = subprocess.run([
+                    "./gnina", 
+                    "-r", self.receptor, 
+                    "-l", os.path.join(temp_input_sdf_dir, sdf), 
+                    # Reference ligand for auto-box definition
+                    "--autobox_ligand", self.reference_ligand,
+                    # Add 4 Ångstroms to the autobox size
+                    "--autobox_add", "4",
+                    "--flexdist_ligand", self.reference_ligand,
+                    # Allow flexible residues up to `flexdist` Ångstroms from ligand
+                    "--flexdist", str(self.flexdist),
+                    "-o", os.path.join(temp_output_dir, f"docked_pose_{ligand_idx}.sdf"), 
+                    # Output only 1 pose
+                    "--num_modes", "1",
+                    "--exhaustiveness", str(self.exhaustiveness),
+                    # Set seed to 0
+                    "--seed", str(0)
+                ], capture_output=True)
+ 
                 # Open the output SDF file and extract the minimized affinity using RDKit
-                suppl = Chem.SDMolSupplier(os.path.join(temp_output_dir, f"docked_pose_{idx+1}.sdf"))
+                suppl = Chem.SDMolSupplier(os.path.join(temp_output_dir, f"docked_pose_{ligand_idx}.sdf"))
                 mol = next(suppl)
                 if mol is not None and mol.HasProp("minimizedAffinity"):
                     affinity = float(mol.GetProp("minimizedAffinity"))
-                    docking_scores[idx] = affinity
+                    docking_scores[ligand_idx-1] = affinity
                 else:
-                    docking_scores[idx] = 0.0  # Set to 0.0 if affinity not found or molecule is None
+                    docking_scores[ligand_idx-1] = 0.0  # Set to 0.0 if affinity not found or molecule is None
+
             # In case of docking fails
             except Exception:
-                docking_scores[idx] = 0.0  # Set to 0.0 if affinity not found or molecule is None
+                docking_scores[ligand_idx-1] = 0.0  # Set to 0.0 if affinity not found or molecule is None
 
         # 4. Check for enforced interactions
         # `Hbind` expects the receptor as .pdb so convert from .pdbqt to .pdb
@@ -150,7 +155,7 @@ class GNINA(OracleComponent):
         ], capture_output=True)
         assert output.returncode == 0, "Failed to convert receptor from .pdbqt to .pdb."
 
-        reward_multiplier = np.zeros(len(sdf_files))
+        reward_multiplier = np.ones(len(mols))
         if self.constrained_docking_parameters.enforce_interactions:
             # Tracker
             self.constrained_generated_smiles[oracle_calls] = []
@@ -158,33 +163,35 @@ class GNINA(OracleComponent):
             # Change directory to the `Hbind` binary directory
             os.chdir(self.constrained_docking_parameters.hbind_binary)
 
-            
-            for idx, sdf in enumerate(sdf_files):
+            for sdf in sdf_files:
+                # Index for reward multiplier array
+                ligand_idx = int(sdf.split("_")[1].split(".")[0])
                 try:
                     # Obabel: Convert docked pose SDF to mol2
                     output = subprocess.run([
                         "obabel",
-                        "-isdf", os.path.join(temp_output_dir, f"docked_pose_{idx+1}.sdf"),
-                        "-O", os.path.join(temp_output_dir, f"temp_ligand_{idx+1}.mol2")
+                        "-isdf", os.path.join(temp_output_dir, f"docked_pose_{ligand_idx}.sdf"),
+                        "-O", os.path.join(temp_output_dir, f"temp_ligand_{ligand_idx}.mol2")
                     ], capture_output=True)
-                    if not os.path.exists(os.path.join(temp_output_dir, f"temp_ligand_{idx+1}.mol2")):
-                        reward_multiplier[idx] = 0.0
+
+                    if not os.path.exists(os.path.join(temp_output_dir, f"temp_ligand_{ligand_idx}.mol2")):
+                        reward_multiplier[ligand_idx-1] = 0.0
                         continue
 
                     # Hbind: Interaction table
                     output = subprocess.run([
                         "./bin/hbind",
                         "-p", os.path.join(temp_output_dir, "receptor.pdb"),
-                        "-l", os.path.join(temp_output_dir, f"temp_ligand_{idx+1}.mol2"),
+                        "-l", os.path.join(temp_output_dir, f"temp_ligand_{ligand_idx}.mol2"),
                         # Include salt-bridges
                         "-s",
                         # Print summary table
                         "-t"
                     ], capture_output=True)
-
+    
                     # Check for errors
                     if output.returncode != 0:
-                        reward_multiplier[idx] = 0.0
+                        reward_multiplier[ligand_idx-1] = 0.0
                         continue
                         
                     output = output.stdout.decode("utf-8")
@@ -199,23 +206,23 @@ class GNINA(OracleComponent):
                             interaction_type="hbond"
                         )
                         if self.reward_type == "binary":
-                            reward_multiplier[idx] = 1.0 if len(enforced_residues_found) == len(self.constrained_docking_parameters.enforced_residues) else 0.0
+                            reward_multiplier[ligand_idx-1] = 1.0 if len(enforced_residues_found) == len(self.constrained_docking_parameters.enforced_residues) else 0.0
                         # Binary Decomposed
                         elif self.reward_type == "binary_decomposed":
-                            reward_multiplier[idx] = 1.0 / len(self.constrained_docking_parameters.enforced_residues) * len(enforced_residues_found)
+                            reward_multiplier[ligand_idx-1] = 1.0 / len(self.constrained_docking_parameters.enforced_residues) * len(enforced_residues_found)
                     # Dense
                     else:
-                        reward_multiplier[idx] = dense_reward_multiplier(
+                        reward_multiplier[ligand_idx-1] = dense_reward_multiplier(
                             interactions=interactions, 
                             enforced_residues=self.constrained_docking_parameters.enforced_residues,
                             interaction_type="hbond"
                         )
 
-                    if reward_multiplier[idx] == 1.0:
-                        self.constrained_generated_smiles[oracle_calls].append(sdf2smiles(os.path.join(temp_output_dir, f"docked_pose_{idx+1}.sdf")))
+                    if reward_multiplier[ligand_idx-1] == 1.0:
+                        self.constrained_generated_smiles[oracle_calls].append(sdf2smiles(os.path.join(temp_output_dir, f"docked_pose_{ligand_idx}.sdf")))
 
                 except Exception:
-                    reward_multiplier[idx] = 0.0
+                    reward_multiplier[ligand_idx-1] = 0.0
 
             with open(os.path.join(self.output_dir, "constrained_generated_smiles.json"), "w") as f:
                 json.dump(self.constrained_generated_smiles, f, indent=4)
@@ -226,8 +233,9 @@ class GNINA(OracleComponent):
         # 6. Copy and save the docking output
         # Remove the temporary files
         os.remove(os.path.join(temp_output_dir, "receptor.pdb"))
-        for sdf in sdf_files:
-            os.remove(os.path.join(temp_output_dir, f"temp_ligand_{sdf.split('_')[1].split('.')[0]}.mol2"))
+        for file in os.listdir(temp_output_dir):
+            if file.startswith("temp_ligand") and file.endswith(".mol2"):
+                os.remove(os.path.join(temp_output_dir, file))
         subprocess.run([
             "cp", 
             "-r", 
