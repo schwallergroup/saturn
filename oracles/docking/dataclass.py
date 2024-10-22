@@ -15,6 +15,6 @@ class DockStreamParameters:
 class ConstrainedDockingParameters:
     hbind_binary: str
     enforce_interactions: bool
-    use_dense_reward: bool
+    reward_type: str
     enforced_residues: List[str]
     # TODO: Add other types of interactions to enforce

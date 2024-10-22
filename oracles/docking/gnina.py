@@ -52,6 +52,8 @@ class GNINA(OracleComponent):
 
         # Constrained docking parameters
         self.constrained_docking_parameters = ConstrainedDockingParameters(**self.parameters.specific_parameters.get("constrained_docking", {}))
+        self.reward_type = self.constrained_docking_parameters.reward_type
+        assert self.reward_type in ["binary", "binary_decomposed", "dense"], "reward_type must be either 'binary', 'binary_decomposed', or 'dense'."
         self.constrained_generated_smiles = dict()
 
         # Output directory
@@ -188,15 +190,20 @@ class GNINA(OracleComponent):
                     output = output.stdout.decode("utf-8")
                     interactions = extract_hbind_interactions(output, "hbond")  # List[Tuple[str, float]
 
-                    # Binary constrained-docking reward
-                    if not self.constrained_docking_parameters.use_dense_reward:
+                    # Constrained-docking reward
+                    # Binary
+                    if self.reward_type in ["binary", "binary_decomposed"]:
                         enforced_residues_found = match_interactions(
                             interactions=interactions, 
                             enforced_residues=self.constrained_docking_parameters.enforced_residues, 
                             interaction_type="hbond"
                         )
-                        reward_multiplier[idx] = 1.0 if len(enforced_residues_found) == len(self.constrained_docking_parameters.enforced_residues) else 0.0
-                    # Dense constrained-docking reward
+                        if self.reward_type == "binary":
+                            reward_multiplier[idx] = 1.0 if len(enforced_residues_found) == len(self.constrained_docking_parameters.enforced_residues) else 0.0
+                        # Binary Decomposed
+                        elif self.reward_type == "binary_decomposed":
+                            reward_multiplier[idx] = 1.0 / len(self.constrained_docking_parameters.enforced_residues) * len(enforced_residues_found)
+                    # Dense
                     else:
                         reward_multiplier[idx] = dense_reward_multiplier(
                             interactions=interactions, 
