@@ -29,8 +29,8 @@ class Syntheseus(OracleComponent):
         super().__init__(parameters)
 
         # Syntheseus environment path
-        self.env_name = self.parameters.specific_parameters.get("env_name", None)
-        assert self.env_name is not None, "Please provide the Conda environment name with Syntheseus installed."
+        self.syntheseus_env_name = self.parameters.specific_parameters.get("syntheseus_env_name", None)
+        assert self.syntheseus_env_name is not None, "Please provide the Conda environment name with Syntheseus installed."
 
         # Whether to optimize for path length
         self.optimize_path_length = self.parameters.specific_parameters.get("optimize_path_length", False)
@@ -77,6 +77,8 @@ class Syntheseus(OracleComponent):
         # Enforce reaction classes
         self.enforce_rxn_class_presence = self.parameters.specific_parameters.get("enforce_rxn_class_presence", False)  # Whether to enforce that the reaction classes appear in the synthesis graph
         if self.enforce_rxn_class_presence:
+            self.rxn_insight_env_name = self.parameters.specific_parameters.get("rxn_insight_env_name", None)
+            assert self.rxn_insight_env_name is not None, "The run specifies to enforce reaction classes, please provide the Conda environment name with Rxn-INSIGHT installed."
             self.enforced_rxn_classes = self.parameters.specific_parameters.get("enforced_rxn_classes", None)
             assert self.enforced_rxn_classes is not None, "The run specifies to enforce reaction classes, please provide the reaction classes to enforce."
             self.rxn_info_extraction_script_path = self.parameters.specific_parameters.get("rxn_info_extraction_script_path", None)
@@ -168,7 +170,7 @@ class Syntheseus(OracleComponent):
             "conda",
             "run",
             "-n",
-            self.env_name,
+            self.syntheseus_env_name,
             "syntheseus",
             "search",
             "--config", os.path.join(temp_dir, "config.yml")
@@ -196,6 +198,10 @@ class Syntheseus(OracleComponent):
                 is_solved[idx] = 1 if num_rxn_steps != np.inf else 0
                 steps[idx] = int(num_rxn_steps) if num_rxn_steps != np.inf else 99
 
+                # -------------------------
+                # ENFORCED BUILDING BLOCKS
+                # -------------------------
+
                 # If the molecule is solved *and* the user specified to enforce that a set of building blocks appears in the synthesis graph
                 if self.enforce_blocks and int(is_solved[idx]) == 1:
 
@@ -208,7 +214,7 @@ class Syntheseus(OracleComponent):
                         "conda", 
                         "run", 
                         "-n",
-                        self.env_name, 
+                        self.syntheseus_env_name, 
                         "python", 
                         self.route_extraction_script_path, 
                         # NOTE: We set Syntheseus to terminate after 1 route is found, so the index is always 0
@@ -217,7 +223,7 @@ class Syntheseus(OracleComponent):
                     ], capture_output=True, text=True)
 
                     # Check for errors
-                    assert extraction_result.returncode == 0, f"Error during Syntheseus route data extraction: {extraction_result.stderr}"
+                    assert extraction_result.returncode == 0, f"Error during Syntheseus route (Mol) data extraction: {extraction_result.stderr}"
                     route = json.loads(extraction_result.stdout)
 
                     # Check whether to use dense reward
@@ -261,7 +267,7 @@ class Syntheseus(OracleComponent):
 
                         with open(os.path.join(self.output_dir, "matched_generated_smiles.json"), "w") as f:
                             json.dump(self.matched_generated_smiles, f, indent=4)
-
+                    
                     # Otherwise, match *exactly*
                     else:
                         is_matched = False
@@ -285,6 +291,78 @@ class Syntheseus(OracleComponent):
 
                         is_solved[idx] = int(is_matched)
                         steps[idx] = steps[idx] if is_matched else 99
+
+                # -------------------------
+                # ENFORCED REACTION CLASSES
+                # -------------------------
+                # If the molecule is solved *and* the user specified to enforce that a set of reaction classes appears in the synthesis graph
+                if self.enforce_rxn_class_presence and int(is_solved[idx]) == 1:
+
+                    if oracle_calls not in self.matched_generated_smiles_with_rxn:
+                        self.matched_generated_smiles_with_rxn[oracle_calls] = []
+
+                    # Read the route data from the pickle file and extract the Reactions
+                    # HACK: This (temporary) solution enables reading the pickled data *without* installing Syntheseus into the Saturn environment
+                    extraction_result = subprocess.run([
+                        "conda", 
+                        "run", 
+                        "-n",
+                        self.syntheseus_env_name, 
+                        "python", 
+                        self.route_extraction_script_path, 
+                        # NOTE: We set Syntheseus to terminate after 1 route is found, so the index is always 0
+                        os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
+                        "rxn"
+                    ], capture_output=True, text=True)
+
+                    # Check for errors
+                    assert extraction_result.returncode == 0, f"Error during Syntheseus route (rxn) data extraction: {extraction_result.stderr}"
+                    route = json.loads(extraction_result.stdout)
+
+                    # Loop through the nodes again, this time computing the reward for each node
+                    # NOTE: Trying binary reward for now
+                    rxn_multiplier = 0
+                    # The nodes are all Reaction nodes - extract reaction information
+                    for node, node_data in route.items():
+                        # Execute Rxn-INSIGHT on the reaction SMILES
+                        # HACK: This (temporary) solution enables reading the pickled data *without* installing Rxn-INSIGHT into the Saturn environment
+                        extraction_result = subprocess.run([
+                            "conda", 
+                            "run", 
+                            "-n",
+                            self.rxn_insight_env_name, 
+                            "python", 
+                            self.rxn_info_extraction_script_path, 
+                            # Pass the rxn SMILES extracted from the Syntheseus route
+                            node_data["rxn_smiles"]
+                        ], capture_output=True, text=True)
+
+                        # Check for errors
+                        assert extraction_result.returncode == 0, f"Error during Rxn-INSIGHT reaction information extraction: {extraction_result.stderr}"
+                        rxn_info = json.loads(extraction_result.stdout)
+
+                        rxn_class, rxn_name = rxn_info["CLASS"], rxn_info["NAME"]
+                        for enforced_rxn_class in self.enforced_rxn_classes:
+                            # Convert to lower-case for more robust string comparison
+                            enforced_rxn_class = enforced_rxn_class.lower()
+                            if enforced_rxn_class in rxn_class.lower() or enforced_rxn_class in rxn_name.lower():
+                                rxn_multiplier = 1
+                                break
+
+                        # Check if the node exactly matches an enforced building block
+                        is_matched, matched_block_smiles = match_stock(
+                            query_smiles=canonicalize_smiles(node_data["smiles"]),
+                            enforced_building_blocks_file=self.enforced_building_blocks_file
+                        )
+                        if is_matched and rxn_multiplier == 1:
+                            self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                            break
+
+                    # This truncates the node reward to 0 if the reaction class is not matched (assuming enforced blocks are also being considered)
+                    node_rewards[idx] = node_rewards[idx] * rxn_multiplier
+
+                    with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
+                        json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)               
 
             # HACK: In case a molecule is in the building blocks stock, Syntheseus returns 0. 
             #       Set these to 1 to work with Binary Reward Shaping
@@ -312,7 +390,7 @@ class Syntheseus(OracleComponent):
         shutil.rmtree(temp_dir)
 
         # 9. Prepare and/or return the output
-        if self.use_dense_reward:
+        if self.use_dense_reward or self.enforce_rxn_class_presence:
             if not self.parallelize:
                 assert len(node_rewards) == len(smiles), "Syntheseus output length mismatch."
             return node_rewards
