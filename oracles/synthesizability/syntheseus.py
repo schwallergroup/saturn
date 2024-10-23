@@ -74,6 +74,14 @@ class Syntheseus(OracleComponent):
                 assert self.reward_type is not None, "Using Dense Reward for Syntheseus but no reward type was provided."
                 self.tango_weights = self.parameters.specific_parameters.get("tango_weights", DEFAULT_TANGO_WEIGHTS)
 
+        # Enforce reaction classes
+        self.enforce_rxn_class_presence = self.parameters.specific_parameters.get("enforce_rxn_class_presence", False)  # Whether to enforce that the reaction classes appear in the synthesis graph
+        if self.enforce_rxn_class_presence:
+            self.enforced_rxn_classes = self.parameters.specific_parameters.get("enforced_rxn_classes", None)
+            assert self.enforced_rxn_classes is not None, "The run specifies to enforce reaction classes, please provide the reaction classes to enforce."
+            self.rxn_info_extraction_script_path = self.parameters.specific_parameters.get("rxn_info_extraction_script_path", None)
+            assert self.rxn_info_extraction_script_path is not None, "The run specifies to enforce reaction classes, please provide the path to the script that extracts the reaction classes from the Syntheseus route pickle file."
+
         # Search time limit
         self.time_limit_s = self.parameters.specific_parameters.get("time_limit_s", 180)  # Default to 3 minutes per molecule
 
@@ -87,8 +95,9 @@ class Syntheseus(OracleComponent):
         #       The order is lost as the count would start from 0 for each chunk
         self.smiles = None
 
-        # Temporary
+        # Trackers for matched SMILES under building block and reaction class constraints
         self.matched_generated_smiles = dict()
+        self.matched_generated_smiles_with_rxn = dict()
 
     def __call__(
         self, 
