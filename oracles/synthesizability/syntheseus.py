@@ -202,7 +202,7 @@ class Syntheseus(OracleComponent):
                     if oracle_calls not in self.matched_generated_smiles:
                         self.matched_generated_smiles[oracle_calls] = []
 
-                    # Read the route data from the pickle file
+                    # Read the route data from the pickle file and extract the Mols
                     # HACK: This (temporary) solution enables reading the pickled data *without* installing Syntheseus into the Saturn environment
                     extraction_result = subprocess.run([
                         "conda", 
@@ -212,7 +212,8 @@ class Syntheseus(OracleComponent):
                         "python", 
                         self.route_extraction_script_path, 
                         # NOTE: We set Syntheseus to terminate after 1 route is found, so the index is always 0
-                        os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl")
+                        os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
+                        "mol"
                     ], capture_output=True, text=True)
 
                     # Check for errors
