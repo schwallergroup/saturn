@@ -50,13 +50,15 @@ class Syntheseus(OracleComponent):
         # Whether to use a Dense Reward formulation
         self.use_dense_reward = self.parameters.specific_parameters.get("use_dense_reward", False)  # Whether to use a Dense Reward formulation
 
-        # Enforced building blocks
         self.enforce_blocks = self.parameters.specific_parameters.get("enforce_blocks", False)  # Whether to enforce synthetic routes cross a set of reference blocks
-        if self.enforce_blocks:
+        self.enforce_rxn_class_presence = self.parameters.specific_parameters.get("enforce_rxn_class_presence", False)  # Whether to enforce that the reaction classes appear in the synthesis graph
+        if self.enforce_blocks or self.enforce_rxn_class_presence:
             # Path to the script that extracts the SMILES and depth from the Syntheseus route pickle file
             self.route_extraction_script_path = self.parameters.specific_parameters.get("route_extraction_script_path", None)
-            assert self.route_extraction_script_path is not None, "The run specifies to enforce building blocks, please provide the path to the script that extracts the SMILES and depth from the Syntheseus route pickle file."
+            assert self.route_extraction_script_path is not None, "The run specifies to enforce building blocks or reaction classes, please provide the path to the script that extracts the SMILES and depth from the Syntheseus route pickle file."
 
+        # Enforce building blocks
+        if self.enforce_blocks:
             self.enforced_building_blocks_file = self.parameters.specific_parameters.get("enforced_building_blocks_file", None)
             assert self.enforced_building_blocks_file is not None, "The run specifies to enforce building blocks, please provide the path to the building blocks file."
 
@@ -76,7 +78,6 @@ class Syntheseus(OracleComponent):
                 self.tango_weights = self.parameters.specific_parameters.get("tango_weights", DEFAULT_TANGO_WEIGHTS)
 
         # Enforce reaction classes
-        self.enforce_rxn_class_presence = self.parameters.specific_parameters.get("enforce_rxn_class_presence", False)  # Whether to enforce that the reaction classes appear in the synthesis graph
         if self.enforce_rxn_class_presence:
             self.rxn_insight_env_name = self.parameters.specific_parameters.get("rxn_insight_env_name", None)
             assert self.rxn_insight_env_name is not None, "The run specifies to enforce reaction classes, please provide the Conda environment name with Rxn-INSIGHT installed."
@@ -324,8 +325,7 @@ class Syntheseus(OracleComponent):
                     assert extraction_result.returncode == 0, f"Error during Syntheseus route (rxn) data extraction: {extraction_result.stderr}"
                     route = json.loads(extraction_result.stdout)
 
-                    # Loop through the nodes again, this time computing the reward for each node
-                    # NOTE: Trying binary reward for now
+                    # NOTE: Trying binary rxn class reward for now
                     rxn_multiplier = 0.0
                     # The nodes are all Reaction nodes - extract reaction information
                     for node, node_data in route.items():
