@@ -199,6 +199,9 @@ class Syntheseus(OracleComponent):
                 is_solved[idx] = 1 if num_rxn_steps != np.inf else 0
                 steps[idx] = int(num_rxn_steps) if num_rxn_steps != np.inf else 99
 
+                # Store the current generated SMILES being considered
+                generated_smiles = canonicalize_smiles(smiles[idx])
+
                 # ------------------------
                 # ENFORCED BUILDING BLOCKS
                 # ------------------------
@@ -326,7 +329,7 @@ class Syntheseus(OracleComponent):
                     rxn_multiplier = 0.0
                     # The nodes are all Reaction nodes - extract reaction information
                     for node, node_data in route.items():
-                        # Execute Rxn-INSIGHT on the reaction SMILES
+                        # Execute Rxn-INSIGHT on the rxn SMILES
                         # HACK: This (temporary) solution enables reading the pickled data *without* installing Rxn-INSIGHT into the Saturn environment
                         extraction_result = subprocess.run([
                             "conda", 
@@ -354,19 +357,15 @@ class Syntheseus(OracleComponent):
                         # NOTE: This block of code is only relevant when enforcing building blocks *and* reaction classes
                         # Check if the node exactly matches an enforced building block
                         if self.enforce_blocks: 
-                            is_matched, matched_block_smiles = match_stock(
-                                query_smiles=canonicalize_smiles(node_data["smiles"]),
-                                enforced_building_blocks_file=self.enforced_building_blocks_file
-                            )
                             if is_matched and rxn_multiplier == 1.0:
                                 self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
-                            break
+                                break
 
                         else:
                             # If the reaction class is matched, then the node reward is 1
                             if rxn_multiplier == 1:
                                 self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
-                            break
+                                break
 
                     # Reaching this code requires that there is a solved route
                     # This truncates the node reward to 0 if the reaction class is not matched (assuming enforced blocks are also being considered)
@@ -458,7 +457,7 @@ class Syntheseus(OracleComponent):
         Syntheseus expects proper capitalization of the model names. Parse user input and return the correct model name.
         """
         # NOTE: Assumes the user is not providing their own trained model.
-        #       The default behaviour in Syntheseus is then to download a trained model by the authors.
+        #       The default behaviour in Syntheseus is to download a trained model by the authors.
         #       These models are stored in .cache/torch/syntheseus by default.
         assert model_name is not None, "Please provide the reaction model name."
         if model_name in ["retroknn", "RetroKNN"]:
