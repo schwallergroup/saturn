@@ -460,7 +460,9 @@ class Syntheseus(OracleComponent):
         #       The default behaviour in Syntheseus is to download a trained model by the authors.
         #       These models are stored in .cache/torch/syntheseus by default.
         assert model_name is not None, "Please provide the reaction model name."
-        if model_name in ["retroknn", "RetroKNN"]:
+        if model_name in ["localretro", "LocalRetro"]:
+            return "LocalRetro"
+        elif model_name in ["retroknn", "RetroKNN"]:
             return "RetroKNN"
         elif model_name in ["rootaligned", "RootAligned"]:
             return "RootAligned"
