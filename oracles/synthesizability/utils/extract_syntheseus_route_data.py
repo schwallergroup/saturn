@@ -1,4 +1,4 @@
-from typing import Dict, Union, List, Any
+from typing import Dict, Union, Set, Any
 import pickle
 import json
 import sys
@@ -6,17 +6,20 @@ import sys
 def extract_data(file_path: str, data_type: str) -> Dict[str, Union[str, int]]:
     # Load the pickle file
     with open(file_path, "rb") as f:
-        route = pickle.load(f)
+        route = pickle.load(f)  # set of syntheseus nodes
 
     if data_type == "mol":
-        return mol_data_from_pickle(route)
+        data = extract_mol_data(route)
     elif data_type == "rxn":
-        return rxn_data_from_pickle(route)
+        data = extract_rxn_data(route)
     else:
         raise ValueError(f"Invalid data type: {data_type}")
+
+    # Convert the data to JSON format
+    return json.dumps(data)
     
-def mol_data_from_pickle(route: List[Any]) -> Dict[str, Union[str, int]]:
-    # For every entry, extract the Mol nodes' SMILES and depth
+def extract_mol_data(route: Set[Any]) -> Dict[str, Union[str, int]]:
+    # Syntheseus Mol nodes have the attribute "mol"
     syntheseus_route_data = {}
     for idx, node in enumerate(route):
         if hasattr(node, "mol"):
@@ -25,21 +28,20 @@ def mol_data_from_pickle(route: List[Any]) -> Dict[str, Union[str, int]]:
                 "depth": node.depth
             }
 
-    # Convert the route data to JSON format
-    return json.dumps(syntheseus_route_data)
+    return syntheseus_route_data
 
-def rxn_data_from_pickle(route: List[Any]) -> Dict[str, Union[str, int]]:
-    # For every entry, extract the Reaction nodes' SMILES and depth
+def extract_rxn_data(route: Set[Any]) -> Dict[str, Union[str, int]]:
+    # Syntheseus Reaction nodes have the attribute "reaction"
     syntheseus_route_data = {}
     for idx, node in enumerate(route):
         if hasattr(node, "reaction"):
+            rxn_smiles = str(node.reaction)
             syntheseus_route_data[idx] = {
-                "rxn_smiles": node.reaction,
+                "rxn_smiles": rxn_smiles,
                 "depth": node.depth
             }
 
-    # Convert the route data to JSON format
-    return json.dumps(syntheseus_route_data)
+    return syntheseus_route_data
 
 if __name__ == "__main__":
     pickle_file = sys.argv[1]  # The path to the pickle file is passed as an argument

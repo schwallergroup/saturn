@@ -3,6 +3,7 @@ import os
 import subprocess
 import tempfile
 import json
+import ast
 import yaml
 import shutil
 import numpy as np
@@ -198,9 +199,9 @@ class Syntheseus(OracleComponent):
                 is_solved[idx] = 1 if num_rxn_steps != np.inf else 0
                 steps[idx] = int(num_rxn_steps) if num_rxn_steps != np.inf else 99
 
-                # -------------------------
+                # ------------------------
                 # ENFORCED BUILDING BLOCKS
-                # -------------------------
+                # ------------------------
 
                 # If the molecule is solved *and* the user specified to enforce that a set of building blocks appears in the synthesis graph
                 if self.enforce_blocks and int(is_solved[idx]) == 1:
@@ -219,7 +220,7 @@ class Syntheseus(OracleComponent):
                         self.route_extraction_script_path, 
                         # NOTE: We set Syntheseus to terminate after 1 route is found, so the index is always 0
                         os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
-                        "mol"
+                        "mol"  # Extract Mol data
                     ], capture_output=True, text=True)
 
                     # Check for errors
@@ -295,6 +296,7 @@ class Syntheseus(OracleComponent):
                 # -------------------------
                 # ENFORCED REACTION CLASSES
                 # -------------------------
+
                 # If the molecule is solved *and* the user specified to enforce that a set of reaction classes appears in the synthesis graph
                 if self.enforce_rxn_class_presence and int(is_solved[idx]) == 1:
 
@@ -312,7 +314,7 @@ class Syntheseus(OracleComponent):
                         self.route_extraction_script_path, 
                         # NOTE: We set Syntheseus to terminate after 1 route is found, so the index is always 0
                         os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
-                        "rxn"
+                        "rxn"  # Extract reaction data
                     ], capture_output=True, text=True)
 
                     # Check for errors
@@ -321,7 +323,7 @@ class Syntheseus(OracleComponent):
 
                     # Loop through the nodes again, this time computing the reward for each node
                     # NOTE: Trying binary reward for now
-                    rxn_multiplier = 0
+                    rxn_multiplier = 0.0
                     # The nodes are all Reaction nodes - extract reaction information
                     for node, node_data in route.items():
                         # Execute Rxn-INSIGHT on the reaction SMILES
@@ -339,27 +341,37 @@ class Syntheseus(OracleComponent):
 
                         # Check for errors
                         assert extraction_result.returncode == 0, f"Error during Rxn-INSIGHT reaction information extraction: {extraction_result.stderr}"
-                        rxn_info = json.loads(extraction_result.stdout)
+                        rxn_info = ast.literal_eval(extraction_result.stdout)
 
                         rxn_class, rxn_name = rxn_info["CLASS"], rxn_info["NAME"]
                         for enforced_rxn_class in self.enforced_rxn_classes:
                             # Convert to lower-case for more robust string comparison
                             enforced_rxn_class = enforced_rxn_class.lower()
                             if enforced_rxn_class in rxn_class.lower() or enforced_rxn_class in rxn_name.lower():
-                                rxn_multiplier = 1
+                                rxn_multiplier = 1.0
                                 break
 
+                        # NOTE: This block of code is only relevant when enforcing building blocks *and* reaction classes
                         # Check if the node exactly matches an enforced building block
-                        is_matched, matched_block_smiles = match_stock(
-                            query_smiles=canonicalize_smiles(node_data["smiles"]),
-                            enforced_building_blocks_file=self.enforced_building_blocks_file
-                        )
-                        if is_matched and rxn_multiplier == 1:
-                            self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                        if self.enforce_blocks: 
+                            is_matched, matched_block_smiles = match_stock(
+                                query_smiles=canonicalize_smiles(node_data["smiles"]),
+                                enforced_building_blocks_file=self.enforced_building_blocks_file
+                            )
+                            if is_matched and rxn_multiplier == 1.0:
+                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
                             break
 
+                        else:
+                            # If the reaction class is matched, then the node reward is 1
+                            if rxn_multiplier == 1:
+                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                            break
+
+                    # Reaching this code requires that there is a solved route
                     # This truncates the node reward to 0 if the reaction class is not matched (assuming enforced blocks are also being considered)
-                    node_rewards[idx] = node_rewards[idx] * rxn_multiplier
+                    # If *not* enforcing blocks, then the reward is 1.0 * rxn_multiplier because the route is solved in the first place and the user specified to enforce *only* reaction classes
+                    node_rewards[idx] = node_rewards[idx] * rxn_multiplier if self.enforce_blocks else 1.0 * rxn_multiplier
 
                     with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
                         json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)               
