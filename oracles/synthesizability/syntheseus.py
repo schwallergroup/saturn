@@ -6,6 +6,7 @@ import json
 import ast
 import yaml
 import shutil
+import pandas as pd
 import numpy as np
 from oracles.oracle_component import OracleComponent
 from oracles.dataclass import OracleComponentParameters
@@ -66,7 +67,8 @@ class Syntheseus(OracleComponent):
 
             if self.use_dense_reward:
                 # Enforced building blocks
-                self.enforced_building_blocks_mols = [Chem.MolFromSmiles(line.strip()) for line in open(self.enforced_building_blocks_file, "r").readlines()]
+                self.enforced_building_block_smiles = [line.strip() for line in open(self.enforced_building_blocks_file, "r").readlines()]
+                self.enforced_building_blocks_mols = [Chem.MolFromSmiles(smiles) for smiles in self.enforced_building_block_smiles]
                 self.enforced_building_blocks_fps = construct_morgan_fingerprints_batch_from_file(self.enforced_building_blocks_file)
                 self.enforced_building_blocks_functional_groups = extract_functional_groups(
                     [canonicalize_smiles(smiles.strip()) for smiles in open(self.enforced_building_blocks_file, "r").readlines()]
@@ -213,23 +215,10 @@ class Syntheseus(OracleComponent):
                     if oracle_calls not in self.matched_generated_smiles:
                         self.matched_generated_smiles[oracle_calls] = []
 
-                    # Read the route data from the pickle file and extract the Mols
-                    # HACK: This (temporary) solution enables reading the pickled data *without* installing Syntheseus into the Saturn environment
-                    extraction_result = subprocess.run([
-                        "conda", 
-                        "run", 
-                        "-n",
-                        self.syntheseus_env_name, 
-                        "python", 
-                        self.route_extraction_script_path, 
-                        # NOTE: We set Syntheseus to terminate after 1 route is found, so the index is always 0
-                        os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
-                        "mol"  # Extract Mol data
-                    ], capture_output=True, text=True)
-
-                    # Check for errors
-                    assert extraction_result.returncode == 0, f"Error during Syntheseus route (Mol) data extraction: {extraction_result.stderr}"
-                    route = json.loads(extraction_result.stdout)
+                    route = self._extract_syntheseus_route_data(
+                        route_path=os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
+                        data_type="mol"
+                    )
 
                     # Check whether to use dense reward
                     if self.use_dense_reward:
@@ -307,23 +296,10 @@ class Syntheseus(OracleComponent):
                     if oracle_calls not in self.matched_generated_smiles_with_rxn:
                         self.matched_generated_smiles_with_rxn[oracle_calls] = []
 
-                    # Read the route data from the pickle file and extract the Reactions
-                    # HACK: This (temporary) solution enables reading the pickled data *without* installing Syntheseus into the Saturn environment
-                    extraction_result = subprocess.run([
-                        "conda", 
-                        "run", 
-                        "-n",
-                        self.syntheseus_env_name, 
-                        "python", 
-                        self.route_extraction_script_path, 
-                        # NOTE: We set Syntheseus to terminate after 1 route is found, so the index is always 0
-                        os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
-                        "rxn"  # Extract reaction data
-                    ], capture_output=True, text=True)
-
-                    # Check for errors
-                    assert extraction_result.returncode == 0, f"Error during Syntheseus route (rxn) data extraction: {extraction_result.stderr}"
-                    route = json.loads(extraction_result.stdout)
+                    route = self._extract_syntheseus_route_data(
+                        route_path=os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
+                        data_type="rxn"
+                    )
 
                     # NOTE: Trying binary rxn class reward for now
                     rxn_multiplier = 0.0
@@ -440,6 +416,114 @@ class Syntheseus(OracleComponent):
         # Write the data to the YAML file
         with open(os.path.join(dir_path, "config.yml"), "w") as f:
             yaml.dump(config, f, default_flow_style=False)
+
+    def _write_out_top_synthesis_graphs(
+        self,
+        oracle_history: pd.DataFrame,
+        # TODO: Make this a parameter
+        top_percentage: float = 0.05
+    ) -> None:
+        """
+        Sort the Oracle History by reward and extract the corresponding Syntheseus synthesis graphs PDF files. 
+        The purpose of this function is to automatically allow the user to visualize the synthesis routes for the top molecules.
+        """
+        # Sort the Oracle History by reward and extract the top percentage
+        oracle_history = oracle_history.sort_values(by="reward", ascending=False)
+        oracle_history = oracle_history.head(int(top_percentage * len(oracle_history)))
+        # Keep only syntheseus_reward = 1, as these are the solved molecules
+        oracle_history = oracle_history.loc[oracle_history["syntheseus_reward"] == 1]
+
+        # Loop through each top generated SMILES, extract the Syntheseus graph, and track which enforced smiles is visited (if applicable)
+        enforced_blocks = []
+        syntheseus_outputs = os.listdir(self.output_dir)
+        pdf_paths = []
+
+        for _, row in oracle_history.iterrows():
+            oracle_calls = int(row["oracle_calls"])
+            generated_smiles = row["smiles"]
+            
+            # FIXME: Below is due to *when* oracle_calls is being incremented. Fix this in the future
+            # Find the syntheseus output folder with the closest smaller number of oracle calls
+            closest_smaller_oracle_calls_folder = max(
+                [folder for folder in syntheseus_outputs if 
+                not folder.endswith(".json") and 
+                not folder.endswith(".pdf") and 
+                not "graphs" in folder and
+                int(folder.split("_")[-1]) < oracle_calls],
+                key=lambda x: int(x.split("_")[-1])
+                )
+
+            # All the Mols matching the oracle calls
+            mol_folder = os.listdir(os.path.join(self.output_dir, closest_smaller_oracle_calls_folder))
+            # Loop through each to find the correct molecule
+            for individual_mol_folder in mol_folder:
+                added = False
+                all_output_files = os.listdir(os.path.join(self.output_dir, closest_smaller_oracle_calls_folder, individual_mol_folder))
+                # Check if the Mol is solved
+                if "route_0.pkl" in all_output_files:
+                    with open(os.path.join(self.output_dir, closest_smaller_oracle_calls_folder, individual_mol_folder, "route_0.pkl"), "rb") as f:
+
+                        # Extract the route Mol data
+                        route = self._extract_syntheseus_route_data(
+                            route_path=os.path.join(self.output_dir, closest_smaller_oracle_calls_folder, individual_mol_folder, "route_0.pkl"),
+                            data_type="mol"
+                        )
+
+                        for node, node_data in route.items():
+                            # Check if the generated SMILES is in the route
+                            if node_data["depth"] == 0 and canonicalize_smiles(node_data["smiles"]) == canonicalize_smiles(generated_smiles):
+                                pdf_paths.append(os.path.join(self.output_dir, closest_smaller_oracle_calls_folder, individual_mol_folder, "route_0.pdf"))
+                                added = True
+                                if self.enforce_blocks:
+                                    # Extract which enforced block is present
+                                    for intermediate_node in route:
+                                        if canonicalize_smiles(intermediate_node.mol.smiles) in self.enforced_building_block_smiles:
+                                            enforced_blocks.append(canonicalize_smiles(intermediate_node.mol.smiles))
+                                            break
+                                if added:
+                                    break
+                        if added:
+                            break
+
+        # Loop through each successful path and copy the "route_0.pdf" to the syntheseus results directory
+        os.makedirs(os.path.join(self.output_dir, "top_synthesis_graphs"), exist_ok=True)
+        for idx, path in enumerate(pdf_paths):
+            os.system(f"cp {path} {os.path.join(self.output_dir, f'top_synthesis_graphs/route_{idx+1}.pdf')}")
+
+        # Add the enforced blocks to the oracle history
+        if self.enforce_blocks:
+            try:
+                oracle_history["enforced_blocks"] = enforced_blocks
+            except Exception as e:
+                print(f"Error adding enforced blocks to oracle history: {e}")
+                oracle_history["enforced_blocks"] = ["nan"] * len(oracle_history)
+
+        oracle_history.to_csv(os.path.join(self.output_dir, "top_synthesis_graphs", "top_synthesis_graphs.csv"), index=False)
+
+    def _extract_syntheseus_route_data(
+        self,
+        route_path: str,
+        data_type: str
+    ) -> Dict[str, Union[str, int]]:
+        # Read Syntheseus route data from the pickle file and extract the Mols or Reactions
+        # HACK: This (temporary) solution enables reading the pickled data *without* installing Syntheseus into the Saturn environment
+        extraction_result = subprocess.run([
+            "conda", 
+            "run", 
+            "-n",
+            self.syntheseus_env_name, 
+            "python", 
+            self.route_extraction_script_path, 
+            # NOTE: We set Syntheseus to terminate after 1 route is found, so the index is always 0
+            route_path,
+            data_type  # "mol" or "rxn"
+        ], capture_output=True, text=True)
+
+        # Check for errors
+        assert extraction_result.returncode == 0, f"Error during Syntheseus route ({data_type}) data extraction: {extraction_result.stderr}"
+        route = json.loads(extraction_result.stdout)
+
+        return route
 
     @staticmethod
     def _get_max_depth(route: Dict[str, Union[str, int]]) -> int:

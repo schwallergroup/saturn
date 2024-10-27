@@ -23,6 +23,10 @@ from diversity_filter.diversity_filter import DiversityFilter
 from hallucinated_memory.utils import initialize_hallucinator
 from beam_enumeration.beam_enumeration import BeamEnumeration
 
+# Syntheseus oracle for custom results write-out
+from oracles.synthesizability.syntheseus import Syntheseus
+
+
 
 class ReinforcementLearningAgent:
     """
@@ -197,12 +201,12 @@ class ReinforcementLearningAgent:
             # 16. Intermediate results write-out
             if self.oracle.calls > self.logging_frequency * self.logging_multiple:
                 logging.info(f"Logging intermediate results at {self.oracle.calls} oracle calls.")
-                self.write_out_results()
+                self._write_out_results()
                 self.agent.save(os.path.join(self.model_checkpoints_dir, f"{self.agent.model_architecture}_{self.oracle.calls}_agent.ckpt"))
                 self.logging_multiple += 1
 
         logging.info(f"Budget reached - final oracle calls: {self.oracle.calls}/{self.oracle.budget}")
-        self.write_out_results()
+        self._write_out_results()
         end_time = time.perf_counter()
         logging.info(f"Total wall time: {end_time - start_time} seconds.")
         self.agent.save(os.path.join(self.model_checkpoints_dir, f"final_{self.agent.model_architecture}_agent.ckpt"))
@@ -243,13 +247,14 @@ class ReinforcementLearningAgent:
         for param in self.prior.get_network_parameters():
             param.requires_grad = False
 
-    def write_out_results(self):
+    def _write_out_results(self):
         """
         Writes out the following results:
             1. Oracle History
-            2. Beam Enumeration History
-            3. Hallucination History
-            4. Number of Oracle repeats
+            2. Number of Oracle Repeats
+            3. Beam Enumeration History
+            4. Hallucination History
+            5. Syntheseus Synthesis Graphs
         """
         base_save_path = os.path.dirname(self.logging_path)
         self.oracle.write_out_oracle_history(base_save_path)
@@ -260,3 +265,10 @@ class ReinforcementLearningAgent:
 
         if self.execute_hallucinated_memory:
             self.hallucinator.write_out_history(base_save_path)
+
+        for oracle in self.oracle.oracle:
+            if isinstance(oracle, Syntheseus):
+                oracle._write_out_top_synthesis_graphs(
+                    oracle_history=self.oracle.oracle_history,
+                    top_percentage=0.05
+                )
