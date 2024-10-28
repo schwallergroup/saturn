@@ -17,6 +17,8 @@ from oracles.synthesizability.utils.utils import match_stock, extract_functional
 from concurrent.futures import ThreadPoolExecutor
 from oracles.synthesizability.utils.CONSTANTS import DEFAULT_TANGO_WEIGHTS
 
+from oracles.synthesizability.dataclass import EnforcedBuildingBlocksParameters, EnforcedReactionsParameters
+
 
 
 class Syntheseus(OracleComponent):
@@ -48,45 +50,51 @@ class Syntheseus(OracleComponent):
         self.building_blocks_file = self.parameters.specific_parameters.get("building_blocks_file", None)
         assert self.building_blocks_file is not None, "Please provide the path to the building blocks file."
 
-        # Whether to use a Dense Reward formulation
-        self.use_dense_reward = self.parameters.specific_parameters.get("use_dense_reward", False)  # Whether to use a Dense Reward formulation
+        # Enforced building blocks
+        # NOTE: The dataclass is only used for organization purpose - still initialize every parameter to guard against missing/invalid parameters
+        self.enforced_building_blocks_parameters = EnforcedBuildingBlocksParameters(
+            **self.parameters.specific_parameters.get("enforced_building_blocks", None)
+        )
+        if self.enforced_building_blocks_parameters.enforce_blocks:
+            self.enforce_blocks = True
+            self.enforce_start = self.enforced_building_blocks_parameters.enforce_start
+            # Enforced building blocks
+            self.enforced_building_blocks_file = self.enforced_building_blocks_parameters.enforced_building_blocks_file             
+            assert self.enforced_building_blocks_file is not None, "The run specifies to enforce building blocks, please provide the path to the file containing the building blocks to enforce."
+            self.enforced_building_blocks_smiles = [line.strip() for line in open(self.enforced_building_blocks_file, "r").readlines()]
+            self.enforced_building_blocks_mols = [Chem.MolFromSmiles(smiles) for smiles in self.enforced_building_blocks_smiles]
+            self.enforced_building_blocks_fps = construct_morgan_fingerprints_batch_from_file(self.enforced_building_blocks_file)
+            self.enforced_building_blocks_functional_groups = extract_functional_groups(
+                [canonicalize_smiles(smiles.strip()) for smiles in open(self.enforced_building_blocks_file, "r").readlines()]
+            )  # Dict[str, List[str]
 
-        self.enforce_blocks = self.parameters.specific_parameters.get("enforce_blocks", False)  # Whether to enforce synthetic routes cross a set of reference blocks
-        self.enforce_rxn_class_presence = self.parameters.specific_parameters.get("enforce_rxn_class_presence", False)  # Whether to enforce that the reaction classes appear in the synthesis graph
-        if self.enforce_blocks or self.enforce_rxn_class_presence:
+            self.use_dense_reward = self.enforced_building_blocks_parameters.use_dense_reward
+            # Reward type
+            self.reward_type = self.enforced_building_blocks_parameters.reward_type
+            if self.use_dense_reward:
+                assert self.reward_type is not None, "Using Dense Reward for Syntheseus but no reward type was provided."
+            self.tango_weights = self.enforced_building_blocks_parameters.tango_weights
+            if any(weight < 0 or weight is None for weight in self.tango_weights.values()):
+                self.tango_weights = DEFAULT_TANGO_WEIGHTS
+
+        # Enforced reactions
+        # NOTE: The dataclass is only used for organization purpose - still initialize every parameter to guard against missing/invalid parameters
+        self.enforced_reactions_parameters = EnforcedReactionsParameters(
+            **self.parameters.specific_parameters.get("enforced_reactions", None)
+        )
+        if self.enforced_reactions_parameters.enforce_rxn_class_presence:
+            self.enforce_rxn_class_presence = True
+            self.rxn_insight_env_name = self.enforced_reactions_parameters.rxn_insight_env_name
+            assert self.rxn_insight_env_name is not None, "The run specifies to enforce reactions, please provide the Conda environment name with Rxn-INSIGHT installed."
+            self.enforced_rxn_classes = self.enforced_reactions_parameters.enforced_rxn_classes
+            assert self.enforced_rxn_classes is not None, "The run specifies to enforce reactions, please provide the reaction classes to enforce."
+            self.rxn_info_extraction_script_path = self.enforced_reactions_parameters.rxn_info_extraction_script_path
+            assert self.rxn_info_extraction_script_path is not None, "The run specifies to enforce reactions, please provide the path to the script that extracts the reaction classes from the Syntheseus route pickle file."
+
+        if self.enforced_building_blocks_parameters.enforce_blocks or self.enforced_reactions_parameters.enforce_rxn_class_presence:
             # Path to the script that extracts the SMILES and depth from the Syntheseus route pickle file
             self.route_extraction_script_path = self.parameters.specific_parameters.get("route_extraction_script_path", None)
-            assert self.route_extraction_script_path is not None, "The run specifies to enforce building blocks or reaction classes, please provide the path to the script that extracts the SMILES and depth from the Syntheseus route pickle file."
-
-        # Enforce building blocks
-        if self.enforce_blocks:
-            self.enforced_building_blocks_file = self.parameters.specific_parameters.get("enforced_building_blocks_file", None)
-            assert self.enforced_building_blocks_file is not None, "The run specifies to enforce building blocks, please provide the path to the building blocks file."
-
-            self.enforce_start = self.parameters.specific_parameters.get("enforce_start", False)  # Whether to enforce that the reference blocks appear in the root nodes
-
-            if self.use_dense_reward:
-                # Enforced building blocks
-                self.enforced_building_block_smiles = [line.strip() for line in open(self.enforced_building_blocks_file, "r").readlines()]
-                self.enforced_building_blocks_mols = [Chem.MolFromSmiles(smiles) for smiles in self.enforced_building_block_smiles]
-                self.enforced_building_blocks_fps = construct_morgan_fingerprints_batch_from_file(self.enforced_building_blocks_file)
-                self.enforced_building_blocks_functional_groups = extract_functional_groups(
-                    [canonicalize_smiles(smiles.strip()) for smiles in open(self.enforced_building_blocks_file, "r").readlines()]
-                )  # Dict[str, List[str]] (SMILES: Functional Groups)
-
-                # Dense Reward Function
-                self.reward_type = self.parameters.specific_parameters.get("reward_type", None)
-                assert self.reward_type is not None, "Using Dense Reward for Syntheseus but no reward type was provided."
-                self.tango_weights = self.parameters.specific_parameters.get("tango_weights", DEFAULT_TANGO_WEIGHTS)
-
-        # Enforce reaction classes
-        if self.enforce_rxn_class_presence:
-            self.rxn_insight_env_name = self.parameters.specific_parameters.get("rxn_insight_env_name", None)
-            assert self.rxn_insight_env_name is not None, "The run specifies to enforce reaction classes, please provide the Conda environment name with Rxn-INSIGHT installed."
-            self.enforced_rxn_classes = self.parameters.specific_parameters.get("enforced_rxn_classes", None)
-            assert self.enforced_rxn_classes is not None, "The run specifies to enforce reaction classes, please provide the reaction classes to enforce."
-            self.rxn_info_extraction_script_path = self.parameters.specific_parameters.get("rxn_info_extraction_script_path", None)
-            assert self.rxn_info_extraction_script_path is not None, "The run specifies to enforce reaction classes, please provide the path to the script that extracts the reaction classes from the Syntheseus route pickle file."
+            assert self.route_extraction_script_path is not None, "The run specifies to enforce building blocks and/or reactions, please provide the path to the script that extracts the SMILES and depth from the Syntheseus route pickle file."
 
         # Search time limit
         self.time_limit_s = self.parameters.specific_parameters.get("time_limit_s", 180)  # Default to 3 minutes per molecule
@@ -286,9 +294,9 @@ class Syntheseus(OracleComponent):
                         is_solved[idx] = int(is_matched)
                         steps[idx] = steps[idx] if is_matched else 99
 
-                # -------------------------
-                # ENFORCED REACTION CLASSES
-                # -------------------------
+                # ------------------
+                # ENFORCED REACTIONS
+                # ------------------
 
                 # If the molecule is solved *and* the user specified to enforce that a set of reaction classes appears in the synthesis graph
                 if self.enforce_rxn_class_presence and int(is_solved[idx]) == 1:
@@ -377,7 +385,7 @@ class Syntheseus(OracleComponent):
         shutil.rmtree(temp_dir)
 
         # 9. Prepare and/or return the output
-        if self.use_dense_reward or self.enforce_rxn_class_presence:
+        if self.enforced_building_blocks_parameters.enforce_blocks or self.enforced_reactions_parameters.enforce_rxn_class_presence:
             if not self.parallelize:
                 assert len(node_rewards) == len(smiles), "Syntheseus output length mismatch."
             return node_rewards
@@ -442,8 +450,8 @@ class Syntheseus(OracleComponent):
             oracle_calls = int(row["oracle_calls"])
             generated_smiles = row["smiles"]
             
-            # FIXME: Below is due to *when* oracle_calls is being incremented. Fix this in the future
-            # Find the syntheseus output folder with the closest smaller number of oracle calls
+            # Find the syntheseus output folder with the closest *smaller* number of oracle calls
+            # FIXME: This is because currently, oracle calls is incremented before the Oracle History is updated. Fix this in the future
             closest_smaller_oracle_calls_folder = max(
                 [folder for folder in syntheseus_outputs if 
                 not folder.endswith(".json") and 
@@ -474,10 +482,10 @@ class Syntheseus(OracleComponent):
                             if node_data["depth"] == 0 and canonicalize_smiles(node_data["smiles"]) == canonicalize_smiles(generated_smiles):
                                 pdf_paths.append(os.path.join(self.output_dir, closest_smaller_oracle_calls_folder, individual_mol_folder, "route_0.pdf"))
                                 added = True
-                                if self.enforce_blocks:
+                                if self.enforced_building_blocks_parameters.enforce_blocks:
                                     # Extract which enforced block is present
                                     for intermediate_node in route:
-                                        if canonicalize_smiles(intermediate_node.mol.smiles) in self.enforced_building_block_smiles:
+                                        if canonicalize_smiles(intermediate_node.mol.smiles) in self.enforced_building_blocks_smiles:
                                             enforced_blocks.append(canonicalize_smiles(intermediate_node.mol.smiles))
                                             break
                                 if added:
@@ -491,7 +499,7 @@ class Syntheseus(OracleComponent):
             os.system(f"cp {path} {os.path.join(self.output_dir, f'top_synthesis_graphs/route_{idx+1}.pdf')}")
 
         # Add the enforced blocks to the oracle history
-        if self.enforce_blocks:
+        if self.enforced_building_blocks_parameters.enforce_blocks:
             try:
                 oracle_history["enforced_blocks"] = enforced_blocks
             except Exception as e:
