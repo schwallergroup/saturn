@@ -10,8 +10,9 @@ from oracles.dataclass import OracleComponentParameters
 from rdkit import Chem
 from rdkit.Chem import AllChem, Mol
 
+from utils.chemistry_utils import canonicalize_smiles
 from oracles.docking.dataclass import ConstrainedDockingParameters
-from oracles.docking.utils.constrained_docking_utils import extract_hbind_interactions, match_interactions, dense_reward_multiplier, sdf2smiles
+from oracles.docking.utils.constrained_docking_utils import extract_hbind_interactions, match_interactions, dense_reward_multiplier
 
 
 
@@ -46,7 +47,7 @@ class GNINA(OracleComponent):
         # Ligand embedding parameter - use ETKDG: https://pubs.acs.org/doi/10.1021/acs.jcim.5b00654
         self.ETKDG = AllChem.ETKDG()
 
-        # gnina parameters 
+        # `gnina` parameters
         self.exhaustiveness = self.parameters.specific_parameters.get("exhaustiveness", 8)  # Default to 8
         self.flexdist = self.parameters.specific_parameters.get("flexdist", 0)  # Allow flexible residues up to `flexdist` Angstroms from ligand. Default to 0
 
@@ -81,10 +82,13 @@ class GNINA(OracleComponent):
         temp_input_sdf_dir = tempfile.mkdtemp()
         temp_output_dir = tempfile.mkdtemp()
 
-        # 2. Protonate Mols
+        # 2. Store SMILES
+        smiles = [canonicalize_smiles(Chem.MolToSmiles(mol)) for mol in mols]
+
+        # 3. Protonate Mols
         mols = [Chem.AddHs(mol) for mol in mols]
 
-        # 3. Generate 1 (lowest energy) conformer using RDKit ETKDG and force-field (UFF or MMFF94) minimize
+        # 4. Generate 1 (lowest energy) conformer using RDKit ETKDG and force-field (UFF or MMFF94) minimize
         for idx, mol in enumerate(mols):
         # Skip molecules that fail to embed
             try:
@@ -101,7 +105,7 @@ class GNINA(OracleComponent):
             writer.flush()
             writer.close()
 
-        # 3. Execute `gnina` and extract the raw docking scores
+        # 5. Execute `gnina` and extract the raw docking scores
         # TODO: Could be paralellized but GPU docking should be fast enough as large libraries are not expected
         # Change directory to the `gnina` binary directory
         current_dir = os.getcwd()
@@ -146,7 +150,7 @@ class GNINA(OracleComponent):
             except Exception:
                 docking_scores[ligand_idx-1] = 0.0  # Set to 0.0 if affinity not found or molecule is None
 
-        # 4. Check for enforced interactions
+        # 6. Check for enforced interactions
         # `Hbind` expects the receptor as .pdb so convert from .pdbqt to .pdb
         output = subprocess.run([
             "obabel",
@@ -158,7 +162,8 @@ class GNINA(OracleComponent):
         reward_multiplier = np.ones(len(mols))
         if self.constrained_docking_parameters.enforce_interactions:
             # Tracker
-            self.constrained_generated_smiles[oracle_calls] = []
+            if oracle_calls not in self.constrained_generated_smiles:
+                self.constrained_generated_smiles[oracle_calls] = []
 
             # Change directory to the `Hbind` binary directory
             os.chdir(self.constrained_docking_parameters.hbind_binary)
@@ -174,7 +179,9 @@ class GNINA(OracleComponent):
                         "-O", os.path.join(temp_output_dir, f"temp_ligand_{ligand_idx}.mol2")
                     ], capture_output=True)
 
-                    if not os.path.exists(os.path.join(temp_output_dir, f"temp_ligand_{ligand_idx}.mol2")):
+                    # Check if mol2 conversion was successful
+                    mol2_path = os.path.join(temp_output_dir, f"temp_ligand_{ligand_idx}.mol2")
+                    if not os.path.exists(mol2_path) or os.path.getsize(mol2_path) == 0:
                         reward_multiplier[ligand_idx-1] = 0.0
                         continue
 
@@ -219,7 +226,7 @@ class GNINA(OracleComponent):
                         )
 
                     if reward_multiplier[ligand_idx-1] == 1.0:
-                        self.constrained_generated_smiles[oracle_calls].append(sdf2smiles(os.path.join(temp_output_dir, f"docked_pose_{ligand_idx}.sdf")))
+                        self.constrained_generated_smiles[oracle_calls].append(smiles[ligand_idx-1])
 
                 except Exception:
                     reward_multiplier[ligand_idx-1] = 0.0
@@ -227,10 +234,10 @@ class GNINA(OracleComponent):
             with open(os.path.join(self.output_dir, "constrained_generated_smiles.json"), "w") as f:
                 json.dump(self.constrained_generated_smiles, f, indent=4)
 
-        # 5. Change back to the original directory
+        # 7. Change back to the original directory
         os.chdir(current_dir)
 
-        # 6. Copy and save the docking output
+        # 8. Copy and save the docking output
         # Remove the temporary files
         os.remove(os.path.join(temp_output_dir, "receptor.pdb"))
         for file in os.listdir(temp_output_dir):
@@ -243,7 +250,7 @@ class GNINA(OracleComponent):
             os.path.join(self.output_dir, f"results_{oracle_calls}")
         ])
 
-        # 7. Delete the temporary folders
+        # 9. Delete the temporary folders
         shutil.rmtree(temp_input_sdf_dir)
         shutil.rmtree(temp_output_dir)
 

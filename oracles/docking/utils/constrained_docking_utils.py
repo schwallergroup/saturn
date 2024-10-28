@@ -1,30 +1,5 @@
 from typing import Dict, List, Tuple, Union, Set
-import os
-import subprocess
 import numpy as np
-from utils.chemistry_utils import canonicalize_smiles
-
-
-# Technically a chemistry utility, but this is likely only used in the constrained-docking oracle
-def sdf2smiles(sdf_file: str) -> str:
-    """
-    Convert an SDF file to its canonical SMILES string.
-    """
-    output_dir = os.path.dirname(sdf_file)
-    output = subprocess.run([
-        "obabel",
-        "-isdf", sdf_file,
-        "-O", os.path.join(output_dir, "temp.smi")
-    ], capture_output=True)
-    
-    try:
-        with open(os.path.join(output_dir, "temp.smi"), "r") as f:
-            smiles = f.read().strip()
-    except FileNotFoundError:
-        raise ValueError(f"SDF file {sdf_file} not found")
-
-    return canonicalize_smiles(smiles)
-
 
 def get_interaction_criteria(interaction_type: str) -> Dict[str, Union[int, float]]:
     # From: https://github.com/rasbt/Hbind
