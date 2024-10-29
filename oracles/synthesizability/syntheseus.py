@@ -562,6 +562,8 @@ class Syntheseus(OracleComponent):
             return "Graph2Edits"
         elif model_name in ["megan", "MEGAN"]:
             return "MEGAN"
+        elif model_name in ["localretro"]:
+            return "LocalRetro"
         else:
             # TODO: Support all the models in Syntheseus 
             raise ValueError(f"Model name {model_name} not recognized or not supported yet.")
