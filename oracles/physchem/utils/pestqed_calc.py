@@ -1,7 +1,7 @@
-"""Stuff used to compute PestQED (insecticides only) based on rdkit way of computing QED. Minimal 
-modification of the actual QED module based on 10.1186/s13321-014-0042-6.
 """
-
+Functions and constants used to compute PestQED (for insecticides) based on RDKit's way of computing QED. 
+Minimal modification of the actual QED module based on 10.1186/s13321-014-0042-6.
+"""
 import math
 
 from rdkit import Chem
@@ -72,7 +72,8 @@ def properties(mol):
 
 
 def pestqed(mol, w=WEIGHT_NONE, qedProperties=None):
-  """ Calculate the weighted sum of ADS mapped properties
+  """ 
+  Calculate the weighted sum of ADS mapped properties
 
   some examples from the QED paper, reference values from Peter G's original implementation
   >>> m = Chem.MolFromSmiles('N=C(CCSCc1csc(N=C(N)N)n1)NS(N)(=O)=O')
