@@ -2,7 +2,6 @@ import numpy as np
 from oracles.oracle_component import OracleComponent
 from oracles.dataclass import OracleComponentParameters
 from rdkit.Chem import Mol
-from rdkit.Chem.Descriptors import qed
 from utils.pestqed_calc import pestqed
 
 class PestQED(OracleComponent):
