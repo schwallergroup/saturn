@@ -56,7 +56,6 @@ class Syntheseus(OracleComponent):
             **self.parameters.specific_parameters.get("enforced_building_blocks", None)
         )
         if self.enforced_building_blocks_parameters.enforce_blocks:
-            self.enforce_blocks = True
             self.enforce_start = self.enforced_building_blocks_parameters.enforce_start
             # Enforced building blocks
             self.enforced_building_blocks_file = self.enforced_building_blocks_parameters.enforced_building_blocks_file             
@@ -218,7 +217,7 @@ class Syntheseus(OracleComponent):
                 # ------------------------
 
                 # If the molecule is solved *and* the user specified to enforce that a set of building blocks appears in the synthesis graph
-                if self.enforce_blocks and int(is_solved[idx]) == 1:
+                if self.enforced_building_blocks_parameters.enforce_blocks and int(is_solved[idx]) == 1:
 
                     if oracle_calls not in self.matched_generated_smiles:
                         self.matched_generated_smiles[oracle_calls] = []
@@ -316,7 +315,7 @@ class Syntheseus(OracleComponent):
                         # Execute Rxn-INSIGHT on the rxn SMILES
                         # HACK: This (temporary) solution enables reading the pickled data *without* installing Rxn-INSIGHT into the Saturn environment
                         extraction_result = subprocess.run([
-                            "conda", 
+                            "conda",
                             "run", 
                             "-n",
                             self.rxn_insight_env_name, 
@@ -340,7 +339,7 @@ class Syntheseus(OracleComponent):
 
                         # NOTE: This block of code is only relevant when enforcing building blocks *and* reaction classes
                         # Check if the node exactly matches an enforced building block
-                        if self.enforce_blocks: 
+                        if self.enforced_building_blocks_parameters.enforce_blocks: 
                             if is_matched and rxn_multiplier == 1.0:
                                 self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
                                 break
@@ -354,7 +353,7 @@ class Syntheseus(OracleComponent):
                     # Reaching this code requires that there is a solved route
                     # This truncates the node reward to 0 if the reaction class is not matched (assuming enforced blocks are also being considered)
                     # If *not* enforcing blocks, then the reward is 1.0 * rxn_multiplier because the route is solved in the first place and the user specified to enforce *only* reaction classes
-                    node_rewards[idx] = node_rewards[idx] * rxn_multiplier if self.enforce_blocks else 1.0 * rxn_multiplier
+                    node_rewards[idx] = node_rewards[idx] * rxn_multiplier if self.enforced_building_blocks_parameters.enforce_blocks else 1.0 * rxn_multiplier
 
                     with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
                         json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)               
