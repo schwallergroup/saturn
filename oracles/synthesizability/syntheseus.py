@@ -95,6 +95,9 @@ class Syntheseus(OracleComponent):
             self.route_extraction_script_path = self.parameters.specific_parameters.get("route_extraction_script_path", None)
             assert self.route_extraction_script_path is not None, "The run specifies to enforce building blocks and/or reactions, please provide the path to the script that extracts the SMILES and depth from the Syntheseus route pickle file."
 
+        # Save top percentage routes
+        self.save_top_percentage_routes = self.parameters.specific_parameters.get("save_top_percentage_routes", 0.05)  # Default to top 5%
+
         # Search time limit
         self.time_limit_s = self.parameters.specific_parameters.get("time_limit_s", 180)  # Default to 3 minutes per molecule
 
@@ -427,8 +430,6 @@ class Syntheseus(OracleComponent):
     def _write_out_top_synthesis_graphs(
         self,
         oracle_history: pd.DataFrame,
-        # TODO: Make this a parameter
-        top_percentage: float = 0.05
     ) -> None:
         """
         Sort the Oracle History by reward and extract the corresponding Syntheseus synthesis graphs PDF files. 
@@ -436,7 +437,7 @@ class Syntheseus(OracleComponent):
         """
         # Sort the Oracle History by reward and extract the top percentage
         oracle_history = oracle_history.sort_values(by="reward", ascending=False)
-        oracle_history = oracle_history.head(int(top_percentage * len(oracle_history)))
+        oracle_history = oracle_history.head(int(self.save_top_percentage_routes * len(oracle_history)))
         # Keep only syntheseus_reward = 1, as these are the solved molecules
         oracle_history = oracle_history.loc[oracle_history["syntheseus_reward"] == 1]
 
@@ -451,14 +452,17 @@ class Syntheseus(OracleComponent):
             
             # Find the syntheseus output folder with the closest *smaller* number of oracle calls
             # FIXME: This is because currently, oracle calls is incremented before the Oracle History is updated. Fix this in the future
+            # FIXME: This is inelegant
             closest_smaller_oracle_calls_folder = max(
-                [folder for folder in syntheseus_outputs if 
-                not folder.endswith(".json") and 
-                not folder.endswith(".pdf") and 
-                not "graphs" in folder and
-                int(folder.split("_")[-1]) < oracle_calls],
+                [
+                    folder for folder in syntheseus_outputs 
+                    if not folder.endswith(".json") and 
+                    not folder.endswith(".pdf") and 
+                    not "graphs" in folder and
+                    int(folder.split("_")[-1]) < oracle_calls
+                ],
                 key=lambda x: int(x.split("_")[-1])
-                )
+            )
 
             # All the Mols matching the oracle calls
             mol_folder = os.listdir(os.path.join(self.output_dir, closest_smaller_oracle_calls_folder))
