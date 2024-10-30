@@ -82,7 +82,6 @@ class Syntheseus(OracleComponent):
             **self.parameters.specific_parameters.get("enforced_reactions", None)
         )
         if self.enforced_reactions_parameters.enforce_rxn_class_presence:
-            self.enforce_rxn_class_presence = True
             self.rxn_insight_env_name = self.enforced_reactions_parameters.rxn_insight_env_name
             assert self.rxn_insight_env_name is not None, "The run specifies to enforce reactions, please provide the Conda environment name with Rxn-INSIGHT installed."
             self.enforced_rxn_classes = self.enforced_reactions_parameters.enforced_rxn_classes
@@ -302,7 +301,7 @@ class Syntheseus(OracleComponent):
                 # ------------------
 
                 # If the molecule is solved *and* the user specified to enforce that a set of reaction classes appears in the synthesis graph
-                if self.enforce_rxn_class_presence and int(is_solved[idx]) == 1:
+                if self.enforced_reactions_parameters.enforce_rxn_class_presence and int(is_solved[idx]) == 1:
 
                     if oracle_calls not in self.matched_generated_smiles_with_rxn:
                         self.matched_generated_smiles_with_rxn[oracle_calls] = []

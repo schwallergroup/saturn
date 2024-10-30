@@ -268,7 +268,4 @@ class ReinforcementLearningAgent:
 
         for oracle in self.oracle.oracle:
             if isinstance(oracle, Syntheseus):
-                oracle._write_out_top_synthesis_graphs(
-                    oracle_history=self.oracle.oracle_history,
-                    top_percentage=0.05
-                )
+                oracle._write_out_top_synthesis_graphs(self.oracle.oracle_history)
