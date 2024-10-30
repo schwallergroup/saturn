@@ -496,10 +496,11 @@ class Syntheseus(OracleComponent):
                         if added:
                             break
 
-        # Loop through each successful path and copy the "route_0.pdf" to the syntheseus results directory
+        # Loop through each successful path and copy the "route_0.pdf" and "route_0.pkl" to the syntheseus results directory
         os.makedirs(os.path.join(self.output_dir, "top_synthesis_graphs"), exist_ok=True)
         for idx, path in enumerate(pdf_paths):
             os.system(f"cp {path} {os.path.join(self.output_dir, f'top_synthesis_graphs/route_{idx+1}.pdf')}")
+            os.system(f"cp {path.replace('.pdf', '.pkl')} {os.path.join(self.output_dir, f'top_synthesis_graphs/route_{idx+1}.pkl')}")
 
         # Add the enforced blocks to the oracle history
         if self.enforced_building_blocks_parameters.enforce_blocks:
