@@ -91,9 +91,3 @@ if __name__ == "__main__":
         data_type=data_type
     )
     print(data)  # Capture result
-    #route = "/home/jeff/iclr_synth/saturn-dev/dev/synth/enforce/dump/syntheseus_results/output_0/mol_53/route_0.pkl"
-    #data = extract_data(
-    #    file_path=route,
-    #    data_type="all"
-    #)
-    #print(data)
