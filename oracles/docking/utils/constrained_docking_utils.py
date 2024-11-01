@@ -100,34 +100,38 @@ def dense_reward_multiplier(
                 if interaction[3] >= interaction_criteria["distance_lower_bound"] and interaction[3] <= interaction_criteria["distance_upper_bound"]:
                     # Perfect reward
                     #distance_factor = 0.5
-                    distance_factor = 1.0
+                    #distance_factor = 1.0
+                    distance_factor = 0.75
                 elif interaction[3] < interaction_criteria["distance_lower_bound"]:
                     # Decrease reward by 0.1 for every 0.1 Angstrom deviation
                     deviation = interaction_criteria["distance_lower_bound"] - interaction[3]
                     #distance_factor = max(0, 0.5 - (deviation / 0.1 * 0.1))
-                    distance_factor = max(0, 1.0 - (deviation / 0.1 * 0.1))
+                    #distance_factor = max(0, 1.0 - (deviation / 0.1 * 0.1))
+                    distance_factor = max(0, 0.75 - (deviation / 0.1 * 0.1))
                 elif interaction[3] > interaction_criteria["distance_upper_bound"]:
                     # Decrease reward by 0.1 for every 0.1 Angstrom deviation
                     deviation = interaction[3] - interaction_criteria["distance_upper_bound"]
                     #distance_factor = max(0, 0.5 - (deviation / 0.1 * 0.1))
-                    distance_factor = max(0, 1.0 - (deviation / 0.1 * 0.1))
-
-                break
+                    #distance_factor = max(0, 1.0 - (deviation / 0.1 * 0.1))
+                    distance_factor = max(0, 0.75 - (deviation / 0.1 * 0.1))
             
                 # Check angle criterion
                 if float(distance_factor) == 0.0:
                     angle_factor = 0.0
                 elif interaction[4] >= interaction_criteria["angle_lower_bound"] and interaction[4] <= interaction_criteria["angle_upper_bound"]:
                     # Perfect reward
-                    angle_factor = 0.5
+                    #angle_factor = 0.5
+                    angle_factor = 0.25
                 elif interaction[4] < interaction_criteria["angle_lower_bound"]:
                     # Decrease reward by 0.1 for every 5 degrees deviation
                     deviation = interaction_criteria["angle_lower_bound"] - interaction[4]
-                    angle_factor = max(0, 0.5 - (deviation / 5 * 0.1))
+                    #angle_factor = max(0, 0.5 - (deviation / 5 * 0.1))
+                    angle_factor = max(0, 0.25 - (deviation / 5 * 0.1))
                 elif interaction[4] > interaction_criteria["angle_upper_bound"]:
                     # Decrease reward by 0.1 for every 5 degrees deviation
                     deviation = interaction[4] - interaction_criteria["angle_upper_bound"]
-                    angle_factor = max(0, 0.5 - (deviation / 5 * 0.1))
+                    #angle_factor = max(0, 0.5 - (deviation / 5 * 0.1))
+                    angle_factor = max(0, 0.25 - (deviation / 5 * 0.1))
 
                 # Break after finding the interaction for the residue
                 break
