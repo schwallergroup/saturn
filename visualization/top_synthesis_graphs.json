@@ -1,0 +1,576 @@
+{
+    "c1c(CC(Nc2ccc(C(N3CN(C)CCC3)=O)o2)=O)ccc(F)c1F": {
+        "reward": {
+            "reward": 0.8160769939422607,
+            "tango_raw_values": 0.5996168851852417,
+            "syntheseus_raw_values": 1.0,
+            "qed_raw_values": 0.9063992789327686
+        },
+        "synthesis_data": {
+            "node_1": {
+                "depth": 0,
+                "is_mol": true,
+                "mol_smiles": "CN1CCCN(C(=O)c2ccc(NC(=O)Cc3ccc(F)c(F)c3)o2)C1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_2": {
+                "depth": 1,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "CN1CCCN(C(=O)c2ccc(N)o2)C1.O=C(O)Cc1ccc(F)c(F)c1>>CN1CCCN(C(=O)c2ccc(NC(=O)Cc3ccc(F)c(F)c3)o2)C1",
+                "rxn_class": "Acylation",
+                "rxn_name": "Carboxylic acid with primary amine to amide",
+                "is_purchasable": null
+            },
+            "node_3": {
+                "depth": 2,
+                "is_mol": true,
+                "mol_smiles": "CN1CCCN(C(=O)c2ccc(N)o2)C1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_4": {
+                "depth": 2,
+                "is_mol": true,
+                "mol_smiles": "O=C(O)Cc1ccc(F)c(F)c1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            },
+            "node_5": {
+                "depth": 3,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "CN1CCCNC1.Nc1ccc(C(=O)O)o1>>CN1CCCN(C(=O)c2ccc(N)o2)C1",
+                "rxn_class": "Acylation",
+                "rxn_name": "Acylation of Nitrogen Nucleophiles by Carboxylic Acids",
+                "is_purchasable": null
+            },
+            "node_6": {
+                "depth": 4,
+                "is_mol": true,
+                "mol_smiles": "Nc1ccc(C(=O)O)o1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            },
+            "node_7": {
+                "depth": 4,
+                "is_mol": true,
+                "mol_smiles": "CN1CCCNC1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            }
+        },
+        "enforced_block": "Nc1ccc(C(=O)O)o1"
+    },
+    "c1c(F)c(F)cc(CC(=O)Nc2oc(C(N3CC[C@@H]C[C@@H]COCC3)=O)cc2)c1": {
+        "reward": {
+            "reward": 0.7926466464996338,
+            "tango_raw_values": 0.5873016119003296,
+            "syntheseus_raw_values": 1.0,
+            "qed_raw_values": 0.8479644907487873
+        },
+        "synthesis_data": {
+            "node_1": {
+                "depth": 0,
+                "is_mol": true,
+                "mol_smiles": "O=C(Cc1ccc(F)c(F)c1)Nc1ccc(C(=O)N2CC[CH]C[CH]COCC2)o1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_2": {
+                "depth": 1,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "C1CCCOCCNCC1.O=C(Cc1ccc(F)c(F)c1)Nc1ccc(C(=O)O)o1>>O=C(Cc1ccc(F)c(F)c1)Nc1ccc(C(=O)N2CC[CH]C[CH]COCC2)o1",
+                "rxn_class": "Acylation",
+                "rxn_name": "OtherReaction",
+                "is_purchasable": null
+            },
+            "node_3": {
+                "depth": 2,
+                "is_mol": true,
+                "mol_smiles": "O=C(Cc1ccc(F)c(F)c1)Nc1ccc(C(=O)O)o1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_4": {
+                "depth": 2,
+                "is_mol": true,
+                "mol_smiles": "C1CCCOCCNCC1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_5": {
+                "depth": 3,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "O=C1COCCCCCCN1>>C1CCCOCCNCC1",
+                "rxn_class": "Reduction",
+                "rxn_name": "Reduction of secondary amides to amines",
+                "is_purchasable": null
+            },
+            "node_6": {
+                "depth": 3,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "Nc1ccc(C(=O)O)o1.O=C(Cl)Cc1ccc(F)c(F)c1>>O=C(Cc1ccc(F)c(F)c1)Nc1ccc(C(=O)O)o1",
+                "rxn_class": "Acylation",
+                "rxn_name": "Acylation of Nitrogen Nucleophiles by Acyl/Thioacyl/Carbamoyl Halides and Analogs_OS",
+                "is_purchasable": null
+            },
+            "node_7": {
+                "depth": 4,
+                "is_mol": true,
+                "mol_smiles": "Nc1ccc(C(=O)O)o1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            },
+            "node_8": {
+                "depth": 4,
+                "is_mol": true,
+                "mol_smiles": "O=C1COCCCCCCN1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_9": {
+                "depth": 4,
+                "is_mol": true,
+                "mol_smiles": "O=C(Cl)Cc1ccc(F)c(F)c1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            },
+            "node_10": {
+                "depth": 5,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "COC(=O)COCCCCCCN>>O=C1COCCCCCCN1",
+                "rxn_class": "Miscellaneous",
+                "rxn_name": "OtherReaction",
+                "is_purchasable": null
+            },
+            "node_11": {
+                "depth": 6,
+                "is_mol": true,
+                "mol_smiles": "COC(=O)COCCCCCCN",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_12": {
+                "depth": 7,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "COC(=O)COCCCCCCN1C(=O)c2ccccc2C1=O>>COC(=O)COCCCCCCN",
+                "rxn_class": "Reduction",
+                "rxn_name": "OtherReaction",
+                "is_purchasable": null
+            },
+            "node_13": {
+                "depth": 8,
+                "is_mol": true,
+                "mol_smiles": "COC(=O)COCCCCCCN1C(=O)c2ccccc2C1=O",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_14": {
+                "depth": 9,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "COC(=O)CBr.O=C1c2ccccc2C(=O)N1CCCCCCO>>COC(=O)COCCCCCCN1C(=O)c2ccccc2C1=O",
+                "rxn_class": "Heteroatom Alkylation and Arylation",
+                "rxn_name": "Williamson Ether Synthesis",
+                "is_purchasable": null
+            },
+            "node_15": {
+                "depth": 10,
+                "is_mol": true,
+                "mol_smiles": "O=C1c2ccccc2C(=O)N1CCCCCCO",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            },
+            "node_16": {
+                "depth": 10,
+                "is_mol": true,
+                "mol_smiles": "COC(=O)CBr",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            }
+        },
+        "enforced_block": "Nc1ccc(C(=O)O)o1"
+    },
+    "N1(C(=O)c2ccc(NC(=O)Cc3cc(F)c(F)cc3)o2)CCC(=O)NCCCCC1": {
+        "reward": {
+            "reward": 0.7720921039581299,
+            "tango_raw_values": 0.5772569179534912,
+            "syntheseus_raw_values": 1.0,
+            "qed_raw_values": 0.7973300586346355
+        },
+        "synthesis_data": {
+            "node_1": {
+                "depth": 0,
+                "is_mol": true,
+                "mol_smiles": "O=C1CCN(C(=O)c2ccc(NC(=O)Cc3ccc(F)c(F)c3)o2)CCCCCN1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_2": {
+                "depth": 1,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "NCCCCCN(CCC(=O)O)C(=O)c1ccc(NC(=O)Cc2ccc(F)c(F)c2)o1>>O=C1CCN(C(=O)c2ccc(NC(=O)Cc3ccc(F)c(F)c3)o2)CCCCCN1",
+                "rxn_class": "Miscellaneous",
+                "rxn_name": "OtherReaction",
+                "is_purchasable": null
+            },
+            "node_3": {
+                "depth": 2,
+                "is_mol": true,
+                "mol_smiles": "NCCCCCN(CCC(=O)O)C(=O)c1ccc(NC(=O)Cc2ccc(F)c(F)c2)o1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_4": {
+                "depth": 3,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "CCOC(=O)CCN(CCCCCN)C(=O)c1ccc(NC(=O)Cc2ccc(F)c(F)c2)o1>>NCCCCCN(CCC(=O)O)C(=O)c1ccc(NC(=O)Cc2ccc(F)c(F)c2)o1",
+                "rxn_class": "Deprotection",
+                "rxn_name": "Ester saponification (alkyl deprotection)",
+                "is_purchasable": null
+            },
+            "node_5": {
+                "depth": 4,
+                "is_mol": true,
+                "mol_smiles": "CCOC(=O)CCN(CCCCCN)C(=O)c1ccc(NC(=O)Cc2ccc(F)c(F)c2)o1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_6": {
+                "depth": 5,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "CCOC(=O)CCN(CCCCCNC(=O)OC(C)(C)C)C(=O)c1ccc(NC(=O)Cc2ccc(F)c(F)c2)o1>>CCOC(=O)CCN(CCCCCN)C(=O)c1ccc(NC(=O)Cc2ccc(F)c(F)c2)o1",
+                "rxn_class": "Reduction",
+                "rxn_name": "Hydrogenolysis of amides/imides/carbamates",
+                "is_purchasable": null
+            },
+            "node_7": {
+                "depth": 6,
+                "is_mol": true,
+                "mol_smiles": "CCOC(=O)CCN(CCCCCNC(=O)OC(C)(C)C)C(=O)c1ccc(NC(=O)Cc2ccc(F)c(F)c2)o1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_8": {
+                "depth": 7,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "CCOC(=O)CCNCCCCCNC(=O)OC(C)(C)C.O=C(Cc1ccc(F)c(F)c1)Nc1ccc(C(=O)O)o1>>CCOC(=O)CCN(CCCCCNC(=O)OC(C)(C)C)C(=O)c1ccc(NC(=O)Cc2ccc(F)c(F)c2)o1",
+                "rxn_class": "Acylation",
+                "rxn_name": "Acylation of Nitrogen Nucleophiles by Carboxylic Acids",
+                "is_purchasable": null
+            },
+            "node_9": {
+                "depth": 8,
+                "is_mol": true,
+                "mol_smiles": "O=C(Cc1ccc(F)c(F)c1)Nc1ccc(C(=O)O)o1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_10": {
+                "depth": 8,
+                "is_mol": true,
+                "mol_smiles": "CCOC(=O)CCNCCCCCNC(=O)OC(C)(C)C",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_11": {
+                "depth": 9,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "Nc1ccc(C(=O)O)o1.O=C(Cl)Cc1ccc(F)c(F)c1>>O=C(Cc1ccc(F)c(F)c1)Nc1ccc(C(=O)O)o1",
+                "rxn_class": "Acylation",
+                "rxn_name": "Acylation of Nitrogen Nucleophiles by Acyl/Thioacyl/Carbamoyl Halides and Analogs_OS",
+                "is_purchasable": null
+            },
+            "node_12": {
+                "depth": 9,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "CC(C)(C)OC(=O)NCCCCCN.CCOC(=O)CCBr>>CCOC(=O)CCNCCCCCNC(=O)OC(C)(C)C",
+                "rxn_class": "Heteroatom Alkylation and Arylation",
+                "rxn_name": "N-alkylation of primary amines with alkyl halides",
+                "is_purchasable": null
+            },
+            "node_13": {
+                "depth": 10,
+                "is_mol": true,
+                "mol_smiles": "CCOC(=O)CCBr",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            },
+            "node_14": {
+                "depth": 10,
+                "is_mol": true,
+                "mol_smiles": "Nc1ccc(C(=O)O)o1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            },
+            "node_15": {
+                "depth": 10,
+                "is_mol": true,
+                "mol_smiles": "CC(C)(C)OC(=O)NCCCCCN",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            },
+            "node_16": {
+                "depth": 10,
+                "is_mol": true,
+                "mol_smiles": "O=C(Cl)Cc1ccc(F)c(F)c1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            }
+        },
+        "enforced_block": "Nc1ccc(C(=O)O)o1"
+    },
+    "c1c(CC(Nc2oc(C(=O)N3CCCCCOc4c3cccc4)cc2)=O)ccc(F)c1F": {
+        "reward": {
+            "reward": 0.7144538760185242,
+            "tango_raw_values": 0.5850694179534912,
+            "syntheseus_raw_values": 1.0,
+            "qed_raw_values": 0.6233258615070263
+        },
+        "synthesis_data": {
+            "node_1": {
+                "depth": 0,
+                "is_mol": true,
+                "mol_smiles": "O=C(Cc1ccc(F)c(F)c1)Nc1ccc(C(=O)N2CCCCCOc3ccccc32)o1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_2": {
+                "depth": 1,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "Nc1ccc(C(=O)N2CCCCCOc3ccccc32)o1.O=C(O)Cc1ccc(F)c(F)c1>>O=C(Cc1ccc(F)c(F)c1)Nc1ccc(C(=O)N2CCCCCOc3ccccc32)o1",
+                "rxn_class": "Acylation",
+                "rxn_name": "Carboxylic acid with primary amine to amide",
+                "is_purchasable": null
+            },
+            "node_3": {
+                "depth": 2,
+                "is_mol": true,
+                "mol_smiles": "Nc1ccc(C(=O)N2CCCCCOc3ccccc32)o1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_4": {
+                "depth": 2,
+                "is_mol": true,
+                "mol_smiles": "O=C(O)Cc1ccc(F)c(F)c1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            },
+            "node_5": {
+                "depth": 3,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "Nc1ccc(C(=O)O)o1.c1ccc2c(c1)NCCCCCO2>>Nc1ccc(C(=O)N2CCCCCOc3ccccc32)o1",
+                "rxn_class": "Acylation",
+                "rxn_name": "Acylation of Nitrogen Nucleophiles by Carboxylic Acids",
+                "is_purchasable": null
+            },
+            "node_6": {
+                "depth": 4,
+                "is_mol": true,
+                "mol_smiles": "Nc1ccc(C(=O)O)o1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            },
+            "node_7": {
+                "depth": 4,
+                "is_mol": true,
+                "mol_smiles": "c1ccc2c(c1)NCCCCCO2",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_8": {
+                "depth": 5,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "Nc1ccccc1OCCCCCCl>>c1ccc2c(c1)NCCCCCO2",
+                "rxn_class": "Heteroatom Alkylation and Arylation",
+                "rxn_name": "OtherReaction",
+                "is_purchasable": null
+            },
+            "node_9": {
+                "depth": 6,
+                "is_mol": true,
+                "mol_smiles": "Nc1ccccc1OCCCCCCl",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_10": {
+                "depth": 7,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "O=[N+]([O-])c1ccccc1OCCCCCCl>>Nc1ccccc1OCCCCCCl",
+                "rxn_class": "Reduction",
+                "rxn_name": "Reduction of nitro groups to amines",
+                "is_purchasable": null
+            },
+            "node_11": {
+                "depth": 8,
+                "is_mol": true,
+                "mol_smiles": "O=[N+]([O-])c1ccccc1OCCCCCCl",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_12": {
+                "depth": 9,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "ClCCCCCBr.O=[N+]([O-])c1ccccc1O>>O=[N+]([O-])c1ccccc1OCCCCCCl",
+                "rxn_class": "Heteroatom Alkylation and Arylation",
+                "rxn_name": "Williamson Ether Synthesis",
+                "is_purchasable": null
+            },
+            "node_13": {
+                "depth": 10,
+                "is_mol": true,
+                "mol_smiles": "O=[N+]([O-])c1ccccc1O",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            },
+            "node_14": {
+                "depth": 10,
+                "is_mol": true,
+                "mol_smiles": "ClCCCCCBr",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            }
+        },
+        "enforced_block": "Nc1ccc(C(=O)O)o1"
+    }
+}
