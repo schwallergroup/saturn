@@ -498,10 +498,11 @@ class Syntheseus(OracleComponent):
                             added = True  
                             if self.enforced_building_blocks_parameters.enforce_blocks:
                                 # Extract which enforced block is present
-                                for intermediate_node in route:
-                                    if canonicalize_smiles(intermediate_node.mol.smiles) in self.enforced_building_blocks_smiles:
-                                        enforced_blocks.append(canonicalize_smiles(intermediate_node.mol.smiles))
-                                        specific_enforced_block = canonicalize_smiles(intermediate_node.mol.smiles)
+                                for intermediate_node, intermediate_node_data in route.items():
+                                    canonical_intermediate_smiles = canonicalize_smiles(intermediate_node_data["smiles"])  # Canonicalize in case
+                                    if canonical_intermediate_smiles in self.enforced_building_blocks_smiles:
+                                        enforced_blocks.append(canonical_intermediate_smiles)
+                                        specific_enforced_block = canonical_intermediate_smiles
                                         break
                             if added:
                                 break
