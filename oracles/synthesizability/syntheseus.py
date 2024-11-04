@@ -81,9 +81,13 @@ class Syntheseus(OracleComponent):
         self.enforced_reactions_parameters = EnforcedReactionsParameters(
             **self.parameters.specific_parameters.get("enforced_reactions", None)
         )
-        if self.enforced_reactions_parameters.enforce_rxn_class_presence:
+
+        self.include_rxn_info = self.parameters.specific_parameters.get("include_rxn_info", False)
+        if self.include_rxn_info or self.enforced_reactions_parameters.enforce_rxn_class_presence:
             self.rxn_insight_env_name = self.enforced_reactions_parameters.rxn_insight_env_name
-            assert self.rxn_insight_env_name is not None, "The run specifies to enforce reactions, please provide the Conda environment name with Rxn-INSIGHT installed."
+            assert self.rxn_insight_env_name is not None, "The run specifies to enforce reactions and/or include reaction information in the top graphs output, please provide the Conda environment name with Rxn-INSIGHT installed."
+        
+        if self.enforced_reactions_parameters.enforce_rxn_class_presence:
             self.enforced_rxn_classes = self.enforced_reactions_parameters.enforced_rxn_classes
             assert self.enforced_rxn_classes is not None, "The run specifies to enforce reactions, please provide the reaction classes to enforce."
             self.rxn_info_extraction_script_path = self.enforced_reactions_parameters.rxn_info_extraction_script_path
@@ -430,10 +434,13 @@ class Syntheseus(OracleComponent):
     def _write_out_top_synthesis_graphs(
         self,
         oracle_history: pd.DataFrame,
-    ) -> None:
+    ) -> bool:
         """
         Sort the Oracle History by reward and extract the corresponding Syntheseus synthesis graphs PDF files. 
         The purpose of this function is to automatically allow the user to visualize the synthesis routes for the top molecules.
+
+        Returns:
+            True if there are any solved molecules, False otherwise
         """
         # Output JSON with all relevant metrics and information
         output = {}
@@ -443,9 +450,10 @@ class Syntheseus(OracleComponent):
         oracle_history = oracle_history.head(int(self.save_top_percentage_routes * len(oracle_history)))
         # Keep only syntheseus_reward = 1, as these are the solved molecules
         oracle_history = oracle_history.loc[oracle_history["syntheseus_reward"] == 1]
-        # If there are no solved molecules, then do not proceed
-        if len(oracle_history) == 0:
-            return
+        # If there are no solved molecules, return
+        solved_exists = len(oracle_history) > 0
+        if not solved_exists:
+            return solved_exists
 
         # Loop through each top generated SMILES, extract the Syntheseus graph, and track which enforced smiles is visited (if applicable)
         enforced_blocks = []
@@ -515,25 +523,26 @@ class Syntheseus(OracleComponent):
                 data_type="all"
             )     
 
-            # For each Reaction node (is_rxn = True), extract the reaction information
-            for node, node_data in synthesis_data.items():
-                if node_data["is_rxn"]:
-                    extraction_result = subprocess.run([
-                        "conda",
-                        "run", 
-                        "-n",
-                        self.rxn_insight_env_name, 
-                        "python", 
-                        self.rxn_info_extraction_script_path, 
-                        # Pass the rxn SMILES extracted from the Syntheseus route
-                        node_data["rxn_smiles"]
-                    ], capture_output=True, text=True)
+            # For each Reaction node (is_rxn = True), extract the reaction information if the user specified to include reaction information
+            if self.include_rxn_info:
+                for node, node_data in synthesis_data.items():
+                    if node_data["is_rxn"]:
+                        extraction_result = subprocess.run([
+                            "conda",
+                            "run", 
+                            "-n",
+                            self.rxn_insight_env_name, 
+                            "python", 
+                            self.rxn_info_extraction_script_path, 
+                            # Pass the rxn SMILES extracted from the Syntheseus route
+                            node_data["rxn_smiles"]
+                        ], capture_output=True, text=True)
 
-                    # Check for errors
-                    assert extraction_result.returncode == 0, f"Error during Rxn-INSIGHT reaction information extraction: {extraction_result.stderr}"
-                    rxn_info = ast.literal_eval(extraction_result.stdout)
-                    node_data["rxn_class"] = rxn_info["CLASS"]
-                    node_data["rxn_name"] = rxn_info["NAME"]
+                        # Check for errors
+                        assert extraction_result.returncode == 0, f"Error during Rxn-INSIGHT reaction information extraction: {extraction_result.stderr}"
+                        rxn_info = ast.literal_eval(extraction_result.stdout)
+                        node_data["rxn_class"] = rxn_info["CLASS"]
+                        node_data["rxn_name"] = rxn_info["NAME"]
 
             # Construct the JSON for the current molecule
             output[generated_smiles] = {
@@ -560,6 +569,8 @@ class Syntheseus(OracleComponent):
                 oracle_history["enforced_blocks"] = ["nan"] * len(oracle_history)
 
         oracle_history.to_csv(os.path.join(self.output_dir, "top_synthesis_graphs", "top_synthesis_graphs.csv"), index=False)
+
+        return solved_exists
 
     def _extract_syntheseus_route_data(
         self,

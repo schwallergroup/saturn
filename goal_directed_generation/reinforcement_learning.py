@@ -268,4 +268,6 @@ class ReinforcementLearningAgent:
 
         for oracle in self.oracle.oracle:
             if isinstance(oracle, Syntheseus):
-                oracle._write_out_top_synthesis_graphs(self.oracle.oracle_history)
+                solved_exists = oracle._write_out_top_synthesis_graphs(self.oracle.oracle_history)
+                if not solved_exists:
+                    logging.info("No solved molecules found when saving Syntheseus top synthesis graphs. Do not expect a top_synthesis_graphs directory.")
