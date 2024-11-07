@@ -133,22 +133,40 @@ def fuzzy_matching_substructure(
     """
     Calculate the *max* substructure overlap between the query SMILES and each enforced block.
     """
+
+    def _query_is_in_bbs(query_mol: str, 
+                         enforced_blocks_mols: List[Mol]
+    ) -> bool:
+        """Return True if query mol is in bbs
+        """
+        canon_query = Chem.MolToSmiles(query_mol)
+
+        # fix bug when score != 1 but the block is enforced
+        canonicalized_bbs_smiles = [Chem.MolToSmiles(mol) 
+                                    for mol in enforced_blocks_mols]
+        
+        is_in_bbs = any([(canon_query == smiles) 
+                         for smiles in canonicalized_bbs_smiles])
+        
+        if is_in_bbs:
+            return True
+        
+        else: 
+            return False
+
+
     query_mol = Chem.MolFromSmiles(query_smiles)
     enforced_blocks_mols = [Chem.MolFromSmiles(smiles) for smiles in enforced_blocks_functional_groups.keys()]
     max_mcs_atoms = 0
+
+    # edge case if query mol is in bbs 
+    is_in_bbs = _query_is_in_bbs(query_mol, enforced_blocks_mols)
+
+    if is_in_bbs:
+        return 1.0
+
+    # FMS computation
     for block_mol in enforced_blocks_mols:
-
-        # fix bug when score != 1 but the block is enforced
-        canonicalized_bbs_smiles = [Chem.MolToSmiles(mol) for mol in 
-                                    enforced_blocks_mols]
-        
-        canon_query = Chem.MolToSmiles(query_mol)
-
-        is_in_bbs = any([(canon_query == smiles) for 
-                         smiles in canonicalized_bbs_smiles])
-        
-        if is_in_bbs:
-            return 1.0
 
         # Perform MCS (find Maximum Common Substructure)
         mcs_result = rdFMCS.FindMCS(
