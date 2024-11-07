@@ -148,11 +148,7 @@ def fuzzy_matching_substructure(
         is_in_bbs = any([(canon_query == smiles) 
                          for smiles in canonicalized_bbs_smiles])
         
-        if is_in_bbs:
-            return True
-        
-        else: 
-            return False
+        return True if is_in_bbs else False
 
 
     query_mol = Chem.MolFromSmiles(query_smiles)
@@ -162,8 +158,7 @@ def fuzzy_matching_substructure(
     # edge case if query mol is in bbs 
     is_in_bbs = _query_is_in_bbs(query_mol, enforced_blocks_mols)
 
-    if is_in_bbs:
-        return 1.0
+    if is_in_bbs: return 1.0
 
     # FMS computation
     for block_mol in enforced_blocks_mols:
