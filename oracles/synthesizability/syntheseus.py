@@ -88,6 +88,7 @@ class Syntheseus(OracleComponent):
             assert self.rxn_insight_env_name is not None, "The run specifies to enforce reactions and/or include reaction information in the top graphs output, please provide the Conda environment name with Rxn-INSIGHT installed."
         
         if self.enforced_reactions_parameters.enforce_rxn_class_presence:
+            self.enforce_all_reactions = self.enforced_reactions_parameters.enforce_all_reactions
             self.enforced_rxn_classes = self.enforced_reactions_parameters.enforced_rxn_classes
             assert self.enforced_rxn_classes is not None, "The run specifies to enforce reactions, please provide the reaction classes to enforce."
             self.rxn_info_extraction_script_path = self.enforced_reactions_parameters.rxn_info_extraction_script_path
@@ -317,6 +318,7 @@ class Syntheseus(OracleComponent):
 
                     # NOTE: Trying binary rxn class reward for now
                     rxn_multiplier = 0.0
+                    all_rxns = []  # List[Tuple[str, str]] --> (rxn_class, rxn_name)
                     # The nodes are all Reaction nodes - extract reaction information
                     for node, node_data in route.items():
                         # Execute Rxn-INSIGHT on the rxn SMILES
@@ -339,23 +341,49 @@ class Syntheseus(OracleComponent):
                         rxn_class, rxn_name = rxn_info["CLASS"], rxn_info["NAME"]
                         for enforced_rxn_class in self.enforced_rxn_classes:
                             # Convert to lower-case for more robust string comparison
-                            enforced_rxn_class = enforced_rxn_class.lower()
-                            if enforced_rxn_class in rxn_class.lower() or enforced_rxn_class in rxn_name.lower():
+                            if (enforced_rxn_class.lower() in rxn_class.lower()) or (enforced_rxn_class.lower() in rxn_name.lower()):
                                 rxn_multiplier = 1.0
-                                break
+                                # If not enforcing all reactions, then finding *a* match is sufficient
+                                if not self.enforced_reactions_parameters.enforce_all_reactions:
+                                    break
+                            # Track all reactions
+                            all_rxns.append((rxn_class, rxn_name))
 
                         # NOTE: This block of code is only relevant when enforcing building blocks *and* reaction classes
                         # Check if the node exactly matches an enforced building block
-                        if self.enforced_building_blocks_parameters.enforce_blocks: 
-                            if is_matched and rxn_multiplier == 1.0:
+                        # If enforcing *all* reactions, then wait until all reactions in the Syntheseus route have been tracked
+                        if (self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_reactions_parameters.enforce_all_reactions): 
+                            if (is_matched) and (rxn_multiplier) == 1.0:
                                 self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
                                 break
 
-                        else:
+                        elif (not self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_reactions_parameters.enforce_all_reactions):
                             # If the reaction class is matched, then the node reward is 1
-                            if rxn_multiplier == 1:
+                            if rxn_multiplier == 1.0:
                                 self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
                                 break
+
+                    # Check if all reactions in the Syntheseus route are enforced
+                    if self.enforced_reactions_parameters.enforce_all_reactions:
+                        # For each (rxn_class, rxn_name) pair, check if the enforced rxn classes are present
+                        for rxn_class, rxn_name in all_rxns:
+                            for enforced_rxn_class in self.enforced_rxn_classes:
+                                if (enforced_rxn_class.lower() in rxn_class.lower()) or (enforced_rxn_class.lower() in rxn_name.lower()):
+                                    break
+                                else:
+                                    rxn_multiplier = 0.0
+                                    break
+                        
+                        # The below tracking is only reached if the user specified to enforce *all* reactions
+                        # Enforcing blocks and *all* reactions
+                        if self.enforced_building_blocks_parameters.enforce_blocks:
+                            if (is_matched) and (rxn_multiplier) == 1.0:
+                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+
+                        # Only enforcing *all* reactions
+                        else:
+                            if rxn_multiplier == 1.0:
+                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
                     # Reaching this code requires that there is a solved route
                     # This truncates the node reward to 0 if the reaction class is not matched (assuming enforced blocks are also being considered)
