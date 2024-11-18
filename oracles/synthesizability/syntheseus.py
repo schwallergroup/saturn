@@ -472,17 +472,18 @@ class Syntheseus(OracleComponent):
         """
         # Output JSON with all relevant metrics and information
         output = {}
-
-        # Sort the Oracle History by reward and extract the top percentage
-        oracle_history = oracle_history.sort_values(by="reward", ascending=False)
-        oracle_history = oracle_history.head(int(self.save_top_percentage_routes * len(oracle_history)))
+        
         # Keep only syntheseus_reward = 1, as these are the solved molecules
         oracle_history = oracle_history.loc[oracle_history["syntheseus_reward"] == 1]
         # If there are no solved molecules, return
         solved_exists = len(oracle_history) > 0
         if not solved_exists:
             return solved_exists
-
+        
+        # Sort the Oracle History by reward and extract the top percentage
+        oracle_history = oracle_history.sort_values(by="reward", ascending=False)
+        oracle_history = oracle_history.head(int(self.save_top_percentage_routes * len(oracle_history)))
+        
         # Loop through each top generated SMILES, extract the Syntheseus graph, and track which enforced smiles is visited (if applicable)
         enforced_blocks = []
         syntheseus_outputs = os.listdir(self.output_dir)
