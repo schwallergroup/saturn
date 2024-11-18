@@ -16,4 +16,5 @@ class EnforcedReactionsParameters:
     enforce_all_reactions: bool  # Whether to enforce all reactions in the route to be in the enforced rxn classes
     rxn_insight_env_name: str  # Name of the Rxn-INSIGHT environment
     enforced_rxn_classes: List[str]  # List of reaction classes to enforce
+    avoid_rxn_classes: List[str]  # List of reaction classes to *avoid*
     rxn_info_extraction_script_path: str  # Path to the Rxn-INSIGHT extraction script

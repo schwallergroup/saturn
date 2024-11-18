@@ -91,6 +91,8 @@ class Syntheseus(OracleComponent):
             self.enforce_all_reactions = self.enforced_reactions_parameters.enforce_all_reactions
             self.enforced_rxn_classes = self.enforced_reactions_parameters.enforced_rxn_classes
             assert self.enforced_rxn_classes is not None, "The run specifies to enforce reactions, please provide the reaction classes to enforce."
+            # NOTE: For now, avoid certain reaction classes only when also enforcing reactions
+            self.avoid_rxn_classes = self.enforced_reactions_parameters.avoid_rxn_classes
             self.rxn_info_extraction_script_path = self.enforced_reactions_parameters.rxn_info_extraction_script_path
             assert self.rxn_info_extraction_script_path is not None, "The run specifies to enforce reactions, please provide the path to the script that extracts the reaction classes from the Syntheseus route pickle file."
 
@@ -384,6 +386,14 @@ class Syntheseus(OracleComponent):
                         else:
                             if rxn_multiplier == 1.0:
                                 self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+
+                    # Check if specified reaction classes are *avoided*
+                    if (len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0) and (rxn_multiplier == 1.0):
+                        for rxn_class, rxn_name in all_rxns:
+                            for avoid_rxn_class in self.enforced_reactions_parameters.avoid_rxn_classes:
+                                if (avoid_rxn_class.lower() in rxn_class.lower()) or (avoid_rxn_class.lower() in rxn_name.lower()):
+                                    rxn_multiplier = 0.0
+                                    break
 
                     # Reaching this code requires that there is a solved route
                     # This truncates the node reward to 0 if the reaction class is not matched (assuming enforced blocks are also being considered)
