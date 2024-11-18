@@ -239,7 +239,7 @@ def get_node_reward(
         6. TANGO-All: *Max* Tanimoto similarity + *Mean* Functional Groups overlap + *Max* Fuzzy Matching Substructure
 
     """
-    if reward_type in ["tan_sim", "tanimoto_similarity"]:
+    if reward_type in ["tanimoto", "tanimoto_similarity", "tan_sim", "tansim"]:
         reward = get_max_stock_similarity(
             query_smiles=query_smiles,
             enforced_building_blocks_fps=enforce_blocks_fps
