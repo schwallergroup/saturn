@@ -15,6 +15,7 @@ from utils.utils import setup_logging
 from utils.chemistry_utils import canonicalize_smiles_batch
 
 
+
 class DistributionLearningTrainer:
     """
     Distribution Learning by Maximum Likelihood Estimation (MLE) and using Teacher Forcing.
@@ -108,7 +109,11 @@ class DistributionLearningTrainer:
         if self.transfer_learning:
             # TODO: Construct the Transfer Learning DataLoader
             # Load the pre-trained Agent
-            agent = Generator.load_from_file(configuration.agent, self.device)
+            agent = Generator.load_from_file(
+                model_path=configuration.agent,
+                device=self.device,
+                sampling_mode=False
+            )
         else:
             # Otherwise, train the Agent from scratch
             train_dataloader = self.get_train_dataloader()
@@ -119,17 +124,19 @@ class DistributionLearningTrainer:
                 network_params=None,
                 device=self.device
             )
-            vocabulary = train_dataloader.dataset.vocabulary
+            # TODO: Remove this
+            # Used for GEAM benchmarking
+            # vocabulary = train_dataloader.dataset.vocabulary
             # GEAM benchmarking: ZINC 250k randomization requires extra tokens
             # extra_zinc_tokens = ["[P@H]", "[S@+]"]
             # vocabulary.update(extra_zinc_tokens)
-            agent = Generator(
-                model_architecture=configuration.model_architecture,
-                vocabulary=vocabulary,
-                tokenizer=train_dataloader.dataset.tokenizer,
-                network_params=None,
-                device=self.device
-            )
+            # agent = Generator(
+            #     model_architecture=configuration.model_architecture,
+            #     vocabulary=vocabulary,
+            #     tokenizer=train_dataloader.dataset.tokenizer,
+            #     network_params=None,
+            #     device=self.device
+            # )
         return agent
 
     def get_train_dataloader(self):
