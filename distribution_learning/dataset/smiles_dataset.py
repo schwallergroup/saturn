@@ -30,6 +30,7 @@ class SMILESDataset(Dataset):
         self.max_sequence_length = max_sequence_length
         self.batch_size = batch_size
         self.randomize = randomize
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.agent = agent
         self.transfer_learning = transfer_learning
@@ -66,7 +67,11 @@ class SMILESDataset(Dataset):
         """
         if self.transfer_learning:
             # Load model and extract the Tokenizer and Vocabulary
-            self.agent = Generator.load_from_file(self.agent)
+            self.agent = Generator.load_from_file(
+                model_path=self.agent,
+                device=self.device,
+                sampling_mode=False
+            )
             self.tokenizer = self.agent.tokenizer
             self.dataset = self.read_data_file()
             self.vocabulary = self.agent.vocabulary
