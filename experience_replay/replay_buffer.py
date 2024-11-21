@@ -6,13 +6,13 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy
 from rdkit import Chem
-from utils import chemistry_utils
-from utils.utils import to_tensor
+from utils.chemistry_utils import randomize_smiles_batch, canonicalize_smiles_batch, get_bemis_murcko_scaffold
 
 from experience_replay.dataclass import ExperienceReplayParameters
 
 # Oracle is called if seeding molecules into the Replay Buffer at the start of the generative experiment
 from oracles.oracle import Oracle
+
 
 
 class ReplayBuffer:
@@ -70,7 +70,7 @@ class ReplayBuffer:
         if len(self.memory) != 0:
             smiles = self.memory["smiles"].values
             # Randomize the smiles
-            randomized_smiles = chemistry_utils.randomize_smiles_batch(smiles, prior)
+            randomized_smiles = randomize_smiles_batch(smiles, prior)
             rewards = self.memory["reward"].values
             return randomized_smiles, rewards
         else:
@@ -106,9 +106,9 @@ class ReplayBuffer:
         zero_reward_indices = np.where(rewards == 0.)[0]
         if len(zero_reward_indices) > 0:
             smiles_to_purge = smiles[zero_reward_indices]
-            scaffolds_to_purge = [chemistry_utils.get_bemis_murcko_scaffold(smiles) for smiles in smiles_to_purge]
+            scaffolds_to_purge = [get_bemis_murcko_scaffold(smiles) for smiles in smiles_to_purge]
             purged_memory = deepcopy(self.memory)
-            purged_memory["scaffolds"] = purged_memory["smiles"].apply(chemistry_utils.get_bemis_murcko_scaffold)
+            purged_memory["scaffolds"] = purged_memory["smiles"].apply(get_bemis_murcko_scaffold)
             purged_memory = purged_memory.loc[~purged_memory["scaffolds"].isin(scaffolds_to_purge)]
             purged_memory.drop("scaffolds", axis=1, inplace=True)
             self.memory = purged_memory
@@ -130,16 +130,16 @@ class ReplayBuffer:
               are implications on the diversity of the solutions found.
         """
         if len(self.parameters.smiles) > 0:
-            canonical_smiles = chemistry_utils.canonicalize_smiles_batch(self.parameters.smiles)
+            canonical_smiles = canonicalize_smiles_batch(self.parameters.smiles)
             mols = [Chem.MolFromSmiles(s) for s in canonical_smiles]
             mols = [mol for mol in mols if mol is not None]
 
             oracle_components_df = pd.DataFrame()
-            rewards = np.empty((len(oracle), len(mols)))
-            for idx, oracle in enumerate(oracle):
-                raw_property_values, component_rewards = oracle.calculate_reward(mols, oracle_calls=0)
-                oracle_components_df[f"{oracle.name}_raw_values"] = raw_property_values
-                oracle_components_df[f"{oracle.name}_reward"] = component_rewards
+            rewards = np.empty((len(oracle.oracle), len(mols)))
+            for idx, oracle_component in enumerate(oracle.oracle):
+                raw_property_values, component_rewards = oracle_component.calculate_reward(mols, oracle_calls=0)
+                oracle_components_df[f"{oracle_component.name}_raw_values"] = raw_property_values
+                oracle_components_df[f"{oracle_component.name}_reward"] = component_rewards
                 rewards[idx] = component_rewards
 
             aggregated_rewards = oracle.aggregator(rewards, oracle.oracle_weights)
@@ -152,6 +152,7 @@ class ReplayBuffer:
 
             oracle.update_oracle_history(
                 smiles=self.parameters.smiles,
+                scaffolds=np.vectorize(get_bemis_murcko_scaffold)(self.parameters.smiles),
                 rewards=aggregated_rewards,
                 penalized_rewards=aggregated_rewards,
                 oracle_components_df=oracle_components_df
