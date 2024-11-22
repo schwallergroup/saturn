@@ -34,7 +34,7 @@ class RewardAggregator:
         """
         Weighted Sum aggregation.
         """
-        total_sum = np.sum(rewards * weights, axis=0)
+        total_sum = np.sum(rewards.T * weights, axis=1)
         total_weight = np.sum(weights)
         return total_sum / total_weight  # (number of SMILES,)
         
