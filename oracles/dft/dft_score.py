@@ -84,7 +84,8 @@ class DFTScore(OracleComponent):
                 with open(os.path.join(temp_dir, self.property), "r") as f:
                     results.append(float(f.read().strip()))
             else:
-                results.append(float("inf"))
+                # FIXME: Do not return 0
+                results.append(0)
 
         # 6. Delete the temporary directories
         for temp_dir in temp_dirs:
