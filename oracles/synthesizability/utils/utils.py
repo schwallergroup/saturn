@@ -203,7 +203,7 @@ def tango_reward(
         enforced_building_blocks_fps=enforce_blocks_fps
     )
     
-    # this was giving problems when using very simple bbs with tango_fms
+    # Compute FG overlap depending on reward type
     if "fg" in reward_type or "all" in reward_type:
         fg_overlap = functional_groups_overlap(
             query_smiles=query_smiles, 
@@ -271,9 +271,12 @@ def get_node_reward(
     return reward
 
 
-def get_percentage_of_carbon(smiles_bb: str, 
-                             smiles_target: str) -> float:
-    """Get percentage of carbon atoms in structure based on reference molecule.
+def get_percentage_of_carbon(
+    smiles_bb: str, 
+    smiles_target: str
+) -> float:
+    """
+    Get percentage of carbon atoms in structure based on reference molecule.
     """
 
     bb = Chem.MolFromSmiles(smiles_bb)
