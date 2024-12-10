@@ -44,7 +44,7 @@ class DistributionLearningTrainer:
 
         # Initialize the Agent
         self.agent = self._initialize_agent(configuration)
-        self.optimizer = torch.optim.AdamW(self.agent.network.parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(self.agent.network.parameters(), lr=self.learning_rate)
 
         # Set up logging
         self.model_checkpoints_dir = model_checkpoints_dir

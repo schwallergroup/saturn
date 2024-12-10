@@ -94,7 +94,7 @@ class ReinforcementLearningAgent:
         )
 
         # Only the Agent is updated so the Prior does not need an optimizer
-        self.optimizer = torch.optim.AdamW(self.agent.get_network_parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)
         # Model checkpointing save directory
         self.model_checkpoints_dir = model_checkpoints_dir
         os.makedirs(self.model_checkpoints_dir, exist_ok=True)
