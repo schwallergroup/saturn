@@ -282,20 +282,21 @@ def get_percentage_of_carbon(
     bb = Chem.MolFromSmiles(smiles_bb)
     target = Chem.MolFromSmiles(smiles_target)
 
-    # find MCS. We use CompareAny
+    # Find MCS. We use CompareAny
     mcs = rdFMCS.FindMCS(mols = [bb, target],
                   matchChiralTag=True,
                   bondCompare=rdFMCS.BondCompare.CompareAny,
                   ringCompare=rdFMCS.RingCompare.StrictRingFusion,
                   completeRingsOnly=True)
 
-    # get match
+    # Get match
     matched_atoms = Chem.MolFromSmarts(mcs.smartsString).GetAtoms()
 
-    # get num matched carbons 
+    # Get number of matched carbons 
     matched_C = len([atom for atom in matched_atoms if atom.GetSymbol() == "C"])
     
-    # get total num of carbon
+    # Get total number of carbons
     total_C = len([atom for atom in target.GetAtoms() if atom.GetSymbol() == "C"])
+    assert total_C > 0, "Total number of carbons must be greater than 0."
     
     return matched_C/total_C
