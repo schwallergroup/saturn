@@ -202,10 +202,14 @@ def tango_reward(
         query_smiles=query_smiles, 
         enforced_building_blocks_fps=enforce_blocks_fps
     )
-    fg_overlap = functional_groups_overlap(
-        query_smiles=query_smiles, 
-        enforced_blocks_functional_groups=enforced_blocks_functional_groups
-    )
+    
+    # Compute FG overlap depending on reward type
+    if "fg" in reward_type or "all" in reward_type:
+        fg_overlap = functional_groups_overlap(
+            query_smiles=query_smiles, 
+            enforced_blocks_functional_groups=enforced_blocks_functional_groups
+        )
+
     fms_overlap = fuzzy_matching_substructure(
         query_smiles=query_smiles, 
         enforced_blocks_functional_groups=enforced_blocks_functional_groups
@@ -265,3 +269,33 @@ def get_node_reward(
     else:
         raise ValueError(f"Invalid reward type: {reward_type}")
     return reward
+
+
+def get_percentage_of_carbon(
+    smiles_bb: str, 
+    smiles_target: str
+) -> float:
+    """
+    Get percentage of carbon atoms in structure based on reference molecule.
+    """
+
+    bb = Chem.MolFromSmiles(smiles_bb)
+    target = Chem.MolFromSmiles(smiles_target)
+
+    # find MCS. We use CompareAny
+    mcs = rdFMCS.FindMCS(mols = [bb, target],
+                  matchChiralTag=True,
+                  bondCompare=rdFMCS.BondCompare.CompareAny,
+                  ringCompare=rdFMCS.RingCompare.StrictRingFusion,
+                  completeRingsOnly=True)
+
+    # get match
+    matched_atoms = Chem.MolFromSmarts(mcs.smartsString).GetAtoms()
+
+    # get num matched carbons 
+    matched_C = len([atom for atom in matched_atoms if atom.GetSymbol() == "C"])
+    
+    # get total num of carbon
+    total_C = len([atom for atom in target.GetAtoms() if atom.GetSymbol() == "C"])
+    
+    return matched_C/total_C
