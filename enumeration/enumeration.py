@@ -8,17 +8,24 @@ import random
 import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import Mol
-from rdkit.Chem.rdMolDescriptors import CalcExactMolWt
 from rdkit.Chem import AllChem
 import pandas as pd
+
+import sys
+BASE_PATH = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_PATH)
+from enumeration.utils import within_molecular_weight_range, is_charged, longest_aliphatic_c_chain, passes_ring_filter
 
 
 def passes_property_filter(mol: Mol) -> bool:
     """
     Check if the building block passess all the property filters.
     """
-    # TODO: Add more filters
-    if CalcExactMolWt(mol) > 150 and CalcExactMolWt(mol) < 200:
+    # TODO: Add more filters or remove some
+    if (within_molecular_weight_range(mol) and 
+        not is_charged(mol) and
+        longest_aliphatic_c_chain(mol) < 3 and 
+        passes_ring_filter(mol)):
         return True
     
     return False
@@ -34,8 +41,7 @@ def get_smirks_from_list(rxn_list: list[str]) -> Dict[str, List[str]]:
     Where for each enforced reaction class specified by the user, the associated SMIRKS are extracted.
     """
     # TODO: path to smirks, this may break or maybe we could have it inside
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    with open(os.path.join(base_path, "smirks.json"), "r") as f:
+    with open(os.path.join(BASE_PATH, "smirks.json"), "r") as f:
         data = [json.loads(line) for line in f]
     
     smirks_names = {}
@@ -52,7 +58,7 @@ def get_smirks_from_list(rxn_list: list[str]) -> Dict[str, List[str]]:
     return smirks_names
     
 
-def get_product_from_bbs(
+def get_product_from_building_blocks(
     smirks: Dict[str, List[str]], 
     building_blocks: List[str]
 ) -> str:
@@ -74,8 +80,7 @@ def get_product_from_bbs(
     # Sample compatible building block from list
     while True:
         idx = random.randint(0, len(building_blocks) - 1)
-        bb = building_blocks[idx]
-        mol = Chem.MolFromSmiles(bb)
+        mol = Chem.MolFromSmiles(building_blocks[idx])
 
         if passes_property_filter(mol):
             if mol.HasSubstructMatch(mol0):
@@ -90,8 +95,7 @@ def get_product_from_bbs(
 
         while True:
             idx = random.randint(0, len(building_blocks) - 1)
-            bb = building_blocks[idx]
-            mol = Chem.MolFromSmiles(bb)
+            mol = Chem.MolFromSmiles(building_blocks[idx])
 
             if passes_property_filter(mol):
                 if mol.HasSubstructMatch(mol1):
@@ -113,13 +117,13 @@ def get_product_from_bbs(
 
     return product
 
-def seed_enumeration(
+def rxn_based_enumeration(
     rxn_list: List[str], 
     building_blocks_path: str,
     n_seeds: int = 10
 ) -> List[str]:
     """
-    Enumerate molecules using target rxns and specified bbs.
+    Enumerate molecules using specified reactions and building blocks.
     """
     assert os.path.exists(building_blocks_path), f"Seed (by reaction) building blocks file {building_blocks_path} does not exist."
     # Read building blocks
@@ -137,7 +141,7 @@ def seed_enumeration(
     while len(seed_smiles) < n_seeds:
 
         try:
-            smiles = get_product_from_bbs(
+            smiles = get_product_from_building_blocks(
                 smirks=names_smirks, 
                 building_blocks=bbs
             )
