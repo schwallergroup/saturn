@@ -69,6 +69,10 @@ def get_product_from_building_blocks(
 
     # FIXME: Currently purposely disallowing for > 2 reactants - returns None
     """
+    # Cap the maximum number of tries in sampling compatible building blocks
+    MAX_TRIES = 1000
+    tries = 0
+
     # Randomly sample reaction
     rxn_name = random.choice(list(smirks.keys()))
     rxn_smirks = random.choice(smirks[rxn_name])
@@ -82,7 +86,7 @@ def get_product_from_building_blocks(
     mol0 = Chem.MolFromSmarts(smarts[0])
 
     # Sample compatible building block from list
-    while True:
+    while tries < MAX_TRIES:
         idx = random.randint(0, len(building_blocks) - 1)
         mol = Chem.MolFromSmiles(building_blocks[idx])
 
@@ -91,13 +95,14 @@ def get_product_from_building_blocks(
                 r0 = mol
                 break
         else:
+            tries += 1
             continue
 
     # If bimol
     if len(smarts) > 1:
         mol1 = Chem.MolFromSmarts(smarts[1])
 
-        while True:
+        while tries < MAX_TRIES:
             idx = random.randint(0, len(building_blocks) - 1)
             mol = Chem.MolFromSmiles(building_blocks[idx])
 
@@ -107,6 +112,7 @@ def get_product_from_building_blocks(
                     break
 
             else:
+                tries += 1
                 continue
     
     # React unimol
@@ -124,7 +130,7 @@ def get_product_from_building_blocks(
 def rxn_based_enumeration(
     rxn_list: List[str], 
     building_blocks_path: str,
-    n_seeds: int = 10
+    n_seeds: int = 100
 ) -> List[str]:
     """
     Enumerate molecules using specified reactions and building blocks.
