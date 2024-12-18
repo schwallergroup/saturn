@@ -27,6 +27,10 @@ from oracles.dataclass import OracleConfiguration
 from scoring.scorer import Scorer
 from scoring.dataclass import ScoringConfiguration
 
+# Rxn enumeration
+from enumeration.enumeration import seed_enumeration
+
+
 parser = argparse.ArgumentParser(description="Run Saturn.")
 parser.add_argument(
     "config", 
@@ -71,6 +75,24 @@ if __name__ == "__main__":
     elif running_mode == "goal_directed_generation":
         # 1. Construct the Oracle
         oracle = Oracle(OracleConfiguration(**config["oracle"]))
+
+        # Ugly hack for bbs rxn seed: populate replay buffer with molecules built with desired rxns
+        is_comp_syntheseus = [comp["name"] == "syntheseus" for comp in config["oracle"]["components"]]
+
+        if any(is_comp_syntheseus):
+            syntheseus_params = config["oracle"]["components"][is_comp_syntheseus.index(True)]["specific_parameters"]
+
+            if syntheseus_params["enforced_reactions"]["seed_rxns"]:
+                # Call function to seed molecules
+                rxn_classes = syntheseus_params["enforced_reactions"]["enforced_rxn_classes"]
+                bbs = syntheseus_params["building_blocks_file"]
+                
+                smiles_seeds = seed_enumeration(rxn_classes,
+                                                bbs)
+
+                # In-place modification of ExperienceReplay parameters config
+                config["goal_directed_generation"]["experience_replay"]["smiles"] = smiles_seeds
+
 
         # 2. Construct the Reinforcement Learning Agent
         reinforcement_learning_agent = ReinforcementLearningAgent(
