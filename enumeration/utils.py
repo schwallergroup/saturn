@@ -50,7 +50,7 @@ def passes_ring_filter(mol: Mol) -> bool:
 
     # If there are no rings, return True
     if len(ring_sizes) == 0:
-        return False
+        return True
 
     # Check for bicylic rings
     elif len(ring_sizes) > 1:
