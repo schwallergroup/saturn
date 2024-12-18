@@ -82,16 +82,21 @@ if __name__ == "__main__":
         if any(is_comp_syntheseus):
             syntheseus_params = config["oracle"]["components"][is_comp_syntheseus.index(True)]["specific_parameters"]
 
-            if syntheseus_params["enforced_reactions"]["seed_rxns"]:
+            if syntheseus_params["enforced_reactions"]["seed_reactions"]:
                 # Call function to seed molecules
                 rxn_classes = syntheseus_params["enforced_reactions"]["enforced_rxn_classes"]
-                bbs = syntheseus_params["building_blocks_file"]
+                building_blocks_path = syntheseus_params["enforced_reactions"]["seed_building_blocks_file"]
                 
-                smiles_seeds = seed_enumeration(rxn_classes,
-                                                bbs)
+                smiles_seeds = seed_enumeration(
+                    rxn_list=rxn_classes,
+                    building_blocks_path=building_blocks_path
+                )
 
                 # In-place modification of ExperienceReplay parameters config
                 config["goal_directed_generation"]["experience_replay"]["smiles"] = smiles_seeds
+
+        print(config["goal_directed_generation"]["experience_replay"]["smiles"])
+        exit()
 
 
         # 2. Construct the Reinforcement Learning Agent

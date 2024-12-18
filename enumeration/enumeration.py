@@ -1,20 +1,41 @@
-"""Enumerate molecules to load replay buffer with molecules from selected rxns.
 """
-
+Enumerate molecules according to specified reactions to seed the Replay Buffer.
+"""
+from typing import List, Dict
+import os
+import json
+import random
+import pandas as pd
 from rdkit import Chem
+from rdkit.Chem import Mol
 from rdkit.Chem.rdMolDescriptors import CalcExactMolWt
 from rdkit.Chem import AllChem
 import pandas as pd
-import json
-import random
 
 
-def get_smirks_from_list(rxn_list: list[str]) -> dict:
-    """Get SMIRKS dict from a list of reaction names.
+def passes_property_filter(mol: Mol) -> bool:
     """
+    Check if the building block passess all the property filters.
+    """
+    # TODO: Add more filters
+    if CalcExactMolWt(mol) > 150 and CalcExactMolWt(mol) < 200:
+        return True
+    
+    return False
 
-    # TO DO?: path to smirks, this may break or maybe we could have it inside
-    with open("enumeration/smirks.json", "r") as f:
+def get_smirks_from_list(rxn_list: list[str]) -> Dict[str, List[str]]:
+    """
+    Returns dict of the form:
+
+    {
+        "rxn_class": [smirks_1, smirks_2, ...]
+    }
+
+    Where for each enforced reaction class specified by the user, the associated SMIRKS are extracted.
+    """
+    # TODO: path to smirks, this may break or maybe we could have it inside
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(base_path, "smirks.json"), "r") as f:
         data = [json.loads(line) for line in f]
     
     smirks_names = {}
@@ -31,14 +52,18 @@ def get_smirks_from_list(rxn_list: list[str]) -> dict:
     return smirks_names
     
 
-def get_candidates_from_bbs(smirks: str, 
-                            bbs: list) -> tuple[str, str]:
+def get_product_from_bbs(
+    smirks: Dict[str, List[str]], 
+    building_blocks: List[str]
+) -> str:
     
-    """Get a seeding molecule from a dictionary with reaction names and
-    SMIRKS and a list of building blocks. Randomly sample and then """
+    """
+    Get a seeding molecule from a dictionary with reaction names and SMIRKS and a list of building blocks. 
+    Randomly sample blocks and reactions and return the product.
+    """
 
     # Shuffle bbs
-    random.shuffle(bbs)
+    random.shuffle(building_blocks)
 
     # Randomly sample reaction
     rxn_name = random.choice(list(smirks.keys()))
@@ -50,22 +75,35 @@ def get_candidates_from_bbs(smirks: str,
 
     mol0 = Chem.MolFromSmarts(smarts[0])
 
-    # Sample compatible bb from list
-    for bb in bbs:
+    # Sample compatible building block from list
+    while True:
+        idx = random.randint(0, len(building_blocks) - 1)
+        bb = building_blocks[idx]
         mol = Chem.MolFromSmiles(bb)
-        if mol.HasSubstructMatch(mol0):
-            r0 = mol
-            break
+
+        if passes_property_filter(mol):
+            if mol.HasSubstructMatch(mol0):
+                r0 = mol
+                break
+        else:
+            continue
 
     # If bimol
     if len(smarts) > 1:
         mol1 = Chem.MolFromSmarts(smarts[1])
 
-        for bb in bbs:
+        while True:
+            idx = random.randint(0, len(building_blocks) - 1)
+            bb = building_blocks[idx]
             mol = Chem.MolFromSmiles(bb)
-            if mol.HasSubstructMatch(mol1):
-                r1 = mol
-                break
+
+            if passes_property_filter(mol):
+                if mol.HasSubstructMatch(mol1):
+                    r1 = mol
+                    break
+
+            else:
+                continue
     
     # React unimol
     if len(smarts) == 1:
@@ -79,30 +117,20 @@ def get_candidates_from_bbs(smirks: str,
 
     return product
 
-
-def get_bbs(bbs_path: str) -> list:
-    """Get building blocks from .smi file"""
-
-    bbs = pd.read_csv(bbs_path, 
-                      header=None)[0].values
-    
-    mols = [Chem.MolFromSmiles(smi) for smi in bbs]
-
-    filter_mols = [mol for mol in mols if CalcExactMolWt(mol) > 175]
-
-    filter_mols = [Chem.MolToSmiles(mol) for mol in filter_mols]
-
-    return filter_mols
-
-
-def seed_enumeration(rxn_list: list[str], 
-                     bbs_path: str,
-                     n_seeds: int = 10) -> list:
-    """Enumerate molecules using target rxns and specified bbs.
+def seed_enumeration(
+    rxn_list: List[str], 
+    building_blocks_path: str,
+    n_seeds: int = 10
+) -> List[str]:
     """
-
-    # Open bbs
-    bbs = get_bbs(bbs_path)
+    Enumerate molecules using target rxns and specified bbs.
+    """
+    assert os.path.exists(building_blocks_path), f"Seed (by reaction) building blocks file {building_blocks_path} does not exist."
+    # Read building blocks
+    bbs = pd.read_csv(
+        building_blocks_path, 
+        header=None
+    )[0].values
 
     # Get smirks
     names_smirks = get_smirks_from_list(rxn_list)
@@ -110,15 +138,19 @@ def seed_enumeration(rxn_list: list[str],
     # Create set to store seed molecules
     seed_smiles = set()
 
-    # Get seeds until list is full
     while len(seed_smiles) < n_seeds:
 
         try:
-            smile = get_candidates_from_bbs(names_smirks, 
-                                        bbs)
+            smiles = get_product_from_bbs(
+                smirks=names_smirks, 
+                building_blocks=bbs
+            )
+            print(smiles)
+            exit()
 
-            seed_smiles.add(smile)
-        except: 
+            seed_smiles.add(smiles)
+
+        except Exception: 
             pass
 
     return list(seed_smiles)
