@@ -118,7 +118,7 @@ class ReplayBuffer:
         
     def prepopulate_buffer(self, oracle: Oracle) -> Oracle:
         """
-        Seeds the replay buffer with a set of SMILES.
+        Seeds the Replay Buffer with a set of SMILES.
         Useful if there are known high-reward molecules to pre-populate the Replay Buffer with.
 
         Oracle is returned here because seeding updates the Oracle's history with the seeded SMILES.
@@ -159,5 +159,8 @@ class ReplayBuffer:
             )
             # Update the Oracle Cache with the canonical SMILES
             oracle.update_oracle_cache(canonical_smiles, rewards)
+
+            # Increment the number of oracle calls
+            oracle.calls += len(canonical_smiles)
 
         return oracle

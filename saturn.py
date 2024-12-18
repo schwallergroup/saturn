@@ -76,6 +76,7 @@ if __name__ == "__main__":
         # 1. Construct the Oracle
         oracle = Oracle(OracleConfiguration(**config["oracle"]))
 
+        # FIXME: Make an Enumerator class which can toggle Replay Buffer seeding and/or just running enumeration alone
         # Ugly hack for bbs rxn seed: populate replay buffer with molecules built with desired rxns
         is_comp_syntheseus = [comp["name"] == "syntheseus" for comp in config["oracle"]["components"]]
 
