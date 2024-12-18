@@ -1,7 +1,7 @@
 """
 Enumerate molecules according to specified reactions to seed the Replay Buffer.
 """
-from typing import List, Dict
+from typing import List, Dict, Union
 import os
 import json
 import random
@@ -14,7 +14,7 @@ import pandas as pd
 import sys
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_PATH)
-from enumeration.utils import within_molecular_weight_range, is_charged, longest_aliphatic_c_chain, passes_ring_filter
+from enumeration.utils import within_molecular_weight_range, within_small_molecule_size, is_charged, longest_aliphatic_c_chain, passes_ring_filter
 
 
 def passes_property_filter(mol: Mol) -> bool:
@@ -61,19 +61,23 @@ def get_smirks_from_list(rxn_list: list[str]) -> Dict[str, List[str]]:
 def get_product_from_building_blocks(
     smirks: Dict[str, List[str]], 
     building_blocks: List[str]
-) -> str:
+) -> Union[str, None]:
     
     """
     Get a seeding molecule from a dictionary with reaction names and SMIRKS and a list of building blocks. 
     Randomly sample blocks and reactions and return the product.
+
+    # FIXME: Currently purposely disallowing for > 2 reactants - returns None
     """
     # Randomly sample reaction
     rxn_name = random.choice(list(smirks.keys()))
-
     rxn_smirks = random.choice(smirks[rxn_name])
     
     # Get SMARTS for reactants
     smarts = rxn_smirks.split(">>")[0].split(".")
+    # FIXME: Do not allow > 2 reactants at the moment
+    if len(smarts) > 2:
+        return None
 
     mol0 = Chem.MolFromSmarts(smarts[0])
 
@@ -113,9 +117,9 @@ def get_product_from_building_blocks(
     else:
         product = AllChem.ReactionFromSmarts(rxn_smirks).RunReactants((r0, r1))
     
-    product = Chem.MolToSmiles(product[0][0])
+    product = product[0][0]
 
-    return product
+    return Chem.MolToSmiles(product) if within_small_molecule_size(product) else None
 
 def rxn_based_enumeration(
     rxn_list: List[str], 
@@ -145,10 +149,8 @@ def rxn_based_enumeration(
                 smirks=names_smirks, 
                 building_blocks=bbs
             )
-            print(smiles)
-            exit()
-
-            seed_smiles.add(smiles)
+            if smiles is not None:
+                seed_smiles.add(smiles)
 
         except Exception: 
             pass

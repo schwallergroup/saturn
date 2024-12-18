@@ -10,6 +10,10 @@ from rdkit.Chem.rdMolDescriptors import CalcExactMolWt
 def within_molecular_weight_range(mol: Mol) -> bool:
     """Returns whether the molecular weight is within the specified range."""
     return 150 < CalcExactMolWt(mol) < 200
+
+def within_small_molecule_size(mol: Mol) -> bool:
+    """Returns whether the molecular weight > 300."""
+    return CalcExactMolWt(mol) > 300
     
 # Exclude SMILES with charges
 def is_charged(mol: Mol) -> bool:
