@@ -61,10 +61,6 @@ def get_product_from_bbs(
     Get a seeding molecule from a dictionary with reaction names and SMIRKS and a list of building blocks. 
     Randomly sample blocks and reactions and return the product.
     """
-
-    # Shuffle bbs
-    random.shuffle(building_blocks)
-
     # Randomly sample reaction
     rxn_name = random.choice(list(smirks.keys()))
 
