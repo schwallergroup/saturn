@@ -27,6 +27,10 @@ from oracles.dataclass import OracleConfiguration
 from scoring.scorer import Scorer
 from scoring.dataclass import ScoringConfiguration
 
+# Reaction-based Enumeration
+from enumeration.enumeration import rxn_based_enumeration
+
+
 parser = argparse.ArgumentParser(description="Run Saturn.")
 parser.add_argument(
     "config", 
@@ -71,6 +75,25 @@ if __name__ == "__main__":
     elif running_mode == "goal_directed_generation":
         # 1. Construct the Oracle
         oracle = Oracle(OracleConfiguration(**config["oracle"]))
+
+        # FIXME: Make an Enumerator class which can toggle Replay Buffer seeding and/or just running enumeration alone
+        is_component_syntheseus = [component["name"] == "syntheseus" for component in config["oracle"]["components"]]
+
+        if any(is_component_syntheseus):
+            syntheseus_params = config["oracle"]["components"][is_component_syntheseus.index(True)]["specific_parameters"]
+
+            if syntheseus_params["enforced_reactions"]["seed_reactions"]:
+                # Call function to seed molecules
+                rxn_classes = syntheseus_params["enforced_reactions"]["enforced_rxn_classes"]
+                building_blocks_path = syntheseus_params["enforced_reactions"]["seed_building_blocks_file"]
+                
+                seeding_smiles = rxn_based_enumeration(
+                    rxn_list=rxn_classes,
+                    building_blocks_path=building_blocks_path
+                )
+
+                # In-place modification of ExperienceReplay parameters config
+                config["goal_directed_generation"]["experience_replay"]["smiles"] = seeding_smiles
 
         # 2. Construct the Reinforcement Learning Agent
         reinforcement_learning_agent = ReinforcementLearningAgent(
