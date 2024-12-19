@@ -7,6 +7,12 @@ from rdkit.Chem.AllChem import GetMorganFingerprintAsBitVect
 from rdkit.Chem.Scaffolds.MurckoScaffold import GetScaffoldForMol
 
 
+def batch_validity(smiles: np.ndarray[str]) -> float:
+    """
+    Compute the Validity of a batch of SMILES strings.
+    """
+    valid_mols = [mol for mol in (Chem.MolFromSmiles(s) for s in smiles) if mol is not None]
+    return len(valid_mols) / len(smiles)
 
 def canonicalize_smiles(smiles: str) -> str:
     """
