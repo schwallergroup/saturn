@@ -77,24 +77,23 @@ if __name__ == "__main__":
         oracle = Oracle(OracleConfiguration(**config["oracle"]))
 
         # FIXME: Make an Enumerator class which can toggle Replay Buffer seeding and/or just running enumeration alone
-        # Ugly hack for bbs rxn seed: populate replay buffer with molecules built with desired rxns
-        is_comp_syntheseus = [comp["name"] == "syntheseus" for comp in config["oracle"]["components"]]
+        is_component_syntheseus = [component["name"] == "syntheseus" for component in config["oracle"]["components"]]
 
-        if any(is_comp_syntheseus):
-            syntheseus_params = config["oracle"]["components"][is_comp_syntheseus.index(True)]["specific_parameters"]
+        if any(is_component_syntheseus):
+            syntheseus_params = config["oracle"]["components"][is_component_syntheseus.index(True)]["specific_parameters"]
 
             if syntheseus_params["enforced_reactions"]["seed_reactions"]:
                 # Call function to seed molecules
                 rxn_classes = syntheseus_params["enforced_reactions"]["enforced_rxn_classes"]
                 building_blocks_path = syntheseus_params["enforced_reactions"]["seed_building_blocks_file"]
                 
-                smiles_seeds = rxn_based_enumeration(
+                seeding_smiles = rxn_based_enumeration(
                     rxn_list=rxn_classes,
                     building_blocks_path=building_blocks_path
                 )
 
                 # In-place modification of ExperienceReplay parameters config
-                config["goal_directed_generation"]["experience_replay"]["smiles"] = smiles_seeds
+                config["goal_directed_generation"]["experience_replay"]["smiles"] = seeding_smiles
 
         # 2. Construct the Reinforcement Learning Agent
         reinforcement_learning_agent = ReinforcementLearningAgent(
