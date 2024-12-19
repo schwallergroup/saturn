@@ -122,6 +122,10 @@ class Syntheseus(OracleComponent):
         self.matched_generated_smiles = dict()
         self.matched_generated_smiles_with_rxn = dict()
 
+        # Guard against invalid combination of parameters
+        if (not self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_reactions_parameters.enforce_rxn_class_presence):
+            assert self.parameters.reward_shaping_function_parameters["transformation_function"] == "binary", "The run specifies to enforce neither building blocks nor reaction classes, please use the Binary Reward Shaping function."
+
     def __call__(
         self, 
         mols: np.ndarray[Mol],
