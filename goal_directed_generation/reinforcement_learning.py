@@ -95,15 +95,18 @@ class ReinforcementLearningAgent:
 
         # Only the Agent is updated so the Prior does not need an optimizer
         self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)
+
         # Model checkpointing save directory
         self.model_checkpoints_dir = model_checkpoints_dir
         os.makedirs(self.model_checkpoints_dir, exist_ok=True)
         self.logging_path = logging_path
         self.logging_frequency = logging_frequency
         self.logging_multiple = 1
+
         # Best Agent checkpointing
         self.best_agent_reward = float("-inf")
         self.patience = 0
+
         # Set up logging
         setup_logging(logging_path)
   
@@ -222,7 +225,7 @@ class ReinforcementLearningAgent:
                 self.logging_multiple += 1
 
             # 18. Checkpoint best Agent (by average reward)
-            if np.mean(penalized_rewards) > self.best_agent_reward and validity > 0.5:
+            if (np.mean(penalized_rewards) > self.best_agent_reward) and (validity > 0.5):
                 self.best_agent_reward = np.mean(penalized_rewards)
                 self.agent.save(os.path.join(self.model_checkpoints_dir, "best_agent.ckpt"))
 
