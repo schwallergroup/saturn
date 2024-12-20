@@ -13,7 +13,7 @@ from oracles.dataclass import OracleComponentParameters
 from rdkit import Chem
 from rdkit.Chem import Mol
 from utils.chemistry_utils import canonicalize_smiles, construct_morgan_fingerprints_batch_from_file
-from oracles.synthesizability.utils.utils import match_stock, extract_functional_groups, get_node_reward
+from oracles.synthesizability.utils.utils import match_stock, extract_functional_groups, get_node_reward, get_percentage_of_carbon
 from concurrent.futures import ThreadPoolExecutor
 from oracles.synthesizability.utils.CONSTANTS import DEFAULT_TANGO_WEIGHTS
 
@@ -273,7 +273,10 @@ class Syntheseus(OracleComponent):
                             if is_matched:
                                 self.matched_generated_smiles[oracle_calls].append(generated_smiles)
                                 break
-
+                        
+                        # if is_matched:
+                        #     max_reward = max_reward * 0.75 + (get_percentage_of_carbon(matched_block_smiles, generated_smiles))
+    
                         node_rewards[idx] = max_reward
 
                         with open(os.path.join(self.output_dir, "matched_generated_smiles.json"), "w") as f:
@@ -402,6 +405,7 @@ class Syntheseus(OracleComponent):
 
                     with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
                         json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)               
+
 
             # HACK: In case a molecule is in the building blocks stock, Syntheseus returns 0. 
             #       Set these to 1 to work with Binary Reward Shaping
