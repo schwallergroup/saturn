@@ -23,7 +23,7 @@ from oracles.synthesizability.dataclass import EnforcedBuildingBlocksParameters,
 
 class Syntheseus(OracleComponent):
     """
-    Wrapper around Syntheseus which itself is a wrapper around various retrosynthesis models and search algorithms.
+    Wrapper around Syntheseus which implements various retrosynthesis models and search algorithms.
 
     References:
     1. https://arxiv.org/abs/2310.19796
@@ -83,23 +83,29 @@ class Syntheseus(OracleComponent):
         )
 
         self.include_rxn_info = self.parameters.specific_parameters.get("include_rxn_info", False)
-        if self.include_rxn_info or self.enforced_reactions_parameters.enforce_rxn_class_presence:
-            self.rxn_insight_env_name = self.enforced_reactions_parameters.rxn_insight_env_name
-            assert self.rxn_insight_env_name is not None, "The run specifies to enforce reactions and/or include reaction information in the top graphs output, please provide the Conda environment name with Rxn-INSIGHT installed."
         
         if self.enforced_reactions_parameters.enforce_rxn_class_presence:
             self.enforce_all_reactions = self.enforced_reactions_parameters.enforce_all_reactions
             self.enforced_rxn_classes = self.enforced_reactions_parameters.enforced_rxn_classes
             assert self.enforced_rxn_classes is not None, "The run specifies to enforce reactions, please provide the reaction classes to enforce."
-            # NOTE: For now, avoid certain reaction classes only when also enforcing reactions
-            self.avoid_rxn_classes = self.enforced_reactions_parameters.avoid_rxn_classes
-            self.rxn_info_extraction_script_path = self.enforced_reactions_parameters.rxn_info_extraction_script_path
-            assert self.rxn_info_extraction_script_path is not None, "The run specifies to enforce reactions, please provide the path to the script that extracts the reaction classes from the Syntheseus route pickle file."
 
-        if self.enforced_building_blocks_parameters.enforce_blocks or self.enforced_reactions_parameters.enforce_rxn_class_presence:
-            # Path to the script that extracts the SMILES and depth from the Syntheseus route pickle file
-            self.route_extraction_script_path = self.parameters.specific_parameters.get("route_extraction_script_path", None)
-            assert self.route_extraction_script_path is not None, "The run specifies to enforce building blocks and/or reactions, please provide the path to the script that extracts the SMILES and depth from the Syntheseus route pickle file."
+        # Avoid reaction classes
+        self.avoid_rxn_classes = self.enforced_reactions_parameters.avoid_rxn_classes
+
+        # -------------------------------------------------------------------
+        # Scripts required to extract reaction nodes and reaction information
+        # -------------------------------------------------------------------
+
+        self.rxn_insight_env_name = self.enforced_reactions_parameters.rxn_insight_env_name
+        assert self.rxn_insight_env_name is not None, "The run specifies to enforce reactions and/or include reaction information in the top graphs output, please provide the Conda environment name with Rxn-INSIGHT installed."
+
+        self.rxn_info_extraction_script_path = self.enforced_reactions_parameters.rxn_info_extraction_script_path
+        assert self.rxn_info_extraction_script_path is not None, "The run requires extracting reaction information, please provide the path to the script that extracts the reaction classes from the Syntheseus route pickle file."
+
+        # Path to the script that extracts the SMILES and depth from the Syntheseus route pickle file
+        self.route_extraction_script_path = self.parameters.specific_parameters.get("route_extraction_script_path", None)
+        # TODO: Avoid certain building blocks/reagents
+        assert self.route_extraction_script_path is not None, "The run specifies to enforce/avoid building blocks and/or reactions, please provide the path to the script that extracts the SMILES and depth from the Syntheseus route pickle file."
 
         # Save top percentage routes
         self.save_top_percentage_routes = self.parameters.specific_parameters.get("save_top_percentage_routes", 0.10)  # Default to top 10%
@@ -123,7 +129,9 @@ class Syntheseus(OracleComponent):
         self.matched_generated_smiles_with_rxn = dict()
 
         # Guard against invalid combination of parameters
-        if (not self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_reactions_parameters.enforce_rxn_class_presence):
+        if (not self.enforced_building_blocks_parameters.enforce_blocks) and \
+           (not self.enforced_reactions_parameters.enforce_rxn_class_presence) and \
+           (len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0):
             assert self.parameters.reward_shaping_function_parameters["transformation_function"] == "binary", "The run specifies to enforce neither building blocks nor reaction classes, please use the Binary Reward Shaping function."
 
     def __call__(
@@ -311,19 +319,17 @@ class Syntheseus(OracleComponent):
                 # ENFORCED REACTIONS
                 # ------------------
 
-                # If the molecule is solved *and* the user specified to enforce that a set of reaction classes appears in the synthesis graph
-                if self.enforced_reactions_parameters.enforce_rxn_class_presence and int(is_solved[idx]) == 1:
-
-                    if oracle_calls not in self.matched_generated_smiles_with_rxn:
-                        self.matched_generated_smiles_with_rxn[oracle_calls] = []
+                # Extract all reactions in the Syntheseus route if this information is required - either:
+                #   1. Enforcing reaction classes
+                #   2. Avoiding reaction classes
+                if (self.enforced_reactions_parameters.enforce_rxn_class_presence and int(is_solved[idx]) == 1) or \
+                   (self.enforced_reactions_parameters.avoid_rxn_classes and int(is_solved[idx]) == 1):
 
                     route = self._extract_syntheseus_route_data(
                         route_path=os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
                         data_type="rxn"
                     )
 
-                    # NOTE: Trying binary rxn class reward for now
-                    rxn_multiplier = 0.0
                     all_rxns = []  # List[Tuple[str, str]] --> (rxn_class, rxn_name)
                     # The nodes are all Reaction nodes - extract reaction information
                     for node, node_data in route.items():
@@ -344,35 +350,45 @@ class Syntheseus(OracleComponent):
                         assert extraction_result.returncode == 0, f"Error during Rxn-INSIGHT reaction information extraction: {extraction_result.stderr}"
                         rxn_info = ast.literal_eval(extraction_result.stdout)
 
-                        rxn_class, rxn_name = rxn_info["CLASS"], rxn_info["NAME"]
-                        for enforced_rxn_class in self.enforced_rxn_classes:
+                        all_rxns.append((rxn_info["CLASS"], rxn_info["NAME"]))
+
+                # If the molecule is solved *and* the user specified to enforce that a set of reaction classes appears in the synthesis graph
+                if self.enforced_reactions_parameters.enforce_rxn_class_presence and int(is_solved[idx]) == 1:
+
+                    if oracle_calls not in self.matched_generated_smiles_with_rxn:
+                        self.matched_generated_smiles_with_rxn[oracle_calls] = []
+
+                    rxn_multiplier = 0.0
+                    for rxn_class, rxn_name in all_rxns:  # Un-pack each (rxn_class, rxn_name) pair
+                        for enforced_rxn_class in self.enforced_rxn_classes:    
                             # Convert to lower-case for more robust string comparison
                             if (enforced_rxn_class.lower() in rxn_class.lower()) or (enforced_rxn_class.lower() in rxn_name.lower()):
                                 rxn_multiplier = 1.0
-                                # If not enforcing all reactions, then finding *a* match is sufficient
-                                if not self.enforced_reactions_parameters.enforce_all_reactions:
-                                    break
-                            # Track all reactions
-                            all_rxns.append((rxn_class, rxn_name))
-
-                        # NOTE: This block of code is only relevant when enforcing building blocks *and* reaction classes
-                        # Check if the node exactly matches an enforced building block
-                        # If enforcing *all* reactions, then wait until all reactions in the Syntheseus route have been tracked
-                        if (self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_reactions_parameters.enforce_all_reactions): 
-                            if (is_matched) and (rxn_multiplier) == 1.0:
-                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                            # If not enforcing all reactions, then finding *a* match is sufficient
+                            if not self.enforced_reactions_parameters.enforce_all_reactions:
                                 break
 
-                        elif (not self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_reactions_parameters.enforce_all_reactions):
+                    # -----------------------------------------------------------------------------------------------
+                    # NOTE: This block of code is only relevant when enforcing building blocks *and* reaction classes
+                    # -----------------------------------------------------------------------------------------------
+
+                    if not self.enforced_reactions_parameters.enforce_all_reactions:
+                        # Check if the node exactly matches an enforced building block
+                        if self.enforced_building_blocks_parameters.enforce_blocks: 
+                            if (is_matched) and (rxn_multiplier) == 1.0:
+                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+
+                        elif not self.enforced_building_blocks_parameters.enforce_blocks:
                             # If the reaction class is matched, then the node reward is 1
                             if rxn_multiplier == 1.0:
                                 self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
-                                break
 
-                    # Check if all reactions in the Syntheseus route are enforced
-                    if self.enforced_reactions_parameters.enforce_all_reactions:
-                        # For each (rxn_class, rxn_name) pair, check if the enforced rxn classes are present
-                        for rxn_class, rxn_name in all_rxns:
+                    # ------------------------------------------------------------------------
+                    # NOTE: This block of code is only relevant when enforcing *all* reactions
+                    # ------------------------------------------------------------------------
+
+                    elif self.enforced_reactions_parameters.enforce_all_reactions:
+                        for rxn_class, rxn_name in all_rxns:   # Un-pack each (rxn_class, rxn_name) pair
                             for enforced_rxn_class in self.enforced_rxn_classes:
                                 if (enforced_rxn_class.lower() in rxn_class.lower()) or (enforced_rxn_class.lower() in rxn_name.lower()):
                                     break
@@ -380,7 +396,6 @@ class Syntheseus(OracleComponent):
                                     rxn_multiplier = 0.0
                                     break
                         
-                        # The below tracking is only reached if the user specified to enforce *all* reactions
                         # Enforcing blocks and *all* reactions
                         if self.enforced_building_blocks_parameters.enforce_blocks:
                             if (is_matched) and (rxn_multiplier) == 1.0:
@@ -391,21 +406,28 @@ class Syntheseus(OracleComponent):
                             if rxn_multiplier == 1.0:
                                 self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
-                    # Check if specified reaction classes are *avoided*
-                    if (len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0) and (rxn_multiplier == 1.0):
-                        for rxn_class, rxn_name in all_rxns:
-                            for avoid_rxn_class in self.enforced_reactions_parameters.avoid_rxn_classes:
-                                if (avoid_rxn_class.lower() in rxn_class.lower()) or (avoid_rxn_class.lower() in rxn_name.lower()):
-                                    rxn_multiplier = 0.0
-                                    break
-
                     # Reaching this code requires that there is a solved route
                     # This truncates the node reward to 0 if the reaction class is not matched (assuming enforced blocks are also being considered)
                     # If *not* enforcing blocks, then the reward is 1.0 * rxn_multiplier because the route is solved in the first place and the user specified to enforce *only* reaction classes
                     node_rewards[idx] = node_rewards[idx] * rxn_multiplier if self.enforced_building_blocks_parameters.enforce_blocks else 1.0 * rxn_multiplier
 
                     with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
-                        json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)               
+                        json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)          
+
+                # -----------------------------------------------------------------------------------------------
+                # NOTE: This block of code is only relevant when *avoiding* a set of reaction classes
+                # -----------------------------------------------------------------------------------------------
+
+                if len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0 and int(is_solved[idx]) == 1:
+                    rxn_multiplier = 1.0
+                    # Check if specified reaction classes are *avoided*
+                    for rxn_class, rxn_name in all_rxns:
+                        for avoid_rxn_class in self.enforced_reactions_parameters.avoid_rxn_classes:
+                            if (avoid_rxn_class.lower() in rxn_class.lower()) or (avoid_rxn_class.lower() in rxn_name.lower()):
+                                rxn_multiplier = 0.0
+                                break
+
+                    node_rewards[idx] = node_rewards[idx] * rxn_multiplier if self.enforced_building_blocks_parameters.enforce_blocks else 1.0 * rxn_multiplier
 
             # HACK: In case a molecule is in the building blocks stock, Syntheseus returns 0. 
             #       Set these to 1 to work with Binary Reward Shaping
@@ -433,7 +455,9 @@ class Syntheseus(OracleComponent):
         shutil.rmtree(temp_dir)
 
         # 9. Prepare and/or return the output
-        if self.enforced_building_blocks_parameters.enforce_blocks or self.enforced_reactions_parameters.enforce_rxn_class_presence:
+        if self.enforced_building_blocks_parameters.enforce_blocks or \
+           self.enforced_reactions_parameters.enforce_rxn_class_presence or \
+           len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0:
             if not self.parallelize:
                 assert len(node_rewards) == len(smiles), "Syntheseus output length mismatch."
             return node_rewards
@@ -513,8 +537,7 @@ class Syntheseus(OracleComponent):
             }
             
             # Find the syntheseus output folder with the closest *smaller* number of oracle calls
-            # FIXME: This is because currently, oracle calls is incremented before the Oracle History is updated. Fix this in the future
-            # FIXME: This is inelegant
+            # FIXME: This is because currently, oracle calls is incremented before the Oracle History is updated. Fix this in the future. This is inelegant
             closest_smaller_oracle_calls_folder = max(
                 [
                     folder for folder in syntheseus_outputs 
