@@ -88,8 +88,11 @@ if __name__ == "__main__":
                 building_blocks_path = syntheseus_params["enforced_reactions"]["seed_building_blocks_file"]
                 
                 seeding_smiles = rxn_based_enumeration(
+                    prior_path=config["goal_directed_generation"]["reinforcement_learning"]["prior"],
+                    device=device,
                     rxn_list=rxn_classes,
-                    building_blocks_path=building_blocks_path
+                    building_blocks_path=building_blocks_path,
+                    n_seeds=100,
                 )
 
                 # In-place modification of ExperienceReplay parameters config
