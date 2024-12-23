@@ -60,14 +60,12 @@ def get_smirks_from_list(rxn_list: list[str]) -> Dict[str, List[str]]:
 
     return smirks_names
     
-
 def get_product_from_building_blocks(
     smirks: Dict[str, List[str]], 
     building_blocks: List[str]
 ) -> Union[str, None]:
-    
     """
-    Get a seeding molecule from a dictionary with reaction names and SMIRKS and a list of building blocks. 
+    Get a seeding molecule from a dictionary with reaction names and SMIRKS and a list of building blocks.
     Randomly sample blocks and reactions and return the product.
 
     # FIXME: Currently purposely disallowing for > 2 reactants - returns None

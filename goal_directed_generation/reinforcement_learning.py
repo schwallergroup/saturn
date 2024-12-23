@@ -185,7 +185,7 @@ class ReinforcementLearningAgent:
 
             # 12. Update Replay Buffer
             self.replay_buffer.add(
-                smiles=smiles, 
+                smiles=smiles,
                 rewards=penalized_rewards
             )
 
