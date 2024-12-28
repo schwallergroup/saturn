@@ -375,12 +375,12 @@ class Syntheseus(OracleComponent):
                     if not self.enforced_reactions_parameters.enforce_all_reactions:
                         # Check if the node exactly matches an enforced building block
                         if self.enforced_building_blocks_parameters.enforce_blocks: 
-                            if (is_matched) and (rxn_multiplier) == 1.0:
+                            if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
                                 self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
                         elif not self.enforced_building_blocks_parameters.enforce_blocks:
                             # If the reaction class is matched, then the node reward is 1
-                            if rxn_multiplier == 1.0:
+                            if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
                                 self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
                     # ------------------------------------------------------------------------
@@ -398,12 +398,12 @@ class Syntheseus(OracleComponent):
                         
                         # Enforcing blocks and *all* reactions
                         if self.enforced_building_blocks_parameters.enforce_blocks:
-                            if (is_matched) and (rxn_multiplier) == 1.0:
+                            if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
                                 self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
                         # Only enforcing *all* reactions
                         else:
-                            if rxn_multiplier == 1.0:
+                            if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
                                 self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
                     # Reaching this code requires that there is a solved route
@@ -411,23 +411,43 @@ class Syntheseus(OracleComponent):
                     # If *not* enforcing blocks, then the reward is 1.0 * rxn_multiplier because the route is solved in the first place and the user specified to enforce *only* reaction classes
                     node_rewards[idx] = node_rewards[idx] * rxn_multiplier if self.enforced_building_blocks_parameters.enforce_blocks else 1.0 * rxn_multiplier
 
-                    with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
-                        json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)          
+                    # Write out the matched generated SMILES with reaction classes if not also avoiding reaction classes (otherwise, wait to check this)
+                    if len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
+                        with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
+                            json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)          
 
                 # -----------------------------------------------------------------------------------------------
                 # NOTE: This block of code is only relevant when *avoiding* a set of reaction classes
                 # -----------------------------------------------------------------------------------------------
 
                 if len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0 and int(is_solved[idx]) == 1:
-                    rxn_multiplier = 1.0
+                    avoid_rxn_multiplier = 1.0
                     # Check if specified reaction classes are *avoided*
                     for rxn_class, rxn_name in all_rxns:
                         for avoid_rxn_class in self.enforced_reactions_parameters.avoid_rxn_classes:
                             if (avoid_rxn_class.lower() in rxn_class.lower()) or (avoid_rxn_class.lower() in rxn_name.lower()):
-                                rxn_multiplier = 0.0
+                                avoid_rxn_multiplier = 0.0
                                 break
+                    
+                    # In the scenario with enforcing reaction classes and the SMILES does not satisfy this constraint, the node_reward[idx] would already have been truncated to 0.
+                    # Therefore, initializing another multiplier = 1.0 above would not change this outcome and is a safe operation
+                    if self.enforced_building_blocks_parameters.enforce_blocks:
+                        node_rewards[idx] = node_rewards[idx] * avoid_rxn_multiplier
+                    else:
+                        # Being very careful here: if the avoid_rxn_multiplier is 0.0, then the reward can automatically be set to 0.0
+                        if avoid_rxn_multiplier == 0.0:
+                            node_rewards[idx] = 0.0
+                        # But if the avoid_rxn_multiplier is 1.0, then the reward might still be 0.0 if the user *also* wants to enforce reaction classes and this constraint is not satisfied
+                        elif avoid_rxn_multiplier == 1.0:
+                            if not self.enforced_reactions_parameters.enforce_rxn_class_presence:
+                                node_rewards[idx] = 1.0
+                            else:
+                                node_rewards[idx] = node_rewards[idx] * 1.0
 
-                    node_rewards[idx] = node_rewards[idx] * rxn_multiplier if self.enforced_building_blocks_parameters.enforce_blocks else 1.0 * rxn_multiplier
+                    if node_rewards[idx] == 1.0:
+                        self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                        with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
+                            json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)          
 
             # HACK: In case a molecule is in the building blocks stock, Syntheseus returns 0. 
             #       Set these to 1 to work with Binary Reward Shaping
