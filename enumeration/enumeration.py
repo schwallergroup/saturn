@@ -11,6 +11,9 @@ from rdkit.Chem import Mol
 from rdkit.Chem import AllChem
 import pandas as pd
 
+from models.generator import Generator
+from utils.chemistry_utils import is_encodable
+
 import sys
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_PATH)
@@ -57,14 +60,12 @@ def get_smirks_from_list(rxn_list: list[str]) -> Dict[str, List[str]]:
 
     return smirks_names
     
-
 def get_product_from_building_blocks(
     smirks: Dict[str, List[str]], 
     building_blocks: List[str]
 ) -> Union[str, None]:
-    
     """
-    Get a seeding molecule from a dictionary with reaction names and SMIRKS and a list of building blocks. 
+    Get a seeding molecule from a dictionary with reaction names and SMIRKS and a list of building blocks.
     Randomly sample blocks and reactions and return the product.
 
     # FIXME: Currently purposely disallowing for > 2 reactants - returns None
@@ -128,13 +129,18 @@ def get_product_from_building_blocks(
     return Chem.MolToSmiles(product) if within_small_molecule_size(product) else None
 
 def rxn_based_enumeration(
+    prior_path: str,
+    device: str,
     rxn_list: List[str], 
     building_blocks_path: str,
-    n_seeds: int = 100
+    n_seeds: int = 100,
 ) -> List[str]:
     """
     Enumerate molecules using specified reactions and building blocks.
     """
+    # Load Prior to check that enumerated SMILES are tokenizable
+    prior = Generator.load_from_file(prior_path, device)
+
     assert os.path.exists(building_blocks_path), f"Seed (by reaction) building blocks file {building_blocks_path} does not exist."
     # Read building blocks
     bbs = pd.read_csv(
@@ -155,7 +161,7 @@ def rxn_based_enumeration(
                 smirks=names_smirks, 
                 building_blocks=bbs
             )
-            if smiles is not None:
+            if smiles is not None and is_encodable(smiles, prior):
                 seed_smiles.add(smiles)
 
         except Exception: 

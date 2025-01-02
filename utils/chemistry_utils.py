@@ -64,6 +64,17 @@ def can_be_encoded(original_smiles: str, randomized_smiles: str, prior) -> str:
         return randomized_smiles
     except KeyError:
         return original_smiles
+
+def is_encodable(smiles: str, prior) -> bool:
+    """
+    Returns True if the SMILES string can be encoded by the Vocabulary.
+    """
+    try:
+        tokens = prior.tokenizer.tokenize(smiles)
+        seq = prior.vocabulary.encode(tokens)
+        return True
+    except KeyError:
+        return False
     
 def get_bemis_murcko_scaffold(smiles: str) -> str:
     """

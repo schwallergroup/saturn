@@ -130,9 +130,9 @@ class ReplayBuffer:
               are implications on the diversity of the solutions found.
         """
         if len(self.parameters.smiles) > 0:
-            canonical_smiles = canonicalize_smiles_batch(self.parameters.smiles)
-            mols = [Chem.MolFromSmiles(s) for s in canonical_smiles]
+            mols = [Chem.MolFromSmiles(s) for s in self.parameters.smiles]
             mols = [mol for mol in mols if mol is not None]
+            assert len(self.parameters.smiles) == len(mols), f"Seeding SMILES are not all valid: {len(self.parameters.smiles)} SMILES vs {len(mols)} mols"
 
             oracle_components_df = pd.DataFrame()
             rewards = np.empty((len(oracle.oracle), len(mols)))
@@ -146,7 +146,7 @@ class ReplayBuffer:
 
             # Add the SMILES to the Replay Buffer
             self.add(
-                smiles=self.parameters.smiles,  # add the original SMILES
+                smiles=self.parameters.smiles,
                 rewards=aggregated_rewards
             )
 
@@ -158,9 +158,9 @@ class ReplayBuffer:
                 oracle_components_df=oracle_components_df
             )
             # Update the Oracle Cache with the canonical SMILES
-            oracle.update_oracle_cache(canonical_smiles, rewards)
+            oracle.update_oracle_cache(self.parameters.smiles, aggregated_rewards)
 
             # Increment the number of oracle calls
-            oracle.calls += len(canonical_smiles)
+            oracle.calls += len(self.parameters.smiles)
 
         return oracle

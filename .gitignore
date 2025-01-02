@@ -5,6 +5,7 @@ chembl-data
 cleaned-chembl-33.smi
 experiments
 test/
+test_files/
 synth/
 constrained-docking/
 boost_1_85_0

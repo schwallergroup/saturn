@@ -4,6 +4,7 @@ Adapted from https://github.com/MolecularAI/Reinvent with code additions for:
     2. Beam Enumeration: https://openreview.net/forum?id=7UhxsmbdaQ
     3. Hallucinated Memory (GraphGA based: https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc05372c)
 """
+from typing import Tuple
 import os
 import logging
 import time
@@ -121,17 +122,11 @@ class ReinforcementLearningAgent:
             seqs, smiles, _ = sample_unique_sequences(self.agent, self.batch_size)
 
             # 2. Compute Validity and guard against Agent drift leading to invalid SMILES
-            # NOTE: This is a rare occurrence
+            # NOTE: This is a rare occurrence and has been observed with repeated 0 reward batches
             # This has also been reported in https://link.springer.com/article/10.1007/s10994-024-06519-w
-            validity = chemistry_utils.batch_validity(smiles)
-            if validity == 0.0:
-                if self.patience == 10:
-                    logging.info("Resetting to best Agent checkpoint.")
-                    self._reset_agent()
-                    self.patience = 0
-                else:
-                    self.patience += 1
-                    continue
+            reset, validity = self._validity_drift_guard(smiles)
+            if reset:
+                continue
 
             # 3. Beam Enumeration: Filter SMILES using the Beam Enumeration pool
             if (self.execute_beam_enumeration) and (len(self.beam_enumeration.pool) != 0):
@@ -185,7 +180,7 @@ class ReinforcementLearningAgent:
 
             # 12. Update Replay Buffer
             self.replay_buffer.add(
-                smiles=smiles, 
+                smiles=smiles,
                 rewards=penalized_rewards
             )
 
@@ -271,9 +266,29 @@ class ReinforcementLearningAgent:
         for param in self.prior.get_network_parameters():
             param.requires_grad = False
 
+    def _validity_drift_guard(self, smiles: np.ndarray[str]) -> Tuple[bool, float]:
+        """
+        Guard against Agent drift leading to invalid SMILES.
+
+        Returns (True, validity float) if patience limit is reached or (False, validity float) otherwise.
+        """
+        validity = chemistry_utils.batch_validity(smiles)
+        if validity == 0.0:
+            if self.patience == 10:
+                logging.info("Resetting to best Agent checkpoint.")
+                self._reset_agent()
+                self.patience = 0
+                return True, validity
+            else:
+                self.patience += 1
+                return False, validity
+        else:
+            self.patience = 0
+            return False, validity
+
     def _reset_agent(self):
         """Reset the Agent to the best checkpoint."""
-        self.agent = Generator.load_from_file(self.model_checkpoints_dir, "best_agent.ckpt", self.device)
+        self.agent = Generator.load_from_file(os.path.join(self.model_checkpoints_dir, "best_agent.ckpt"), self.device)
 
     def _write_out_results(self):
         """
