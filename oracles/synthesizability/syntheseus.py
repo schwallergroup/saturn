@@ -108,8 +108,9 @@ class Syntheseus(OracleComponent):
         assert self.route_extraction_script_path is not None, "The run specifies to enforce/avoid building blocks and/or reactions, please provide the path to the script that extracts the SMILES and depth from the Syntheseus route pickle file."
 
         # Save top percentage routes
-        self.save_top_percentage_routes = self.parameters.specific_parameters.get("save_top_percentage_routes", 0.005)  # Default to top 0.5%
-        assert self.save_top_percentage_routes > 0.0 and self.save_top_percentage_routes <= 1.0, "The save top percentage routes must be between 0.0 and 1.0."
+        self.save_top_routes = self.parameters.specific_parameters.get("save_top_routes", False)
+        self.percentage_to_save = self.parameters.specific_parameters.get("percentage_to_save", 0.005)  # Default to top 0.5%
+        assert self.percentage_to_save > 0.0 and self.percentage_to_save <= 1.0, "The save top percentage routes must be between 0.0 and 1.0."
 
         # Search time limit
         self.time_limit_s = self.parameters.specific_parameters.get("time_limit_s", 180)  # Default to 3 minutes per molecule
@@ -544,7 +545,7 @@ class Syntheseus(OracleComponent):
         
         # Sort the Oracle History by reward and extract the top percentage
         oracle_history = oracle_history.sort_values(by="reward", ascending=False)
-        oracle_history = oracle_history.head(int(self.save_top_percentage_routes * len(oracle_history)))
+        oracle_history = oracle_history.head(int(self.percentage_to_save * len(oracle_history)))
         
         # Loop through each top generated SMILES, extract the Syntheseus graph, and track which enforced smiles is visited (if applicable)
         enforced_blocks = []
