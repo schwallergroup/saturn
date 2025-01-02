@@ -108,7 +108,7 @@ class Syntheseus(OracleComponent):
         assert self.route_extraction_script_path is not None, "The run specifies to enforce/avoid building blocks and/or reactions, please provide the path to the script that extracts the SMILES and depth from the Syntheseus route pickle file."
 
         # Save top percentage routes
-        self.save_top_percentage_routes = self.parameters.specific_parameters.get("save_top_percentage_routes", 0.10)  # Default to top 10%
+        self.save_top_percentage_routes = self.parameters.specific_parameters.get("save_top_percentage_routes", 0.005)  # Default to top 0.5%
         assert self.save_top_percentage_routes > 0.0 and self.save_top_percentage_routes <= 1.0, "The save top percentage routes must be between 0.0 and 1.0."
 
         # Search time limit
