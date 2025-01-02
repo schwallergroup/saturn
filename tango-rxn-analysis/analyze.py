@@ -28,7 +28,7 @@ from utils import (
 )
 
 # -----------------
-# Globals Variables
+# Global Variables
 # -----------------
 pd.options.mode.chained_assignment = None
 
@@ -338,7 +338,6 @@ if __name__ == "__main__":
         DOCKING_SCORE_ENUM = get_docking_score_enum(args.docking_oracle)
 
         # Log enforced reaction and building blocks info
-        # TODO: Include BBs information
         log_molecule_and_rxn_stats(
             seeds=seeds,
             experiment_name=experiment_name,
