@@ -54,6 +54,7 @@ from oracles.xtb.ionization_potential import IonizationPotential
 from oracles.xtb.lumo import LUMO
 from oracles.xtb.nucleophilicity_index import NucleophilicityIndex
 from oracles.xtb.nucleophilicity import Nucleophilicity
+from oracles.xtb.homo_lumo_gap import HOMOLUMOGap
 
 # DFT electronic properties
 from oracles.dft.dft_score import DFTScore
@@ -150,6 +151,8 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return NucleophilicityIndex(oracle_component_parameters)
     elif name == "nucleophilicity":
         return Nucleophilicity(oracle_component_parameters)
+    elif name == "homo_lumo_gap":
+        return HOMOLUMOGap(oracle_component_parameters)
     # DFT electronic properties
     elif name == "dft_score":
         return DFTScore(oracle_component_parameters)

@@ -14,14 +14,14 @@ class HOMO(OracleComponent):
         raw_homo_values = []
         for mol in mols:
             try:
-                temp_dir, geometry_path = self.geometry_optimizer.optimize_geometry(mol)
+                temp_dir, geometry_path, xtb_output = self.geometry_optimizer.optimize_geometry(mol)
                 elements, coordinates = read_xyz(geometry_path)
                 xtb = XTB(elements, coordinates)
                 # delete temp file storing the geometry
                 self.geometry_optimizer.clean_up_temp_dir(temp_dir)
                 raw_homo_values.append(xtb.get_homo())
 
-            except Exception:
+            except Exception as e:
                 # FIXME: could be dangerous as 0.0 may actually be a good value
                 raw_homo_values.append(0.0)
 
