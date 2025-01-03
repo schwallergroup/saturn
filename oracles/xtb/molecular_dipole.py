@@ -14,18 +14,23 @@ class MolecularDipole(OracleComponent):
         raw_molecular_dipole_values = []
         for mol in mols:
             try:
+                added = False
                 temp_dir, geometry_path, xtb_output = self.geometry_optimizer.optimize_geometry(mol)
                 for idx, line in enumerate(xtb_output):
                     if "molecular dipole" in line:
                         dipole_line = xtb_output[idx+3]
                         raw_molecular_dipole_values.append(float(dipole_line.split()[-1]))
+                        added = True
                         break
+                    
+                if not added:
+                    raw_molecular_dipole_values.append(99)
 
                 # Delete temp file storing the geometry
                 self.geometry_optimizer.clean_up_temp_dir(temp_dir)
 
             except Exception as e:
-                # FIXME: Could be dangerous as 0.0 may actually be a good value
-                raw_molecular_dipole_values.append(0.0)
+                # FIXME: Could be dangerous as 99 may actually be a good value
+                raw_molecular_dipole_values.append(99)
 
         return np.array(raw_molecular_dipole_values, dtype=np.float32)
