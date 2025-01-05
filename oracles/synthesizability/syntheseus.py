@@ -218,9 +218,17 @@ class Syntheseus(OracleComponent):
         try:
             # Syntheseus output is tagged by the reaction model name
             output_results_dir = [folder for folder in os.listdir(os.path.join(temp_dir)) if self.reaction_model in folder][0]
-            output_files = [file for file in os.listdir(os.path.join(temp_dir, output_results_dir)) if not file.endswith(".json")]
-            # *Important* to sort by ascending integer order so the molecules to output mapping is correct
-            output_files = sorted(output_files, key=lambda x: int(x))
+
+            # If there was more than 1 SMILES, Syntheseus outputs the results for each SMILES in a separate folder
+            if len(smiles) > 1:
+                output_files = [file for file in os.listdir(os.path.join(temp_dir, output_results_dir)) if not file.endswith(".json")]
+                # *Important* to sort by ascending integer order so the molecules to output mapping is correct
+                output_files = sorted(output_files, key=lambda x: int(x))
+
+            # Otherwise, Syntheseus outputs the results directly in the output_results_dir folder
+            else:
+                output_files = [os.path.join(temp_dir, output_results_dir)]
+
             # Loop through the results for each query SMILES and extract the number of model calls 
             # required to solve. This is the number of reaction steps 
             for idx, mol_results in enumerate(output_files):
@@ -250,16 +258,23 @@ class Syntheseus(OracleComponent):
                         data_type="mol"
                     )
 
+                    # Track the synthesis pathway contains an enforced building block
+                    is_matched = False
+                    
                     # Check whether to use dense reward
                     if self.use_dense_reward:
                         max_reward = 0.0
                         max_depth = self._get_max_depth(route)
+
+                        # FIXME: Should be redundant as the generated SMILES is already tracked above
+
                         # Loop through the nodes in the route to ensure the root node (generated molecule) is tracked
                         for node, node_data in route.items():
                             # First extract the generated molecule
                             if node_data["depth"] == 0:
                                 generated_smiles = canonicalize_smiles(node_data["smiles"])
                                 break
+
                         # Loop through the nodes again, this time computing the reward for each node
                         for node, node_data in route.items():
                             # Skip root node because this is the generated molecule
@@ -294,7 +309,6 @@ class Syntheseus(OracleComponent):
                     
                     # Otherwise, match *exactly*
                     else:
-                        is_matched = False
                         max_depth = self._get_max_depth(route)
                         for node, node_data in route.items():
                             # Skip root node because this is the generated molecule
