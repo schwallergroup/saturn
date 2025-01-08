@@ -245,7 +245,7 @@ def log_molecule_and_rxn_stats(
 
             syntheseus_path = os.path.join(seed, "syntheseus_results")
             # TODO: Check why the number of solved molecules does not match with the one if syntheseus_raw_values == 1
-            extracted_graphs = write_out_top_syntheseus_graphs(
+            extracted_graph = write_out_top_syntheseus_graphs(
                 oracle_history=df,
                 syntheseus_folder=syntheseus_path,
                 enforce_building_blocks=enforce_building_blocks,
@@ -254,7 +254,7 @@ def log_molecule_and_rxn_stats(
                 rxn_info_path_script=RXN_INFO_EXTRACTION_SCRIPT
             )
         
-            top_graphs.update(extracted_graphs)
+            top_graphs.update(extracted_graph)
         
         # Save top graphs
         os.makedirs(save_dir, exist_ok=True)
@@ -262,9 +262,17 @@ def log_molecule_and_rxn_stats(
         with open(os.path.join(save_dir, f"{experiment_name}-top-graphs.json"), "w") as f:
             json.dump(top_graphs, f, indent=4)
 
+        # Count number of unique enforced blocks amongst top graphs
+        if enforce_building_blocks:
+            unique_enforced_blocks = set()
+            for graph in top_graphs.values():
+                unique_enforced_blocks.add(graph["enforced_block"])
+
+            total_num_enforced_blocks = len(set([canonicalize_smiles(s) for s in open(enforced_building_blocks_file).readlines()]))
+            logging.info(f"Unique Enforced Blocks: {len(unique_enforced_blocks)}/{total_num_enforced_blocks}")
+
         # Plot reactions
         rxn_count, rxn_steps = count_rxn_graph(top_graphs)
-
         logging.info(f"Top Graphs Reaction Steps: {np.mean(rxn_steps):.2f} ± {np.std(rxn_steps):.2f}")
 
         plot_rxn_classes(
