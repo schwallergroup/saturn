@@ -7,7 +7,7 @@ import json
 import subprocess
 import tempfile
 import os
-from typing import List, Dict
+from typing import List, Dict, Union
 from rdkit import Chem
 from rdkit.Chem import Mol
 from rdkit.Chem.rdMolDescriptors import CalcExactMolWt
@@ -21,7 +21,11 @@ def within_molecular_weight_range(mol: Mol) -> bool:
 def within_small_molecule_size(mol: Mol) -> bool:
     """Returns whether the molecular weight > 300."""
     return CalcExactMolWt(mol) > 300
-    
+
+def more_than_five_heavy_atoms(mol: Mol) -> bool:
+    """Returns whether the molecule has more than 5 heavy atoms."""
+    return len(mol.GetAtoms()) >= 5
+
 # Exclude SMILES with charges
 def is_charged(mol: Mol) -> bool:
     """Returns whether any atom has a charge."""
@@ -75,6 +79,23 @@ def passes_ring_filter(mol: Mol) -> bool:
                 return False
         return True
 
+
+def passes_property_filter(mol: Union[Mol, str]) -> bool:
+    """
+    Check if the building block passess all the property filters.
+    """
+    # TODO: Add more filters or remove some
+    if isinstance(mol, str):
+        mol = Chem.MolFromSmiles(mol)
+
+    if (within_molecular_weight_range(mol) and 
+        not is_charged(mol) and
+        longest_aliphatic_c_chain(mol) < 3 and 
+        more_than_five_heavy_atoms(mol) and
+        passes_ring_filter(mol)):
+        return True
+    
+    return False
 
 def are_solvable_by_retro(smiles: List[str], 
                           config: Dict[str, str]) -> List[str]:
@@ -150,7 +171,7 @@ def write_config(dir_path: str,
 
     # TODO: Can expose more Syntheseus parameters to the user in the future
     config = {
-        "inventory_smiles_file": run_config["enforced_reactions"]["seed_building_blocks_file"],
+        "inventory_smiles_file": run_config["building_blocks_file"],
         "search_targets_file": os.path.join(dir_path, "smiles.smi"),
         "model_class": run_config["reaction_model"],
         "time_limit_s": run_config["time_limit_s"],

@@ -3,14 +3,16 @@ from pathlib import Path
 
 from tqdm import tqdm
 from enumeration.reaction import Reaction
-import multiprocessing
+import multiprocessing 
 import json
+import os
 from typing import Optional, List
 
 # For multiprocessing
 MAX_PROCESSES = min(32, multiprocessing.cpu_count()) - 1
 
 from enumeration.reaction import ReactionSet
+from enumeration.utils import passes_property_filter
 
 
 class BuildingBlockFilter:
@@ -87,18 +89,30 @@ class BuildingBlockFileHandler:
         """Load building blocks from .smi"""
         import pandas as pd
 
-        return pd.read_csv(file, header=None)[0].to_list()
+        return pd.read_csv(file, header=None, names=["SMILES"])
 
-    def load(self, file: str) -> list[str]:
+    def load(self, 
+             file: str,
+             property_filter: bool = True) -> list[str]:
         """Load building blocks from file."""
         file = Path(file)
         if ".csv" in file.suffixes:
-            return self._load_csv(file)
+            smiles = self._load_csv(file)
         
         elif ".smi" in file.suffixes:
-            return self._load_smi(file)
+            smiles = self._load_smi(file)
         else:
             raise NotImplementedError
+        
+        # If property filter, use predefined filter
+        if property_filter:
+            
+            from pathos import multiprocessing as mp
+            with mp.Pool(processes=MAX_PROCESSES) as pool:
+                smiles["passes_filter"] = pool.map(passes_property_filter, smiles["SMILES"].values)
+                smiles = smiles[smiles["passes_filter"] == True]["SMILES"].values
+        
+        return smiles
 
     def _save_csv(self, file: Path, building_blocks: list[str]):
         """Save building blocks to `*.csv.gz`"""
@@ -136,7 +150,7 @@ class ReactionTemplateFileHandler:
                 rxn_templates = [rxn["smirks"] for rxn in data if any(name in rxn["name"].lower() for name in names)]
                 
                 # Filter reactions that have more than 2 reactants
-                rxn_templates = [template for template in rxn_templates if (len(template.split(">>")[0].split(".")) < 2)]
+                rxn_templates = [template for template in rxn_templates if (len(template.split(">>")[0].split(".")) <= 2)]
 
         # else normal pipeline
         else:
@@ -147,7 +161,6 @@ class ReactionTemplateFileHandler:
 
         if not all([self._validate(t)] for t in rxn_templates):
             raise ValueError("Not all reaction templates are valid.")
-
 
         return rxn_templates
 
@@ -183,15 +196,13 @@ def match_bbs(bbs_file: str,
         building_blocks=bblocks,
         rxn_templates=rxn_templates,
         verbose=False,
-        processes=20,
+        processes=MAX_PROCESSES,
     )
     # Time intensive task...
     bbf.filter()
 
     # ... and save to disk
     bblocks_filtered = bbf.building_blocks_filtered
-    # output
-    # BuildingBlockFileHandler().save(output_bblock_file, bblocks_filtered)
 
     # Save collection of reactions which have "available reactants" set (for convenience)
     rxn_collection = ReactionSet(bbf.rxns)
