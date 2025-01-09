@@ -20,3 +20,4 @@ class EnforcedReactionsParameters:
     rxn_info_extraction_script_path: str  # Path to the Rxn-INSIGHT extraction script
     seed_reactions: bool  # Whether to seed the route with enforced reaction classes
     seed_building_blocks_file: str  # Path to the file containing the building blocks to use for seeding
+    seed_reactions_file_folder: str # Path to the folder where we store the preloaded reactions file for the seeding

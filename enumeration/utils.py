@@ -1,10 +1,17 @@
 """
-Helper functions for Physico-chemical property filters.
+Helper functions for Physico-chemical property filters and retro solvable SMILES.
 """
+import numpy as np
+import yaml
+import json
+import subprocess
+import tempfile
+import os
+from typing import List, Dict
 from rdkit import Chem
 from rdkit.Chem import Mol
 from rdkit.Chem.rdMolDescriptors import CalcExactMolWt
-
+from utils.chemistry_utils import canonicalize_smiles
 
 # Constrain molecular weight
 def within_molecular_weight_range(mol: Mol) -> bool:
@@ -67,3 +74,95 @@ def passes_ring_filter(mol: Mol) -> bool:
             if size in ring_sizes:
                 return False
         return True
+
+
+def are_solvable_by_retro(smiles: List[str], 
+                          config: Dict[str, str]) -> List[str]:
+    """Take a list of SMILES, run retro model and return only the solvable ones
+    """
+
+    # 2. Make a temporary directory to store the SMILES and output results
+    temp_dir = tempfile.mkdtemp()
+
+    # 3. Write the SMILES to the temporary directory
+    with open(os.path.join(temp_dir, "smiles.smi"), "w") as f:
+        # Syntheseus does not accept empty lines
+        for idx, s in enumerate(smiles):
+            if idx < len(smiles) - 1:
+                f.write(f"{s}\n")
+            else:
+                f.write(f"{s}")
+
+    # 4. Write the config.yml to the temporary directory
+    write_config(temp_dir, config)
+
+    # 5. Run Syntheseus
+    output = subprocess.run([
+        "conda",
+        "run",
+        "-n",
+        config["syntheseus_env_name"],
+        "syntheseus",
+        "search",
+        "--config", os.path.join(temp_dir, "config.yml")
+    ], capture_output=True)
+
+    # 6. Parse the output
+    is_solved = np.zeros(len(smiles))
+
+    try:
+        # Syntheseus output is tagged by the reaction model name
+        output_results_dir = [folder for folder in os.listdir(os.path.join(temp_dir)) if "LocalRetro" in folder][0]
+
+        # If there was more than 1 SMILES, Syntheseus outputs the results for each SMILES in a separate folder
+        if len(smiles) > 1:
+            output_files = [file for file in os.listdir(os.path.join(temp_dir, output_results_dir)) if not file.endswith(".json")]
+            # *Important* to sort by ascending integer order so the molecules to output mapping is correct
+            output_files = sorted(output_files, key=lambda x: int(x))
+
+        # Otherwise, Syntheseus outputs the results directly in the output_results_dir folder
+        else:
+            output_files = [os.path.join(temp_dir, output_results_dir)]
+
+        # Loop through the results for each query SMILES and extract the number of model calls 
+        # required to solve. This is the number of reaction steps 
+        for idx, mol_results in enumerate(output_files):
+            # Load the JSON file
+            with open(os.path.join(temp_dir, output_results_dir, mol_results, "stats.json"), "r") as f:
+                stats = json.load(f)
+            # Extract the number of steps
+            num_rxn_steps = stats["soln_time_rxn_model_calls"]
+            is_solved[idx] = 1 if num_rxn_steps != np.inf else 0
+
+    except:
+        pass
+
+    solvable_smiles = [smile for smile, solved in zip(smiles, is_solved) if solved]
+
+    return solvable_smiles
+            
+
+def write_config(dir_path: str, 
+                 run_config: Dict[str, str]) -> None:
+    """
+    Syntheseus can take as input a yaml file for easy execution. Write this yaml file.
+    """
+
+    # TODO: Can expose more Syntheseus parameters to the user in the future
+    config = {
+        "inventory_smiles_file": run_config["enforced_reactions"]["seed_building_blocks_file"],
+        "search_targets_file": os.path.join(dir_path, "smiles.smi"),
+        "model_class": run_config["reaction_model"],
+        "time_limit_s": run_config["time_limit_s"],
+        # Only return 1 result for now - this implies that if 1 solution is found, Syntheseus stops
+        # NOTE: In retrosynthesis, it can be very useful to return multiple routes (unless a model's top-1 accuracy is 100%) 
+        #       but we do this for simplicity at the moment, i.e., so long as *a* route is found, consider the molecule solved
+        "num_top_results": 1,
+        "results_dir": dir_path,
+        # Saves storage memory
+        "save_graph": False
+    }
+
+    # Write the data to the YAML file
+    with open(os.path.join(dir_path, "config.yml"), "w") as f:
+        yaml.dump(config, f, default_flow_style=False)
