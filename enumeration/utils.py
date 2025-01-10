@@ -143,7 +143,8 @@ def are_solvable_by_retro(
 
     try:
         # Syntheseus output is tagged by the reaction model name
-        output_results_dir = [folder for folder in os.listdir(os.path.join(temp_dir)) if "LocalRetro" in folder][0]
+        reaction_model = parse_model_name(config["reaction_model"])
+        output_results_dir = [folder for folder in os.listdir(os.path.join(temp_dir)) if reaction_model in folder][0]
 
         # If there was more than 1 SMILES, Syntheseus outputs the results for each SMILES in a separate folder
         if len(smiles) > 1:
