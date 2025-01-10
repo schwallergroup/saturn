@@ -101,8 +101,10 @@ def rxn_based_enumeration(
     
     # Things that will be used from run config
     rxn_list = syntheseus_params["enforced_reactions"]["enforced_rxn_classes"]
+    rxn_names = "_".join(sorted(rxn_list))
     building_blocks_path = syntheseus_params["building_blocks_file"]
     prefiltered_rxn_folder = syntheseus_params["enforced_reactions"]["seed_reactions_file_folder"]
+    prefiltered_file_name = f"enumeration_rxns_{rxn_names}.json.gz"
     smirks_file = os.path.join(BASE_PATH, "smirks.json")
 
     # Load Prior to check that enumerated SMILES are tokenizable
@@ -111,7 +113,7 @@ def rxn_based_enumeration(
     assert os.path.exists(building_blocks_path), f"Seed (by reaction) building blocks file {building_blocks_path} does not exist."
     
     # Load prefiltered file if it exists, otherwise generate it
-    if not os.path.exists(os.path.join(prefiltered_rxn_folder, "enumeration_rxns.json.gz")):
+    if not os.path.exists(os.path.join(prefiltered_rxn_folder, prefiltered_file_name)):
 
         os.makedirs(prefiltered_rxn_folder, exist_ok=True)
         
@@ -121,9 +123,10 @@ def rxn_based_enumeration(
         match_bbs(building_blocks_path,
                   smirks_file,
                   prefiltered_rxn_folder,
+                  prefiltered_file_name,
                   rxn_list=rxn_list)
 
-    with gzip.open(os.path.join(prefiltered_rxn_folder, "enumeration_rxns.json.gz"), "r") as f:
+    with gzip.open(os.path.join(prefiltered_rxn_folder, prefiltered_file_name), "r") as f:
         rxns = json.load(f)
     
     # Function that generates candidate molecules with the preloaded reactions and filters them

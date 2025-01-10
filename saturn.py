@@ -85,6 +85,7 @@ if __name__ == "__main__":
             if syntheseus_params["enforced_reactions"]["seed_reactions"]:
                 # Call function to seed molecules
 
+                print("Seeding replay buffer")
                 seeding_smiles = rxn_based_enumeration(
                     prior_path=config["goal_directed_generation"]["reinforcement_learning"]["prior"],
                     device=device,

@@ -184,6 +184,7 @@ class ReactionTemplateFileHandler:
 def match_bbs(bbs_file: str,
               rxn_templates_file: str,
               save_folder: str,
+              file_name: str,
               rxn_list: List[str] = None) -> None:
     """Execute first step (bbs matching with our templates and bbs file)
     """
@@ -204,9 +205,12 @@ def match_bbs(bbs_file: str,
     # ... and save to disk
     bblocks_filtered = bbf.building_blocks_filtered
 
+    # Filter if reactions do not have available_bbs
+    good_rxns = [rxn for rxn in bbf.rxns if not any(len(bb)==0 for bb in rxn.available_reactants)]
+
     # Save collection of reactions which have "available reactants" set (for convenience)
-    rxn_collection = ReactionSet(bbf.rxns)
-    output_file_name = os.path.join(save_folder, "enumeration_rxns.json.gz")
+    rxn_collection = ReactionSet(good_rxns)
+    output_file_name = os.path.join(save_folder, file_name)
     rxn_collection.save(output_file_name)
 
     print(f"Total number of building blocks {len(bblocks):d}")
