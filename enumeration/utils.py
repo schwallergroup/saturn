@@ -1,13 +1,15 @@
 """
 Helper functions for Physico-chemical property filters and retro solvable SMILES.
 """
-import numpy as np
+from typing import List, Dict, Union
+import os
 import yaml
 import json
 import subprocess
 import tempfile
-import os
-from typing import List, Dict, Union
+import shutil
+import numpy as np
+
 from rdkit import Chem
 from rdkit.Chem import Mol
 from rdkit.Chem.rdMolDescriptors import CalcExactMolWt
@@ -170,10 +172,12 @@ def are_solvable_by_retro(
         print(e)
         pass
 
+    # 6. Delete the temporary directory and Syntheseus output
+    shutil.rmtree(temp_dir)
+
     solvable_smiles = [s for s, solved in zip(smiles, is_solved) if solved]
 
     return solvable_smiles
-            
 
 def write_config(
     dir_path: str, 
