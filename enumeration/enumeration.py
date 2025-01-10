@@ -137,7 +137,7 @@ def rxn_based_enumeration(
         n_seeds=n_seeds,
         prior=prior
     )
-    candidate_seeds = candidate_seeds[:5]
+
     # Limit candidate seeds to n_seeds*10, otherwise retrosynthesis model may take long
     if len(candidate_seeds) > n_seeds*10:
         candidate_seeds = random.sample(candidate_seeds, n_seeds*10)
