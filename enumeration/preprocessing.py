@@ -1,4 +1,6 @@
-"""Code from SynNet to handle Building Blocks and reactions."""
+"""
+Code from SynNet to handle Building Blocks and reactions.
+"""
 from pathlib import Path
 
 from tqdm import tqdm
@@ -181,12 +183,15 @@ class ReactionTemplateFileHandler:
         return is_uni_or_bimolecular and has_single_product
 
 
-def match_bbs(bbs_file: str,
-              rxn_templates_file: str,
-              save_folder: str,
-              file_name: str,
-              rxn_list: List[str] = None) -> None:
-    """Execute first step (bbs matching with our templates and bbs file)
+def match_bbs(
+    bbs_file: str,
+    rxn_templates_file: str,
+    save_folder: str,
+    file_name: str,
+    rxn_list: List[str] = None
+) -> None:
+    """
+    Execute first step (building blocks matching with our templates and building blocks file)
     """
     # Load assets
     bblocks = BuildingBlockFileHandler().load(bbs_file)

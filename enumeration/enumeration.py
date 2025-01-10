@@ -6,14 +6,12 @@ import os
 import json
 import random
 import gzip
-import pandas as pd
 from rdkit import Chem
-from rdkit.Chem import Mol
 from rdkit.Chem import AllChem
-import pandas as pd
 
 from models.generator import Generator
 from utils.chemistry_utils import is_encodable
+from enumeration.utils import passes_property_filter
 
 import sys
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -24,11 +22,11 @@ from enumeration.preprocessing import match_bbs
 
 
 def sample_react(rxn: Dict[str, Union[List, str]]) -> str:
-    """Sample and react from a preloaded reaction"""
+    """Sample and react from a pre-loaded reaction."""
 
     reaction = AllChem.ReactionFromSmarts(rxn["smirks"])
 
-    # sample 1
+    # Sample 1
     r1 = Chem.MolFromSmiles(random.choice(rxn["available_reactants"][0]))
 
     if rxn["num_reactant"] == 2:
@@ -47,10 +45,13 @@ def sample_react(rxn: Dict[str, Union[List, str]]) -> str:
 
     return product 
 
-def sample_products(rxns: Dict[str, List],
-                    n_seeds: int,
-                    prior: Generator) -> List[str]:
-    """Sample products from a preloaded reaction and the corresponding seed
+def sample_products(
+    rxns: Dict[str, List],
+    n_seeds: int,
+    prior: Generator
+) -> List[str]:
+    """
+    Sample products from a pre-loaded reaction and building blocks set.
     """
     
     # Take reactions from preloaded file
@@ -59,7 +60,7 @@ def sample_products(rxns: Dict[str, List],
     # We take a high enough number of samples per reaction (this was done based on tests)
     samples_per_reaction = n_seeds*150//len(reactions)
 
-    seed_smiles = []
+    enumerated_smiles = []
 
     # For each reaction, we randomly generate samples_per_reaction products 
     # FIXME: this is just a way of making sure we will have a large number of solved molecules
@@ -73,32 +74,31 @@ def sample_products(rxns: Dict[str, List],
             if product:
                 reaction_seed.append(product)
         
-        seed_smiles.extend(reaction_seed)
+        enumerated_smiles.extend(reaction_seed)
 
-    final_smiles = []
-
-    # Load SMILES that can be canonicalized and are in our range
-    for smiles in seed_smiles:
+    seed_smiles = []
+    # Load SMILES that can be canonicalized and pass filters
+    for smiles in enumerated_smiles:
         try:
-            if is_encodable(smiles, prior): #and within_small_molecule_size(Chem.MolFromSmiles(smiles)):
-                smiles = Chem.MolToSmiles(Chem.MolFromSmiles(smiles))
-                final_smiles.append(smiles)
+            if is_encodable(smiles, prior):
+                mol = Chem.MolFromSmiles(smiles)
+                if mol:
+                    if passes_property_filter(mol):
+                        seed_smiles.append(smiles)
         except Exception:
             pass
 
-    return final_smiles
-
+    return seed_smiles
 
 def rxn_based_enumeration(
     prior_path: str,
     device: str,
     syntheseus_params: Dict[str, str],
-    n_seeds: int = 5,
+    n_seeds: int = 100,
 ) -> List[str]:
     """
     Enumerate molecules using specified reactions and building blocks.
     """
-    
     # Things that will be used from run config
     rxn_list = syntheseus_params["enforced_reactions"]["enforced_rxn_classes"]
     rxn_names = "_".join(sorted(rxn_list))
@@ -117,7 +117,7 @@ def rxn_based_enumeration(
 
         os.makedirs(prefiltered_rxn_folder, exist_ok=True)
         
-        print("Generating file")
+        print("Pre-processing reactions and building blocks for replay buffer seeding via enumeration")
         
         # Generate prefiltered reactions file
         match_bbs(building_blocks_path,
@@ -129,24 +129,28 @@ def rxn_based_enumeration(
     with gzip.open(os.path.join(prefiltered_rxn_folder, prefiltered_file_name), "r") as f:
         rxns = json.load(f)
     
-    # Function that generates candidate molecules with the preloaded reactions and filters them
-    candidate_seeds = sample_products(rxns, 
-                                      n_seeds,
-                                      prior)
+    # Function that generates candidate molecules with the pre-loaded reactions and filters them
+    candidate_seeds = sample_products(
+        rxns=rxns, 
+        n_seeds=n_seeds,
+        prior=prior
+    )
     
-    # Limit candidate seeds to n_seeds*10, otherwise retro model will take long
+    # Limit candidate seeds to n_seeds*10, otherwise retrosynthesis model may take long
     if len(candidate_seeds) > n_seeds*10:
         candidate_seeds = random.sample(candidate_seeds, n_seeds*10)
 
-    # We double check that our retro model 
-    final_smiles = are_solvable_by_retro(candidate_seeds,
-                                         syntheseus_params)
-    
-    # If we have more SMILES than n_seeds, randomly sample n_seeds
-    if len(final_smiles) > n_seeds:
-        final_smiles = random.sample(final_smiles, n_seeds)
-    
-    else:
-        print(f"Loading {len(final_smiles)} in replay buffer")
+    # Double check that the retrosynthesis model can solve the enumerated molecules
+    solvable_smiles = are_solvable_by_retro(
+        smiles=candidate_seeds,
+        config=syntheseus_params
+    )
 
-    return final_smiles
+    # If we have more SMILES than n_seeds, randomly sample n_seeds
+    if len(solvable_smiles) > n_seeds:
+        solvable_smiles = random.sample(solvable_smiles, n_seeds)
+    
+    assert len(solvable_smiles) == n_seeds, f"Number of solvable *enumerated* molecules ({len(solvable_smiles)}) does not match desired number ({n_seeds})."
+    print(f"Loading {len(solvable_smiles)} in replay buffer")
+
+    return solvable_smiles

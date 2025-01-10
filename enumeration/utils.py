@@ -79,7 +79,6 @@ def passes_ring_filter(mol: Mol) -> bool:
                 return False
         return True
 
-
 def passes_property_filter(mol: Union[Mol, str]) -> bool:
     """
     Check if the building block passess all the property filters.
@@ -97,15 +96,17 @@ def passes_property_filter(mol: Union[Mol, str]) -> bool:
     
     return False
 
-def are_solvable_by_retro(smiles: List[str], 
-                          config: Dict[str, str]) -> List[str]:
-    """Take a list of SMILES, run retro model and return only the solvable ones
+def are_solvable_by_retro(
+    smiles: List[str], 
+    config: Dict[str, str]
+) -> List[str]:
     """
-
-    # 2. Make a temporary directory to store the SMILES and output results
+    Take a list of SMILES, run retrosynthesis model and return only the solvable ones.
+    """
+    # 1. Make a temporary directory to store the SMILES and output results
     temp_dir = tempfile.mkdtemp()
 
-    # 3. Write the SMILES to the temporary directory
+    # 2. Write the SMILES to the temporary directory
     with open(os.path.join(temp_dir, "smiles.smi"), "w") as f:
         # Syntheseus does not accept empty lines
         for idx, s in enumerate(smiles):
@@ -114,10 +115,10 @@ def are_solvable_by_retro(smiles: List[str],
             else:
                 f.write(f"{s}")
 
-    # 4. Write the config.yml to the temporary directory
+    # 3. Write the config.yml to the temporary directory
     write_config(temp_dir, config)
 
-    # 5. Run Syntheseus
+    # 4. Run Syntheseus
     output = subprocess.run([
         "conda",
         "run",
@@ -128,7 +129,7 @@ def are_solvable_by_retro(smiles: List[str],
         "--config", os.path.join(temp_dir, "config.yml")
     ], capture_output=True)
 
-    # 6. Parse the output
+    # 5. Parse the output
     is_solved = np.zeros(len(smiles))
 
     try:
@@ -155,25 +156,27 @@ def are_solvable_by_retro(smiles: List[str],
             num_rxn_steps = stats["soln_time_rxn_model_calls"]
             is_solved[idx] = 1 if num_rxn_steps != np.inf else 0
 
-    except:
+    except Exception as e:
+        print(e)
         pass
 
-    solvable_smiles = [smile for smile, solved in zip(smiles, is_solved) if solved]
+    solvable_smiles = [s for s, solved in zip(smiles, is_solved) if solved]
 
     return solvable_smiles
             
 
-def write_config(dir_path: str, 
-                 run_config: Dict[str, str]) -> None:
+def write_config(
+    dir_path: str, 
+    run_config: Dict[str, str]
+) -> None:
     """
     Syntheseus can take as input a yaml file for easy execution. Write this yaml file.
     """
-
     # TODO: Can expose more Syntheseus parameters to the user in the future
     config = {
         "inventory_smiles_file": run_config["building_blocks_file"],
         "search_targets_file": os.path.join(dir_path, "smiles.smi"),
-        "model_class": run_config["reaction_model"],
+        "model_class": parse_model_name(run_config["reaction_model"]),
         "time_limit_s": run_config["time_limit_s"],
         # Only return 1 result for now - this implies that if 1 solution is found, Syntheseus stops
         # NOTE: In retrosynthesis, it can be very useful to return multiple routes (unless a model's top-1 accuracy is 100%) 
@@ -187,3 +190,25 @@ def write_config(dir_path: str,
     # Write the data to the YAML file
     with open(os.path.join(dir_path, "config.yml"), "w") as f:
         yaml.dump(config, f, default_flow_style=False)
+
+def parse_model_name(model_name: str) -> str:
+    """
+    Syntheseus expects proper capitalization of the model names. Parse user input and return the correct model name.
+    """
+    # NOTE: Assumes the user is not providing their own trained model.
+    #       The default behaviour in Syntheseus is to download a trained model by the authors.
+    #       These models are stored in .cache/torch/syntheseus by default.
+    assert model_name is not None, "Please provide the reaction model name."
+    if model_name in ["localretro", "LocalRetro"]:
+        return "LocalRetro"
+    elif model_name in ["retroknn", "RetroKNN"]:
+        return "RetroKNN"
+    elif model_name in ["rootaligned", "RootAligned"]:
+        return "RootAligned"
+    elif model_name in ["graph2edits", "Graph2Edits", "graph2edit", "Graph2Edit"]:
+        return "Graph2Edits"
+    elif model_name in ["megan", "MEGAN"]:
+        return "MEGAN"
+    else:
+        # TODO: Support all the models in Syntheseus 
+        raise ValueError(f"Model name {model_name} not recognized or not supported yet.")

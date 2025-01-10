@@ -1,7 +1,6 @@
-"""Code taken from SynNet to model reactions. https://github.com/wenhao-gao/SynNet
 """
-
-
+Code from SynNet to model reactions: https://github.com/wenhao-gao/SynNet
+"""
 import functools
 import json
 import gzip
