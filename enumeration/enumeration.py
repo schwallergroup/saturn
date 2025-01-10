@@ -11,7 +11,7 @@ from rdkit.Chem import AllChem
 
 from models.generator import Generator
 from utils.chemistry_utils import is_encodable
-from enumeration.utils import passes_property_filter
+from enumeration.utils import enumerated_mol_passes_property_filter
 
 import sys
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -83,7 +83,7 @@ def sample_products(
             if is_encodable(smiles, prior):
                 mol = Chem.MolFromSmiles(smiles)
                 if mol:
-                    if passes_property_filter(mol):
+                    if enumerated_mol_passes_property_filter(mol):
                         seed_smiles.append(smiles)
         except Exception:
             pass
@@ -112,19 +112,21 @@ def rxn_based_enumeration(
 
     assert os.path.exists(building_blocks_path), f"Seed (by reaction) building blocks file {building_blocks_path} does not exist."
     
-    # Load prefiltered file if it exists, otherwise generate it
+    # Load pre-filtered file if it exists, otherwise generate it
     if not os.path.exists(os.path.join(prefiltered_rxn_folder, prefiltered_file_name)):
 
         os.makedirs(prefiltered_rxn_folder, exist_ok=True)
         
         print("Pre-processing reactions and building blocks for replay buffer seeding via enumeration")
         
-        # Generate prefiltered reactions file
-        match_bbs(building_blocks_path,
-                  smirks_file,
-                  prefiltered_rxn_folder,
-                  prefiltered_file_name,
-                  rxn_list=rxn_list)
+        # Generate pre-filtered reactions file
+        match_bbs(
+            bbs_file=building_blocks_path,
+            rxn_templates_file=smirks_file,
+            save_folder=prefiltered_rxn_folder,
+            file_name=prefiltered_file_name,
+            rxn_list=rxn_list
+        )
 
     with gzip.open(os.path.join(prefiltered_rxn_folder, prefiltered_file_name), "r") as f:
         rxns = json.load(f)
@@ -150,7 +152,7 @@ def rxn_based_enumeration(
     if len(solvable_smiles) > n_seeds:
         solvable_smiles = random.sample(solvable_smiles, n_seeds)
     
-    assert len(solvable_smiles) == n_seeds, f"Number of solvable *enumerated* molecules ({len(solvable_smiles)}) does not match desired number ({n_seeds})."
+    assert len(solvable_smiles) == n_seeds, f"Number of solvable *enumerated* molecules ({len(solvable_smiles)}/{len(candidate_seeds)}) does not match desired number ({n_seeds})."
     print(f"Loading {len(solvable_smiles)} in replay buffer")
 
     return solvable_smiles

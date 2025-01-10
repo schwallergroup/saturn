@@ -14,7 +14,7 @@ from typing import Optional, List
 MAX_PROCESSES = min(32, multiprocessing.cpu_count()) - 1
 
 from enumeration.reaction import ReactionSet
-from enumeration.utils import passes_property_filter
+from enumeration.utils import building_block_passes_property_filter
 
 
 class BuildingBlockFilter:
@@ -106,12 +106,12 @@ class BuildingBlockFileHandler:
         else:
             raise NotImplementedError
         
-        # If property filter, use predefined filter
+        # If property filter, use pre-defined filter
         if property_filter:
             
             from pathos import multiprocessing as mp
             with mp.Pool(processes=MAX_PROCESSES) as pool:
-                smiles["passes_filter"] = pool.map(passes_property_filter, smiles["SMILES"].values)
+                smiles["passes_filter"] = pool.map(building_block_passes_property_filter, smiles["SMILES"].values)
                 smiles = smiles[smiles["passes_filter"] == True]["SMILES"].values
         
         return smiles
@@ -195,7 +195,7 @@ def match_bbs(
     """
     # Load assets
     bblocks = BuildingBlockFileHandler().load(bbs_file)
-    rxn_templates = ReactionTemplateFileHandler().load(rxn_templates_file,
+    rxn_templates = ReactionTemplateFileHandler().load(file=rxn_templates_file,
                                                        names=rxn_list)
 
     bbf = BuildingBlockFilter(

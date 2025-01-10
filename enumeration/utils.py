@@ -79,7 +79,7 @@ def passes_ring_filter(mol: Mol) -> bool:
                 return False
         return True
 
-def passes_property_filter(mol: Union[Mol, str]) -> bool:
+def building_block_passes_property_filter(mol: Union[Mol, str]) -> bool:
     """
     Check if the building block passess all the property filters.
     """
@@ -95,6 +95,15 @@ def passes_property_filter(mol: Union[Mol, str]) -> bool:
         return True
     
     return False
+
+def enumerated_mol_passes_property_filter(mol: Mol) -> bool:
+    """
+    Check if the enumerated molecule passes all the property filters.
+    """
+    return (within_small_molecule_size(mol) and 
+            not is_charged(mol) and
+            longest_aliphatic_c_chain(mol) < 3 and 
+            passes_ring_filter(mol))
 
 def are_solvable_by_retro(
     smiles: List[str], 
