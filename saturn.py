@@ -82,6 +82,9 @@ if __name__ == "__main__":
         if any(is_component_syntheseus):
             syntheseus_params = config["oracle"]["components"][is_component_syntheseus.index(True)]["specific_parameters"]
 
+            # Getting syntheseus oracle
+            syntheseus_oracle = [orac for orac in oracle.oracle if orac.name == "syntheseus"][0]
+
             if syntheseus_params["enforced_reactions"]["seed_reactions"]:
                 # Call function to seed molecules
 
@@ -90,7 +93,8 @@ if __name__ == "__main__":
                     prior_path=config["goal_directed_generation"]["reinforcement_learning"]["prior"],
                     device=device,
                     syntheseus_params=syntheseus_params,
-                    n_seeds=100
+                    syntheseus_oracle=syntheseus_oracle,
+                    n_seeds=5
                 )
 
                 # In-place modification of ExperienceReplay parameters config

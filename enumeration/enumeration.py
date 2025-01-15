@@ -6,9 +6,11 @@ import os
 import json
 import random
 import gzip
+import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
+from oracles.synthesizability.syntheseus import Syntheseus
 from models.generator import Generator
 from utils.chemistry_utils import is_encodable
 from enumeration.utils import enumerated_mol_passes_property_filter
@@ -45,55 +47,76 @@ def sample_react(rxn: Dict[str, Union[List, str]]) -> str:
 
     return product 
 
+
 def sample_products(
     rxns: Dict[str, List],
     n_seeds: int,
-    prior: Generator
+    prior: Generator,
+    syntheseus_oracle: Syntheseus
 ) -> List[str]:
     """
-    Sample products from a pre-loaded reaction and building blocks set.
+    Sample products from a pre-loaded reaction and building blocks set. Check if they
+    have Syntheseus reward = 1
     """
     
     # Take reactions from preloaded file
     reactions = rxns["reactions"]
 
-    # We take a high enough number of samples per reaction (this was done based on tests)
-    samples_per_reaction = n_seeds*150//len(reactions)
-
+    # Final enumerated SMILES are stored in this list
     enumerated_smiles = []
 
-    # For each reaction, we randomly generate samples_per_reaction products 
-    # FIXME: this is just a way of making sure we will have a large number of solved molecules
-    for reaction in reactions:
+    # Enumerate and check until n_seeds
+    while len(enumerated_smiles) < n_seeds:
 
-        reaction_seed = []
+        # List of SMILES batch to verify with Syntheseus
+        smiles_batch = []
 
-        for _ in range(samples_per_reaction):
-            product = sample_react(reaction)
+        # Sample batch of reactions
+        sampled_reactions = random.choices(reactions, k=(n_seeds - len(enumerated_smiles)))
 
-            if product:
-                reaction_seed.append(product)
+        print("sampling products")
+        # Sample SMILES
+        for reaction in sampled_reactions:
+
+            tries = 0
+
+            while tries < 1000:
+                product = sample_react(reaction)
+
+                try:
+                    if is_encodable(product, prior):
+                        mol = Chem.MolFromSmiles(product)
+                        if mol:
+                            if enumerated_mol_passes_property_filter(mol):
+                                smiles_batch.append(product)
+                                break
+                except Exception:
+                    pass
+
+                tries += 1
+
+        print("running syntheseus")
+
+        # Compute the reward with the oracle and append valid SMILES
+        mol_batch = [Chem.MolFromSmiles(smiles) for smiles in smiles_batch]
+
+        syntheseus_rewards = syntheseus_oracle(mol_batch, 1)
         
-        enumerated_smiles.extend(reaction_seed)
+        print(syntheseus_rewards)
 
-    seed_smiles = []
-    # Load SMILES that can be canonicalized and pass filters
-    for smiles in enumerated_smiles:
-        try:
-            if is_encodable(smiles, prior):
-                mol = Chem.MolFromSmiles(smiles)
-                if mol:
-                    if enumerated_mol_passes_property_filter(mol):
-                        seed_smiles.append(smiles)
-        except Exception:
-            pass
+        solved_smiles = [smiles for smiles, reward in 
+                         zip(smiles_batch, syntheseus_rewards) if reward == 1]
 
-    return seed_smiles
+        print(f"solved smiles: {solved_smiles}")
+        enumerated_smiles.extend(solved_smiles)
+
+    return enumerated_smiles
 
 def rxn_based_enumeration(
     prior_path: str,
     device: str,
     syntheseus_params: Dict[str, str],
+    syntheseus_oracle: Syntheseus,
     n_seeds: int = 100,
 ) -> List[str]:
     """
@@ -135,24 +158,10 @@ def rxn_based_enumeration(
     candidate_seeds = sample_products(
         rxns=rxns, 
         n_seeds=n_seeds,
-        prior=prior
+        prior=prior,
+        syntheseus_oracle=syntheseus_oracle
     )
-
-    # Limit candidate seeds to n_seeds*10, otherwise retrosynthesis model may take long
-    if len(candidate_seeds) > n_seeds*10:
-        candidate_seeds = random.sample(candidate_seeds, n_seeds*10)
-
-    # Double check that the retrosynthesis model can solve the enumerated molecules
-    solvable_smiles = are_solvable_by_retro(
-        smiles=candidate_seeds,
-        config=syntheseus_params
-    )
-
-    # If we have more SMILES than n_seeds, randomly sample n_seeds
-    if len(solvable_smiles) > n_seeds:
-        solvable_smiles = random.sample(solvable_smiles, n_seeds)
     
-    assert len(solvable_smiles) == n_seeds, f"Number of solvable *enumerated* molecules ({len(solvable_smiles)}/{len(candidate_seeds)}) does not match desired number ({n_seeds})."
-    print(f"Loading {len(solvable_smiles)} in replay buffer")
+    print(candidate_seeds)
 
-    return solvable_smiles
+    return candidate_seeds
