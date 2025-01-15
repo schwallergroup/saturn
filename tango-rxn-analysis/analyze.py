@@ -65,7 +65,7 @@ def log_num_solved(seeds: List[str]) -> None:
 
         # Non-solved molecules
         df_non_solved = df.loc[df[SYNTHESEUS_REWARD_ENUM] == 0]
-        try:
+        try: 
             df_non_solved = df_remove_duplicate_smiles(df_non_solved)
         except Exception:
             logging.info("Error in *non-solved* de-duplication")
