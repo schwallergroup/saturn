@@ -6,7 +6,6 @@ import os
 import json
 import random
 import gzip
-import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
@@ -55,15 +54,14 @@ def sample_products(
     syntheseus_oracle: Syntheseus
 ) -> List[str]:
     """
-    Sample products from a pre-loaded reaction and building blocks set. Check if they
-    have Syntheseus reward = 1
+    Sample products from a pre-loaded reaction and building blocks set. 
+    Ensure syntheseus_reward = 1 for all enumerated molecules.
     """
-    
-    # Take reactions from preloaded file
+    # Take reactions from pre-loaded file
     reactions = rxns["reactions"]
 
-    # Final enumerated SMILES are stored in this list
-    enumerated_smiles = []
+    # Final enumerated SMILES
+    enumerated_smiles = set()
 
     # Enumerate and check until n_seeds
     while len(enumerated_smiles) < n_seeds:
@@ -74,7 +72,6 @@ def sample_products(
         # Sample batch of reactions
         sampled_reactions = random.choices(reactions, k=(n_seeds - len(enumerated_smiles)))
 
-        print("sampling products")
         # Sample SMILES
         for reaction in sampled_reactions:
 
@@ -95,20 +92,20 @@ def sample_products(
 
                 tries += 1
 
-        print("running syntheseus")
+        if len(smiles_batch) > 0:
+            # Compute the reward with the oracle and append valid SMILES
+            syntheseus_rewards = syntheseus_oracle(
+                mols=[Chem.MolFromSmiles(smiles) for smiles in smiles_batch],  # Redundant 
+                oracle_calls=1
+            )
 
-        # Compute the reward with the oracle and append valid SMILES
-        mol_batch = [Chem.MolFromSmiles(smiles) for smiles in smiles_batch]
+            solved_smiles = [smiles for smiles, reward in 
+                            zip(smiles_batch, syntheseus_rewards) if reward == 1]
 
-        syntheseus_rewards = syntheseus_oracle(mol_batch, 1)
-        
-        print(syntheseus_rewards)
-
-        solved_smiles = [smiles for smiles, reward in 
-                         zip(smiles_batch, syntheseus_rewards) if reward == 1]
-
-        print(f"solved smiles: {solved_smiles}")
-        enumerated_smiles.extend(solved_smiles)
+            print(f"solved smiles: {len(solved_smiles)}/{len(smiles_batch)}")
+            # NOTE: It is highly unlikely that there will be duplicates but could ensure this by canonicalization
+            enumerated_smiles.update(solved_smiles)
+            print(f"enumerated smiles: {len(enumerated_smiles)}\n")
 
     return enumerated_smiles
 

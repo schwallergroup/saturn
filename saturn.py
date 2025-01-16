@@ -94,7 +94,8 @@ if __name__ == "__main__":
                     device=device,
                     syntheseus_params=syntheseus_params,
                     syntheseus_oracle=syntheseus_oracle,
-                    n_seeds=5
+                    # Seed to the maximum Replay Buffer capacity
+                    n_seeds=config["goal_directed_generation"]["experience_replay"]["memory_size"]
                 )
 
                 # In-place modification of ExperienceReplay parameters config
