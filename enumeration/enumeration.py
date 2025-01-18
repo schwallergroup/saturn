@@ -57,6 +57,8 @@ def sample_products(
     Sample products from a pre-loaded reaction and building blocks set. 
     Ensure syntheseus_reward = 1 for all enumerated molecules.
     """
+    import time
+    start_time = time.perf_counter()
     # Take reactions from pre-loaded file
     reactions = rxns["reactions"]
 
@@ -107,7 +109,10 @@ def sample_products(
             enumerated_smiles.update(solved_smiles)
             print(f"enumerated smiles: {len(enumerated_smiles)}\n")
 
-    return enumerated_smiles
+    end_time = time.perf_counter()
+    print(f"Enumeration seeding time: {end_time - start_time} seconds")
+    
+    return list(enumerated_smiles)
 
 def rxn_based_enumeration(
     prior_path: str,
