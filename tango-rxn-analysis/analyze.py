@@ -84,10 +84,10 @@ def log_num_solved(seeds: List[str]) -> None:
             N += 1
 
     if len(solved) > 0:
-        logging.info(f"Successful Runs: {N}, Non-solved: {int(np.mean(non_solved))} ± {int(np.std(non_solved))}, Solved: {int(np.mean(solved))} ± {int(np.std(solved))}")
-        logging.info(f"Raw Non-solved: {non_solved}, Raw Solved: {solved}")
+        logging.info(f"Successful Runs: {N}, Non-solved: {int(np.mean(non_solved))} ± {int(np.std(non_solved))}, Solved (with all constraints): {int(np.mean(solved))} ± {int(np.std(solved))}")
+        logging.info(f"Raw Non-solved: {non_solved}, Raw Solved (with all constraints): {solved}")
     else:
-        logging.info(f"No runs generated any solved molecules.")
+        logging.info(f"No runs generated any solved molecules (with all constraints).")
 
 
 def log_wall_time(seeds: List[str]) -> None:
@@ -191,7 +191,11 @@ def log_molecule_and_rxn_stats(
         
         # Track metrics
         num_enforced_rxn.append(len(enforced_rxn_smiles))
-        df_enforced_rxn = df[df["canonical_smiles"].isin(enforced_rxn_smiles)]  # This keeps only syntheseus_raw_values == 1
+        df_enforced_rxn = df[df["canonical_smiles"].isin(enforced_rxn_smiles)]  
+
+        # Double check that all matched molecules have syntheseus_raw_values == 1
+        assert sum(df_enforced_rxn[SYNTHESEUS_REWARD_ENUM]) == len(df_enforced_rxn), "Error: Not all matched molecules from the JSON have syntheseus_raw_values == 1 in the oracle history."
+
         df_enforced_rxn = df_enforced_rxn.sort_values(by=REWARD_ENUM, ascending=False)
         df_top_enforced_rxn = df_enforced_rxn.head(int(save_top_percentage_routes * len(df_enforced_rxn)))
 
