@@ -56,7 +56,7 @@ RXN_INFO_EXTRACTION_SCRIPT = os.path.join(SATURN_BASE_PATH, "oracles/synthesizab
 
 
 def log_synthesizable_metrics(seeds: List[str]) -> None:
-    """Log number of synthesizable molecules to logging file."""
+    """Log number of synthesizable molecules."""
     N = 0
     non_synthesizable = []
     synthesizable = []
@@ -64,6 +64,7 @@ def log_synthesizable_metrics(seeds: List[str]) -> None:
     
     for seed in seeds:
         df = pd.read_csv(os.path.join(seed, "oracle_history.csv"))
+        # Number of generated molecules
         num_generated_molecules = len(df)
 
         # Synthesizable molecules
@@ -88,11 +89,13 @@ def log_synthesizable_metrics(seeds: List[str]) -> None:
 
     if len(synthesizable_with_constraints) > 0:
         logging.info(f"# Successful Runs: {N}")
-        logging.info(f"Non-synthesizable: {int(np.mean(non_synthesizable))} ± {int(np.std(non_synthesizable))}, Raw Non-synthesizable: {non_synthesizable}")
-        logging.info(f"Synthesizable: {int(np.mean(synthesizable))} ± {int(np.std(synthesizable))}, Raw Synthesizable: {synthesizable}")
-        logging.info(f"Synthesizable (with all constraints): {int(np.mean(synthesizable_with_constraints))} ± {int(np.std(synthesizable_with_constraints))}, Raw Synthesizable (with all constraints): {synthesizable_with_constraints}")
+        logging.info(f"Non-synthesizable: {int(np.mean(non_synthesizable))} ± {int(np.std(non_synthesizable))}, Raw values: {non_synthesizable}")
+        logging.info(f"Synthesizable (not necessarily with all constraints): {int(np.mean(synthesizable))} ± {int(np.std(synthesizable))}, Raw values: {synthesizable}")
+        logging.info(f"Synthesizable (with all constraints): {int(np.mean(synthesizable_with_constraints))} ± {int(np.std(synthesizable_with_constraints))}, Raw values: {synthesizable_with_constraints}")
     else:
         logging.info(f"No runs generated any synthesizable molecules (with all constraints).")
+
+    exit()
 
 
 def log_wall_time(seeds: List[str]) -> None:
