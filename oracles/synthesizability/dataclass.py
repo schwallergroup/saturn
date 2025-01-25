@@ -19,4 +19,4 @@ class EnforcedReactionsParameters:
     avoid_rxn_classes: List[str]  # List of reaction classes to *avoid*
     rxn_info_extraction_script_path: str  # Path to the Rxn-INSIGHT extraction script
     seed_reactions: bool  # Whether to seed the route with enforced reaction classes
-    seed_reactions_file_folder: str # Path to the folder where we store the preloaded reactions file for the seeding
+    seed_reactions_file_folder: str  # Path to the folder where the pre-loaded reactions file for the seeding is stored
