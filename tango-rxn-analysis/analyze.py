@@ -84,10 +84,10 @@ def log_num_solved(seeds: List[str]) -> None:
             N += 1
 
     if len(solved) > 0:
-        logging.info(f"Successful Runs: {N}, Non-solved: {int(np.mean(non_solved))} ± {int(np.std(non_solved))}, Solved (with all constraints): {int(np.mean(solved))} ± {int(np.std(solved))}")
-        logging.info(f"Raw Non-solved: {non_solved}, Raw Solved (with all constraints): {solved}")
+        logging.info(f"# Successful Runs: {N}, Non-solved: {int(np.mean(non_solved))} ± {int(np.std(non_solved))}, Synthesizable (with all constraints): {int(np.mean(solved))} ± {int(np.std(solved))}")
+        logging.info(f"Raw Non-solved: {non_solved}, Raw Synthesizable (with all constraints): {solved}")
     else:
-        logging.info(f"No runs generated any solved molecules (with all constraints).")
+        logging.info(f"No runs generated any synthesizable molecules (with all constraints).")
 
 
 def log_wall_time(seeds: List[str]) -> None:
@@ -236,7 +236,7 @@ def log_molecule_and_rxn_stats(
 
     # Highest Reward
     metrics_highest_reward = [(smiles, dock, qed) for smiles, dock, qed in top_enforced_rxn_metrics]
-    log_pooled_molecules_stats(metrics_highest_reward, f"Top {save_top_percentage_routes * 100}% by Reward")
+    log_pooled_molecules_stats(metrics_highest_reward, f"Top {save_top_percentage_routes * 100}% by Reward, Docking Scores:")
     
     # If save_top_graphs, iterate over graphs, save them and plot reaction distribution
     if save_top_graphs:

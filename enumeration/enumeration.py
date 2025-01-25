@@ -105,7 +105,6 @@ def sample_products(
                             zip(smiles_batch, syntheseus_rewards) if reward == 1]
 
             print(f"solved smiles: {len(solved_smiles)}/{len(smiles_batch)}")
-            # NOTE: It is highly unlikely that there will be duplicates but could ensure this by canonicalization
             enumerated_smiles.update(solved_smiles)
             print(f"enumerated smiles: {len(enumerated_smiles)}\n")
 
