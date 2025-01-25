@@ -3,6 +3,7 @@ Script to extract and plot metrics from TANGO-RXN runs (post-run).
 """
 from typing import List, Tuple
 import os
+import subprocess
 import time
 import logging
 import argparse
@@ -57,35 +58,39 @@ RXN_INFO_EXTRACTION_SCRIPT = os.path.join(SATURN_BASE_PATH, "oracles/synthesizab
 def log_synthesizable_metrics(seeds: List[str]) -> None:
     """Log number of synthesizable molecules to logging file."""
     N = 0
-    non_solved = []
-    solved = []
+    non_synthesizable = []
+    synthesizable = []
+    synthesizable_with_constraints = []
     
     for seed in seeds:
         df = pd.read_csv(os.path.join(seed, "oracle_history.csv"))
+        num_generated_molecules = len(df)
 
-        # Non-solved molecules
-        df_non_solved = df.loc[df[SYNTHESEUS_REWARD_ENUM] == 0]
-        try:
-            df_non_solved = df_remove_duplicate_smiles(df_non_solved)
-        except Exception:
-            logging.info("Error in *non-solved* de-duplication")
-        non_solved.append(len(df_non_solved))
+        # Synthesizable molecules
+        syntheseus_results_dir = os.path.join(seed, "syntheseus_results")
+        num_pdfs = int(subprocess.check_output(f"find {syntheseus_results_dir} -type f -name '*.pdf' | wc -l", shell=True))
+        synthesizable.append(num_pdfs)
+
+        # Non-synthesizable molecules
+        non_synthesizable.append(num_generated_molecules - num_pdfs)
 
         # Solved molecules
-        df_solved = df.loc[df[SYNTHESEUS_REWARD_ENUM] == 1]
+        df_synthesizable_with_constraints = df.loc[df[SYNTHESEUS_REWARD_ENUM] == 1]
         try:
-            df_solved = df_remove_duplicate_smiles(df_solved)
+            df_synthesizable_with_constraints = df_remove_duplicate_smiles(df_synthesizable_with_constraints)
         except Exception:
-            logging.info("Error in *solved* de-duplication")
-        solved.append(len(df_solved))
+            logging.info("Error in *synthesizable with constraints* de-duplication")
+        synthesizable_with_constraints.append(len(df_synthesizable_with_constraints))
 
         # Number of successes
-        if len(df_solved) > 0:
+        if len(df_synthesizable_with_constraints) > 0:
             N += 1
 
-    if len(solved) > 0:
-        logging.info(f"# Successful Runs: {N}, Non-solved: {int(np.mean(non_solved))} ± {int(np.std(non_solved))}, Synthesizable (with all constraints): {int(np.mean(solved))} ± {int(np.std(solved))}")
-        logging.info(f"Raw Non-solved: {non_solved}, Raw Synthesizable (with all constraints): {solved}")
+    if len(synthesizable_with_constraints) > 0:
+        logging.info(f"# Successful Runs: {N}")
+        logging.info(f"Non-synthesizable: {int(np.mean(non_synthesizable))} ± {int(np.std(non_synthesizable))}, Raw Non-synthesizable: {non_synthesizable}")
+        logging.info(f"Synthesizable: {int(np.mean(synthesizable))} ± {int(np.std(synthesizable))}, Raw Synthesizable: {synthesizable}")
+        logging.info(f"Synthesizable (with all constraints): {int(np.mean(synthesizable_with_constraints))} ± {int(np.std(synthesizable_with_constraints))}, Raw Synthesizable (with all constraints): {synthesizable_with_constraints}")
     else:
         logging.info(f"No runs generated any synthesizable molecules (with all constraints).")
 
