@@ -69,7 +69,7 @@ def log_synthesizable_metrics(seeds: List[str]) -> None:
 
         # Synthesizable molecules
         syntheseus_results_dir = os.path.join(seed, "syntheseus_results")
-        num_pdfs = int(subprocess.check_output(f"find {syntheseus_results_dir} -type f -name '*.pdf' | wc -l", shell=True))
+        num_pdfs = int(subprocess.check_output(f"find {syntheseus_results_dir} -type f -name '*.pkl' | wc -l", shell=True))
         synthesizable.append(num_pdfs)
 
         # Non-synthesizable molecules
