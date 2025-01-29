@@ -104,14 +104,13 @@ def sample_products(
             solved_smiles = [smiles for smiles, reward in 
                             zip(smiles_batch, syntheseus_rewards) if reward == 1]
 
-            print(f"solved smiles: {len(solved_smiles)}/{len(smiles_batch)}")
             enumerated_smiles.update(solved_smiles)
-            print(f"enumerated smiles: {len(enumerated_smiles)}\n")
 
     end_time = time.perf_counter()
     print(f"Enumeration seeding time: {end_time - start_time} seconds")
     
     return list(enumerated_smiles)
+
 
 def rxn_based_enumeration(
     prior_path: str,
