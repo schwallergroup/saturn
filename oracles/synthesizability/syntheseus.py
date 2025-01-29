@@ -125,15 +125,17 @@ class Syntheseus(OracleComponent):
         #       The order is lost as the count would start from 0 for each chunk
         self.smiles = None
 
-        # Trackers for matched SMILES under building block and reaction class constraints
-        self.matched_generated_smiles = dict()
-        self.matched_generated_smiles_with_rxn = dict()
-
         # Guard against invalid combination of parameters
         if (not self.enforced_building_blocks_parameters.enforce_blocks) and \
            (not self.enforced_reactions_parameters.enforce_rxn_class_presence) and \
            (len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0):
             assert self.parameters.reward_shaping_function_parameters["transformation_function"] == "binary", "The run specifies to enforce neither building blocks nor reaction classes, please use the Binary Reward Shaping function."
+
+        # Trackers for matched SMILES under building block and reaction class constraints
+        self.matched_generated_smiles = dict()
+        self.matched_generated_smiles_with_rxn = dict()
+        # Track the evolution of reaction classes/names (if applicable)
+        self.smiles_to_rxn_tracker = dict()  # Dict[str, List[Tuple[int, str, str]]] --> {smiles: [(depth, rxn_class, rxn_name), ...]}
 
     def __call__(
         self, 
@@ -267,7 +269,6 @@ class Syntheseus(OracleComponent):
                         max_depth = self._get_max_depth(route)
 
                         # FIXME: Should be redundant as the generated SMILES is already tracked above
-
                         # Loop through the nodes in the route to ensure the root node (generated molecule) is tracked
                         for node, node_data in route.items():
                             # First extract the generated molecule
@@ -301,10 +302,7 @@ class Syntheseus(OracleComponent):
                             if is_matched:
                                 self.matched_generated_smiles[oracle_calls].append(generated_smiles)
                                 break
-                        
-                        # if is_matched:
-                        #     max_reward = max_reward * 0.75 + (get_percentage_of_carbon(matched_block_smiles, generated_smiles))
-    
+                    
                         node_rewards[idx] = max_reward
 
                         with open(os.path.join(self.output_dir, "matched_generated_smiles.json"), "w") as f:
