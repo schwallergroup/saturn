@@ -3,6 +3,7 @@ Script to extract and plot metrics from TANGO-RXN runs (post-run).
 """
 from typing import List, Tuple
 import os
+import subprocess
 import time
 import logging
 import argparse
@@ -54,44 +55,49 @@ ROUTE_EXTRACTION_SCRIPT = os.path.join(SATURN_BASE_PATH, "oracles/synthesizabili
 RXN_INFO_EXTRACTION_SCRIPT = os.path.join(SATURN_BASE_PATH, "oracles/synthesizability/utils/extract_rxn_info.py")
 
 
-def log_num_solved(seeds: List[str]) -> None:
-    """Log number of solved molecules to logging file"""
+def log_synthesizable_metrics(seeds: List[str]) -> None:
+    """Log number of synthesizable molecules."""
     N = 0
-    non_solved = []
-    solved = []
+    non_synthesizable = []
+    synthesizable = []
+    synthesizable_with_constraints = []
     
     for seed in seeds:
         df = pd.read_csv(os.path.join(seed, "oracle_history.csv"))
+        # Number of generated molecules
+        num_generated_molecules = len(df)
 
-        # Non-solved molecules
-        df_non_solved = df.loc[df[SYNTHESEUS_REWARD_ENUM] == 0]
-        try: 
-            df_non_solved = df_remove_duplicate_smiles(df_non_solved)
-        except Exception:
-            logging.info("Error in *non-solved* de-duplication")
-        non_solved.append(len(df_non_solved))
+        # Synthesizable molecules
+        syntheseus_results_dir = os.path.join(seed, "syntheseus_results")
+        num_pkl = int(subprocess.check_output(f"find {syntheseus_results_dir} -type f -name '*.pkl' | wc -l", shell=True))
+        synthesizable.append(num_pkl)
+
+        # Non-synthesizable molecules
+        non_synthesizable.append(num_generated_molecules - num_pkl)
 
         # Solved molecules
-        df_solved = df.loc[df[SYNTHESEUS_REWARD_ENUM] == 1]
+        df_synthesizable_with_constraints = df.loc[df[SYNTHESEUS_REWARD_ENUM] == 1]
         try:
-            df_solved = df_remove_duplicate_smiles(df_solved)
+            df_synthesizable_with_constraints = df_remove_duplicate_smiles(df_synthesizable_with_constraints)
         except Exception:
-            logging.info("Error in *solved* de-duplication")
-        solved.append(len(df_solved))
+            logging.info("Error in *synthesizable with constraints* de-duplication")
+        synthesizable_with_constraints.append(len(df_synthesizable_with_constraints))
 
         # Number of successes
-        if len(df_solved) > 0:
+        if len(df_synthesizable_with_constraints) > 0:
             N += 1
 
-    if len(solved) > 0:
-        logging.info(f"Successful Runs: {N}, Non-solved: {int(np.mean(non_solved))} ± {int(np.std(non_solved))}, Solved: {int(np.mean(solved))} ± {int(np.std(solved))}")
-        logging.info(f"Raw Non-solved: {non_solved}, Raw Solved: {solved}")
+    if len(synthesizable_with_constraints) > 0:
+        logging.info(f"# Successful Runs: {N}")
+        logging.info(f"Non-synthesizable: {int(np.mean(non_synthesizable))} ± {int(np.std(non_synthesizable))}, Raw values: {non_synthesizable}")
+        logging.info(f"Synthesizable (not necessarily with all constraints): {int(np.mean(synthesizable))} ± {int(np.std(synthesizable))}, Raw values: {synthesizable}")
+        logging.info(f"Synthesizable (with all constraints): {int(np.mean(synthesizable_with_constraints))} ± {int(np.std(synthesizable_with_constraints))}, Raw values: {synthesizable_with_constraints}")
     else:
-        logging.info(f"No runs generated any solved molecules.")
+        logging.info(f"No runs generated any synthesizable molecules (with all constraints).")
 
 
 def log_wall_time(seeds: List[str]) -> None:
-    """Log run wall time"""
+    """Log run wall time."""
     times = []
 
     for seed in seeds:
@@ -113,11 +119,11 @@ def log_wall_time(seeds: List[str]) -> None:
         logging.info(f"Wall Time (N={len(times)}): {int(mean_hours)}h {int(mean_minutes)}m ± {int(std_hours)}h {int(std_minutes)}m")
 
 
-def log_pooled_molecules_stats(
+def log_pooled_molecules_metrics(
     pooled_data: List[Tuple[str, float, float]],  # (SMILES, docking_score, qed)
     threshold_label: str
 ) -> None:
-    """Log pooled molecules stats"""
+    """Log pooled molecules metrics."""
     if pooled_data:
         docking_scores = [dock for _, dock, _ in pooled_data]
         qed_values = [qed for _, _, qed in pooled_data]
@@ -146,14 +152,14 @@ def log_pooled_molecules_stats(
         logging.info(f"No molecules generated for {threshold_label} docking score interval")
 
 
-def log_molecule_and_rxn_stats(
+def log_molecule_and_rxn_metrics(
     seeds: List[str],    
     experiment_name: str,
     save_top_graphs: bool = True,
-    save_top_percentage_routes: float = 0.01,
+    save_top_percentage_routes: float = 0.005,
     save_dir: str = "./top_graphs/"
 ) -> None:
-    """Log molecule and reaction metrics stats"""
+    """Log molecule and reaction metrics."""
     # If top graphs should be saved 
     if save_top_graphs:
         top_oracle_histories = [] # Store DataFrames with top molecules
@@ -191,7 +197,11 @@ def log_molecule_and_rxn_stats(
         
         # Track metrics
         num_enforced_rxn.append(len(enforced_rxn_smiles))
-        df_enforced_rxn = df[df["canonical_smiles"].isin(enforced_rxn_smiles)]  # This keeps only syntheseus_raw_values == 1
+        df_enforced_rxn = df[df["canonical_smiles"].isin(enforced_rxn_smiles)]  
+
+        # Double check that all matched molecules have syntheseus_raw_values == 1
+        assert sum(df_enforced_rxn[SYNTHESEUS_REWARD_ENUM]) == len(df_enforced_rxn), "Error: Not all matched molecules from the JSON have syntheseus_raw_values == 1 in the oracle history."
+
         df_enforced_rxn = df_enforced_rxn.sort_values(by=REWARD_ENUM, ascending=False)
         df_top_enforced_rxn = df_enforced_rxn.head(int(save_top_percentage_routes * len(df_enforced_rxn)))
 
@@ -220,19 +230,19 @@ def log_molecule_and_rxn_stats(
 
     # -8 to -9
     metrics_8_9 = [(smiles, dock, qed) for smiles, dock, qed in enforced_rxn_metrics if -9 <= dock < -8]
-    log_pooled_molecules_stats(metrics_8_9, "Docking Scores: -8 to -9")
+    log_pooled_molecules_metrics(metrics_8_9, "Docking Scores: -8 to -9")
     
     # -9 to -10
     metrics_9_10 = [(smiles, dock, qed) for smiles, dock, qed in enforced_rxn_metrics if -10 <= dock < -9]
-    log_pooled_molecules_stats(metrics_9_10, "Docking Scores: -9 to -10")
+    log_pooled_molecules_metrics(metrics_9_10, "Docking Scores: -9 to -10")
     
     # < -10
     metrics_10 = [(smiles, dock, qed) for smiles, dock, qed in enforced_rxn_metrics if dock < -10]
-    log_pooled_molecules_stats(metrics_10, "Docking Scores: < -10")
+    log_pooled_molecules_metrics(metrics_10, "Docking Scores: < -10")
 
     # Highest Reward
     metrics_highest_reward = [(smiles, dock, qed) for smiles, dock, qed in top_enforced_rxn_metrics]
-    log_pooled_molecules_stats(metrics_highest_reward, f"Top {save_top_percentage_routes * 100}% by Reward")
+    log_pooled_molecules_metrics(metrics_highest_reward, f"Top {save_top_percentage_routes * 100}% by Reward, Docking Scores:")
     
     # If save_top_graphs, iterate over graphs, save them and plot reaction distribution
     if save_top_graphs:
@@ -338,7 +348,7 @@ if __name__ == "__main__":
         logging.info(f"----- Results for: {experiment_name} -----")
 
         # Log number of solved molecules
-        log_num_solved(seeds)
+        log_synthesizable_metrics(seeds)
 
         # Log wall time
         log_wall_time(seeds)
@@ -346,7 +356,7 @@ if __name__ == "__main__":
         DOCKING_SCORE_ENUM = get_docking_score_enum(args.docking_oracle)
 
         # Log enforced reaction and building blocks info
-        log_molecule_and_rxn_stats(
+        log_molecule_and_rxn_metrics(
             seeds=seeds,
             experiment_name=experiment_name,
             save_top_graphs=args.save_top_graphs,
