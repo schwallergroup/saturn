@@ -392,7 +392,7 @@ class Syntheseus(OracleComponent):
                                 "-n",
                                 self.rxn_insight_env_name, 
                                 "python", 
-                                self.rxn_info_extraction_script_path, 
+                                self.rxn_insight_extraction_script_path, 
                                 # Pass the rxn SMILES extracted from the Syntheseus route
                                 node_data["rxn_smiles"]
                             ], capture_output=True, text=True)
@@ -677,7 +677,7 @@ class Syntheseus(OracleComponent):
                             "-n",
                             self.rxn_insight_env_name, 
                             "python", 
-                            self.rxn_info_extraction_script_path, 
+                            self.rxn_insight_extraction_script_path, 
                             # Pass the rxn SMILES extracted from the Syntheseus route
                             node_data["rxn_smiles"]
                         ], capture_output=True, text=True)
