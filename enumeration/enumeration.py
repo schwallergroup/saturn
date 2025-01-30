@@ -5,166 +5,163 @@ from typing import List, Dict, Union
 import os
 import json
 import random
-import pandas as pd
+import gzip
 from rdkit import Chem
-from rdkit.Chem import Mol
 from rdkit.Chem import AllChem
-import pandas as pd
 
+from oracles.synthesizability.syntheseus import Syntheseus
 from models.generator import Generator
 from utils.chemistry_utils import is_encodable
+from enumeration.utils import enumerated_mol_passes_property_filter
 
 import sys
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_PATH)
-from enumeration.utils import within_molecular_weight_range, within_small_molecule_size, is_charged, longest_aliphatic_c_chain, passes_ring_filter
+
+from enumeration.utils import are_solvable_by_retro
+from enumeration.preprocessing import match_bbs
 
 
-def passes_property_filter(mol: Mol) -> bool:
-    """
-    Check if the building block passess all the property filters.
-    """
-    # TODO: Add more filters or remove some
-    if (within_molecular_weight_range(mol) and 
-        not is_charged(mol) and
-        longest_aliphatic_c_chain(mol) < 3 and 
-        passes_ring_filter(mol)):
-        return True
-    
-    return False
+def sample_react(rxn: Dict[str, Union[List, str]]) -> str:
+    """Sample and react from a pre-loaded reaction."""
 
-def get_smirks_from_list(rxn_list: list[str]) -> Dict[str, List[str]]:
-    """
-    Returns dict of the form:
+    reaction = AllChem.ReactionFromSmarts(rxn["smirks"])
 
-    {
-        "rxn_class": [smirks_1, smirks_2, ...]
-    }
+    # Sample 1
+    r1 = Chem.MolFromSmiles(random.choice(rxn["available_reactants"][0]))
 
-    Where for each enforced reaction class specified by the user, the associated SMIRKS are extracted.
-    """
-    # TODO: path to smirks, this may break or maybe we could have it inside
-    with open(os.path.join(BASE_PATH, "smirks.json"), "r") as f:
-        data = [json.loads(line) for line in f]
-    
-    smirks_names = {}
+    if rxn["num_reactant"] == 2:
+        r2 = Chem.MolFromSmiles(random.choice(rxn["available_reactants"][1]))
 
-    for rxn in rxn_list:
+        product = reaction.RunReactants((r1, r2))
 
-        rxn_smirks = []
-        for entry in data:
-            if rxn in entry["name"].lower():
-                rxn_smirks.append(entry["smirks"])
-        
-        smirks_names[rxn] = rxn_smirks
-
-    return smirks_names
-    
-def get_product_from_building_blocks(
-    smirks: Dict[str, List[str]], 
-    building_blocks: List[str]
-) -> Union[str, None]:
-    """
-    Get a seeding molecule from a dictionary with reaction names and SMIRKS and a list of building blocks.
-    Randomly sample blocks and reactions and return the product.
-
-    # FIXME: Currently purposely disallowing for > 2 reactants - returns None
-    """
-    # Cap the maximum number of tries in sampling compatible building blocks
-    MAX_TRIES = 1000
-    tries = 0
-
-    # Randomly sample reaction
-    rxn_name = random.choice(list(smirks.keys()))
-    rxn_smirks = random.choice(smirks[rxn_name])
-    
-    # Get SMARTS for reactants
-    smarts = rxn_smirks.split(">>")[0].split(".")
-    # FIXME: Do not allow > 2 reactants at the moment
-    if len(smarts) > 2:
+    # Do not allow more than 2 reactants
+    elif rxn["num_reactant"] > 2:
         return None
 
-    mol0 = Chem.MolFromSmarts(smarts[0])
-
-    # Sample compatible building block from list
-    while tries < MAX_TRIES:
-        idx = random.randint(0, len(building_blocks) - 1)
-        mol = Chem.MolFromSmiles(building_blocks[idx])
-
-        if passes_property_filter(mol):
-            if mol.HasSubstructMatch(mol0):
-                r0 = mol
-                break
-        else:
-            tries += 1
-            continue
-
-    # If bimol
-    if len(smarts) > 1:
-        mol1 = Chem.MolFromSmarts(smarts[1])
-
-        while tries < MAX_TRIES:
-            idx = random.randint(0, len(building_blocks) - 1)
-            mol = Chem.MolFromSmiles(building_blocks[idx])
-
-            if passes_property_filter(mol):
-                if mol.HasSubstructMatch(mol1):
-                    r1 = mol
-                    break
-
-            else:
-                tries += 1
-                continue
-    
-    # React unimol
-    if len(smarts) == 1:
-        product = AllChem.ReactionFromSmarts(rxn_smirks).RunReactants((r0,))
-    
-    # Else react bimol
     else:
-        product = AllChem.ReactionFromSmarts(rxn_smirks).RunReactants((r0, r1))
+        product = reaction.RunReactants((r1,))
     
-    product = product[0][0]
+    product = Chem.MolToSmiles(product[0][0])
 
-    return Chem.MolToSmiles(product) if within_small_molecule_size(product) else None
+    return product 
+
+
+def sample_products(
+    rxns: Dict[str, List],
+    n_seeds: int,
+    prior: Generator,
+    syntheseus_oracle: Syntheseus
+) -> List[str]:
+    """
+    Sample products from a pre-loaded reaction and building blocks set. 
+    Ensure syntheseus_reward = 1 for all enumerated molecules.
+    """
+    import time
+    start_time = time.perf_counter()
+    # Take reactions from pre-loaded file
+    reactions = rxns["reactions"]
+
+    # Final enumerated SMILES
+    enumerated_smiles = set()
+
+    # Enumerate and check until n_seeds
+    while len(enumerated_smiles) < n_seeds:
+
+        # List of SMILES batch to verify with Syntheseus
+        smiles_batch = []
+
+        # Sample batch of reactions
+        sampled_reactions = random.choices(reactions, k=(n_seeds - len(enumerated_smiles)))
+
+        # Sample SMILES
+        for reaction in sampled_reactions:
+
+            tries = 0
+
+            while tries < 1000:
+                product = sample_react(reaction)
+
+                try:
+                    if is_encodable(product, prior):
+                        mol = Chem.MolFromSmiles(product)
+                        if mol:
+                            if enumerated_mol_passes_property_filter(mol):
+                                smiles_batch.append(product)
+                                break
+                except Exception:
+                    pass
+
+                tries += 1
+
+        if len(smiles_batch) > 0:
+            # Compute the reward with the oracle and append valid SMILES
+            syntheseus_rewards = syntheseus_oracle(
+                mols=[Chem.MolFromSmiles(smiles) for smiles in smiles_batch],  # Redundant 
+                oracle_calls=1
+            )
+
+            solved_smiles = [smiles for smiles, reward in 
+                            zip(smiles_batch, syntheseus_rewards) if reward == 1]
+
+            enumerated_smiles.update(solved_smiles)
+
+    end_time = time.perf_counter()
+    print(f"Enumeration seeding time: {end_time - start_time} seconds")
+    
+    return list(enumerated_smiles)
+
 
 def rxn_based_enumeration(
     prior_path: str,
     device: str,
-    rxn_list: List[str], 
-    building_blocks_path: str,
+    syntheseus_params: Dict[str, str],
+    syntheseus_oracle: Syntheseus,
     n_seeds: int = 100,
 ) -> List[str]:
     """
     Enumerate molecules using specified reactions and building blocks.
     """
+    # Things that will be used from run config
+    rxn_list = syntheseus_params["enforced_reactions"]["enforced_rxn_classes"]
+    rxn_names = "_".join(sorted(rxn_list))
+    building_blocks_path = syntheseus_params["building_blocks_file"]
+    prefiltered_rxn_folder = syntheseus_params["enforced_reactions"]["seed_reactions_file_folder"]
+    prefiltered_file_name = f"enumeration_rxns_{rxn_names}.json.gz"
+    smirks_file = os.path.join(BASE_PATH, "smirks.json")
+
     # Load Prior to check that enumerated SMILES are tokenizable
     prior = Generator.load_from_file(prior_path, device)
 
     assert os.path.exists(building_blocks_path), f"Seed (by reaction) building blocks file {building_blocks_path} does not exist."
-    # Read building blocks
-    bbs = pd.read_csv(
-        building_blocks_path, 
-        header=None
-    )[0].values
+    
+    # Load pre-filtered file if it exists, otherwise generate it
+    if not os.path.exists(os.path.join(prefiltered_rxn_folder, prefiltered_file_name)):
 
-    # Get smirks
-    names_smirks = get_smirks_from_list(rxn_list)
+        os.makedirs(prefiltered_rxn_folder, exist_ok=True)
+        
+        print("Pre-processing reactions and building blocks for replay buffer seeding via enumeration")
+        
+        # Generate pre-filtered reactions file
+        match_bbs(
+            bbs_file=building_blocks_path,
+            rxn_templates_file=smirks_file,
+            save_folder=prefiltered_rxn_folder,
+            file_name=prefiltered_file_name,
+            rxn_list=rxn_list
+        )
 
-    # Create set to store seed molecules
-    seed_smiles = set()
+    with gzip.open(os.path.join(prefiltered_rxn_folder, prefiltered_file_name), "r") as f:
+        rxns = json.load(f)
+    
+    # Function that generates candidate molecules with the pre-loaded reactions and filters them
+    candidate_seeds = sample_products(
+        rxns=rxns, 
+        n_seeds=n_seeds,
+        prior=prior,
+        syntheseus_oracle=syntheseus_oracle
+    )
+    
+    print(candidate_seeds)
 
-    while len(seed_smiles) < n_seeds:
-
-        try:
-            smiles = get_product_from_building_blocks(
-                smirks=names_smirks, 
-                building_blocks=bbs
-            )
-            if smiles is not None and is_encodable(smiles, prior):
-                seed_smiles.add(smiles)
-
-        except Exception: 
-            pass
-
-    return list(seed_smiles)
+    return candidate_seeds

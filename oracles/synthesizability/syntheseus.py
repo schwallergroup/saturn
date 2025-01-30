@@ -13,7 +13,7 @@ from oracles.dataclass import OracleComponentParameters
 from rdkit import Chem
 from rdkit.Chem import Mol
 from utils.chemistry_utils import canonicalize_smiles, construct_morgan_fingerprints_batch_from_file
-from oracles.synthesizability.utils.utils import match_stock, extract_functional_groups, get_node_reward, get_percentage_of_carbon
+from oracles.synthesizability.utils.utils import match_stock, extract_functional_groups, get_node_reward
 from concurrent.futures import ThreadPoolExecutor
 from oracles.synthesizability.utils.CONSTANTS import DEFAULT_TANGO_WEIGHTS
 
@@ -96,11 +96,19 @@ class Syntheseus(OracleComponent):
         # Scripts required to extract reaction nodes and reaction information
         # -------------------------------------------------------------------
 
+        # FIXME: Do not necessarily need these attributes - they are always initialized at the moment just for safety, fix later
         self.rxn_insight_env_name = self.enforced_reactions_parameters.rxn_insight_env_name
         assert self.rxn_insight_env_name is not None, "The run specifies to enforce reactions and/or include reaction information in the top graphs output, please provide the Conda environment name with Rxn-INSIGHT installed."
 
-        self.rxn_info_extraction_script_path = self.enforced_reactions_parameters.rxn_info_extraction_script_path
-        assert self.rxn_info_extraction_script_path is not None, "The run requires extracting reaction information, please provide the path to the script that extracts the reaction classes from the Syntheseus route pickle file."
+        self.rxn_insight_extraction_script_path = self.enforced_reactions_parameters.rxn_insight_extraction_script_path
+        assert self.rxn_insight_extraction_script_path is not None, "The run requires extracting reaction information, please provide the path to the script that extracts the reaction classes from the Syntheseus route pickle file."
+
+        if self.enforced_reactions_parameters.use_namerxn:
+            self.namerxn_binary_path = self.enforced_reactions_parameters.namerxn_binary_path
+            assert self.namerxn_binary_path is not None, "The run specifies to use NameRXN, please provide the path to the NameRXN executable. Note that this requires a license."
+
+            self.namerxn_extraction_script_path = self.enforced_reactions_parameters.namerxn_extraction_script_path
+            assert self.namerxn_extraction_script_path is not None, "The run specifies to use NameRXN, please provide the path to the NameRXN extraction script."
 
         # Path to the script that extracts the SMILES and depth from the Syntheseus route pickle file
         self.route_extraction_script_path = self.parameters.specific_parameters.get("route_extraction_script_path", None)
@@ -125,15 +133,17 @@ class Syntheseus(OracleComponent):
         #       The order is lost as the count would start from 0 for each chunk
         self.smiles = None
 
-        # Trackers for matched SMILES under building block and reaction class constraints
-        self.matched_generated_smiles = dict()
-        self.matched_generated_smiles_with_rxn = dict()
-
         # Guard against invalid combination of parameters
         if (not self.enforced_building_blocks_parameters.enforce_blocks) and \
            (not self.enforced_reactions_parameters.enforce_rxn_class_presence) and \
            (len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0):
             assert self.parameters.reward_shaping_function_parameters["transformation_function"] == "binary", "The run specifies to enforce neither building blocks nor reaction classes, please use the Binary Reward Shaping function."
+
+        # Trackers for matched SMILES under building block and reaction class constraints
+        self.matched_generated_smiles = dict()
+        self.matched_generated_smiles_with_rxn = dict()
+        # Track the evolution of reaction classes/names (if applicable)
+        self.smiles_to_rxn_tracker = dict()  # Dict[str, List[Tuple[int, str, str]]] --> {smiles: [(depth, rxn_class, rxn_name), ...]}
 
     def __call__(
         self, 
@@ -267,7 +277,6 @@ class Syntheseus(OracleComponent):
                         max_depth = self._get_max_depth(route)
 
                         # FIXME: Should be redundant as the generated SMILES is already tracked above
-
                         # Loop through the nodes in the route to ensure the root node (generated molecule) is tracked
                         for node, node_data in route.items():
                             # First extract the generated molecule
@@ -301,10 +310,7 @@ class Syntheseus(OracleComponent):
                             if is_matched:
                                 self.matched_generated_smiles[oracle_calls].append(generated_smiles)
                                 break
-                        
-                        # if is_matched:
-                        #     max_reward = max_reward * 0.75 + (get_percentage_of_carbon(matched_block_smiles, generated_smiles))
-    
+                    
                         node_rewards[idx] = max_reward
 
                         with open(os.path.join(self.output_dir, "matched_generated_smiles.json"), "w") as f:
@@ -346,29 +352,59 @@ class Syntheseus(OracleComponent):
                     route = self._extract_syntheseus_route_data(
                         route_path=os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
                         data_type="rxn"
-                    )
+                    ) # The returned nodes are all Reaction nodes - extract reaction information from them
 
                     all_rxns = []  # List[Tuple[str, str]] --> (rxn_class, rxn_name)
-                    # The nodes are all Reaction nodes - extract reaction information
-                    for node, node_data in route.items():
-                        # Execute Rxn-INSIGHT on the rxn SMILES
-                        # HACK: This (temporary) solution enables reading the pickled data *without* installing Rxn-INSIGHT into the Saturn environment
-                        extraction_result = subprocess.run([
-                            "conda",
-                            "run", 
-                            "-n",
-                            self.rxn_insight_env_name, 
-                            "python", 
-                            self.rxn_info_extraction_script_path, 
-                            # Pass the rxn SMILES extracted from the Syntheseus route
-                            node_data["rxn_smiles"]
+            
+                    # NameRXN classification of every reaction in the route
+                    if self.enforced_reactions_parameters.use_namerxn:
+                        reaction_depth_smiles = []  # [(depth, rxn_smiles), ...]
+                        for node, node_data in route.items():
+                            reaction_depth_smiles.append((node_data["depth"], node_data["rxn_smiles"]))
+
+                        # Write the reaction SMILES to a temp fi.e
+                        temp_rxn_smiles_file = os.path.join(temp_dir, "rxn_smiles.smi")
+                        with open(temp_rxn_smiles_file, "w") as f:
+                            for idx, (_, rxn_smiles) in enumerate(reaction_depth_smiles):
+                                if idx < len(reaction_depth_smiles) - 1:
+                                    f.write(f"{rxn_smiles}\n")
+                                else:
+                                    f.write(f"{rxn_smiles}")
+
+                        all_rxns = subprocess.run([
+                            "python",
+                            self.namerxn_extraction_script_path,
+                            self.namerxn_binary_path,
+                            temp_rxn_smiles_file
                         ], capture_output=True, text=True)
 
                         # Check for errors
-                        assert extraction_result.returncode == 0, f"Error during Rxn-INSIGHT reaction information extraction: {extraction_result.stderr}"
-                        rxn_info = ast.literal_eval(extraction_result.stdout)
+                        assert all_rxns.returncode == 0, f"Error during NameRXN reaction information extraction: {all_rxns.stderr}"
+                        all_rxns = ast.literal_eval(all_rxns.stdout)
 
-                        all_rxns.append((rxn_info["CLASS"], rxn_info["NAME"]))
+                    else:
+                        for node, node_data in route.items():
+                            # Execute Rxn-INSIGHT on the rxn SMILES
+                            # HACK: This (temporary) solution enables reading the pickled data *without* installing Rxn-INSIGHT into the Saturn environment
+                            extraction_result = subprocess.run([
+                                "conda",
+                                "run", 
+                                "-n",
+                                self.rxn_insight_env_name, 
+                                "python", 
+                                self.rxn_info_extraction_script_path, 
+                                # Pass the rxn SMILES extracted from the Syntheseus route
+                                node_data["rxn_smiles"]
+                            ], capture_output=True, text=True)
+
+                            # Check for errors
+                            assert extraction_result.returncode == 0, f"Error during Rxn-INSIGHT reaction information extraction: {extraction_result.stderr}"
+                            rxn_info = ast.literal_eval(extraction_result.stdout)
+
+                            all_rxns.append((rxn_info["CLASS"], rxn_info["NAME"]))
+
+                # Assume the the reaction constraints are not satisfied
+                rxn_multiplier = 0.0
 
                 # If the molecule is solved *and* the user specified to enforce that a set of reaction classes appears in the synthesis graph
                 if self.enforced_reactions_parameters.enforce_rxn_class_presence and int(is_solved[idx]) == 1:
@@ -376,14 +412,13 @@ class Syntheseus(OracleComponent):
                     if oracle_calls not in self.matched_generated_smiles_with_rxn:
                         self.matched_generated_smiles_with_rxn[oracle_calls] = []
 
-                    rxn_multiplier = 0.0
                     for rxn_class, rxn_name in all_rxns:  # Un-pack each (rxn_class, rxn_name) pair
-                        for enforced_rxn_class in self.enforced_rxn_classes:    
+                        for enforced_rxn_class in self.enforced_rxn_classes:
                             # Convert to lower-case for more robust string comparison
                             if (enforced_rxn_class.lower() in rxn_class.lower()) or (enforced_rxn_class.lower() in rxn_name.lower()):
                                 rxn_multiplier = 1.0
                             # If not enforcing all reactions, then finding *a* match is sufficient
-                            if not self.enforced_reactions_parameters.enforce_all_reactions:
+                            if (rxn_multiplier == 1.0) and (not self.enforced_reactions_parameters.enforce_all_reactions):
                                 break
 
                     # -----------------------------------------------------------------------------------------------
@@ -497,13 +532,17 @@ class Syntheseus(OracleComponent):
         if self.enforced_building_blocks_parameters.enforce_blocks or \
            self.enforced_reactions_parameters.enforce_rxn_class_presence or \
            len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0:
+
             if not self.parallelize:
                 assert len(node_rewards) == len(smiles), "Syntheseus output length mismatch."
+
             return node_rewards
+
         elif self.optimize_path_length:
             if not self.parallelize:
                 assert len(steps) == len(smiles), "Syntheseus output length mismatch."
             return steps
+
         else:
             # Even if the path length is not being optimized, the output is still the number of steps so that this information is tracked 
             # HACK: Path length is only meaningful if a route is solved. If not solved, set the path length = -99 

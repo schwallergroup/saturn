@@ -82,17 +82,20 @@ if __name__ == "__main__":
         if any(is_component_syntheseus):
             syntheseus_params = config["oracle"]["components"][is_component_syntheseus.index(True)]["specific_parameters"]
 
+            # Getting syntheseus oracle
+            syntheseus_oracle = [orac for orac in oracle.oracle if orac.name == "syntheseus"][0]
+
             if syntheseus_params["enforced_reactions"]["seed_reactions"]:
                 # Call function to seed molecules
-                rxn_classes = syntheseus_params["enforced_reactions"]["enforced_rxn_classes"]
-                building_blocks_path = syntheseus_params["enforced_reactions"]["seed_building_blocks_file"]
-                
+
+                print("Seeding replay buffer")
                 seeding_smiles = rxn_based_enumeration(
                     prior_path=config["goal_directed_generation"]["reinforcement_learning"]["prior"],
                     device=device,
-                    rxn_list=rxn_classes,
-                    building_blocks_path=building_blocks_path,
-                    n_seeds=100,
+                    syntheseus_params=syntheseus_params,
+                    syntheseus_oracle=syntheseus_oracle,
+                    # Seed to the maximum Replay Buffer capacity
+                    n_seeds=config["goal_directed_generation"]["experience_replay"]["memory_size"]
                 )
 
                 # In-place modification of ExperienceReplay parameters config

@@ -270,7 +270,6 @@ def get_node_reward(
         raise ValueError(f"Invalid reward type: {reward_type}")
     return reward
 
-
 def get_percentage_of_carbon(
     smiles_bb: str, 
     smiles_target: str
@@ -300,3 +299,4 @@ def get_percentage_of_carbon(
     assert total_C > 0, "Total number of carbons must be greater than 0."
     
     return matched_C/total_C
+    
