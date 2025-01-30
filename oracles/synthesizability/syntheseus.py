@@ -96,11 +96,16 @@ class Syntheseus(OracleComponent):
         # Scripts required to extract reaction nodes and reaction information
         # -------------------------------------------------------------------
 
+        # FIXME: Do not necessarily need these attributes - they are always initialized at the moment just for safety, fix later
         self.rxn_insight_env_name = self.enforced_reactions_parameters.rxn_insight_env_name
         assert self.rxn_insight_env_name is not None, "The run specifies to enforce reactions and/or include reaction information in the top graphs output, please provide the Conda environment name with Rxn-INSIGHT installed."
 
         self.rxn_info_extraction_script_path = self.enforced_reactions_parameters.rxn_info_extraction_script_path
         assert self.rxn_info_extraction_script_path is not None, "The run requires extracting reaction information, please provide the path to the script that extracts the reaction classes from the Syntheseus route pickle file."
+
+        if self.enforced_reactions_parameters.use_namerxn:
+            self.namerxn_binary_path = self.enforced_reactions_parameters.namerxn_binary_path
+            assert self.namerxn_binary_path is not None, "The run specifies to use NameRXN, please provide the path to the NameRXN executable. Note that this requires a license."
 
         # Path to the script that extracts the SMILES and depth from the Syntheseus route pickle file
         self.route_extraction_script_path = self.parameters.specific_parameters.get("route_extraction_script_path", None)
