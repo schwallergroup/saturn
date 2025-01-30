@@ -19,6 +19,7 @@ class EnforcedReactionsParameters:
     namerxn_binary_path: str  # Path to the NameRXN executable
     enforced_rxn_classes: List[str]  # List of reaction classes to enforce
     avoid_rxn_classes: List[str]  # List of reaction classes to *avoid*
-    rxn_info_extraction_script_path: str  # Path to the Rxn-INSIGHT extraction script
+    rxn_insight_extraction_script_path: str  # Path to the Rxn-INSIGHT extraction script
+    namerxn_extraction_script_path: str  # Path to the NameRXN extraction script
     seed_reactions: bool  # Whether to seed the route with enforced reaction classes
     seed_reactions_file_folder: str  # Path to the folder where the pre-loaded reactions file for the seeding is stored
