@@ -344,17 +344,18 @@ class Syntheseus(OracleComponent):
                     route = self._extract_syntheseus_route_data(
                         route_path=os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
                         data_type="rxn"
-                    ) # The returned nodes are all Reaction nodes - extract reaction information from them
+                    ) 
+                    
+                    # The returned nodes are all Reaction nodes - extract reaction information from them
+                    reaction_depth_smiles = []  # [(depth, rxn_smiles), ...]
+                    for node, node_data in route.items():
+                        reaction_depth_smiles.append((node_data["depth"], node_data["rxn_smiles"]))
 
-                    all_rxns = []  # List[Tuple[str, str]] --> (rxn_class, rxn_name)
+                    all_rxns_labels = []  # List[Tuple[str, str]] --> (rxn_class, rxn_name)
             
                     # NameRXN classification of every reaction in the route
                     if self.enforced_reactions_parameters.use_namerxn:
-                        reaction_depth_smiles = []  # [(depth, rxn_smiles), ...]
-                        for node, node_data in route.items():
-                            reaction_depth_smiles.append((node_data["depth"], node_data["rxn_smiles"]))
-
-                        # Write the reaction SMILES to a temp fi.e
+                        # Write the reaction SMILES to a temp file
                         temp_rxn_smiles_file = os.path.join(temp_dir, "rxn_smiles.smi")
                         with open(temp_rxn_smiles_file, "w") as f:
                             for idx, (_, rxn_smiles) in enumerate(reaction_depth_smiles):
@@ -363,7 +364,7 @@ class Syntheseus(OracleComponent):
                                 else:
                                     f.write(f"{rxn_smiles}")
 
-                        all_rxns = subprocess.run([
+                        all_rxns_labels = subprocess.run([
                             "python",
                             self.namerxn_extraction_script_path,
                             self.namerxn_binary_path,
@@ -371,11 +372,11 @@ class Syntheseus(OracleComponent):
                         ], capture_output=True, text=True)
 
                         # Check for errors
-                        assert all_rxns.returncode == 0, f"Error during NameRXN reaction information extraction: {all_rxns.stderr}"
-                        all_rxns = ast.literal_eval(all_rxns.stdout)
+                        assert all_rxns_labels.returncode == 0, f"Error during NameRXN reaction information extraction: {all_rxns_labels.stderr}"
+                        all_rxns_labels = ast.literal_eval(all_rxns_labels.stdout)
 
                     else:
-                        for node, node_data in route.items():
+                        for _, rxn_smiles in reaction_depth_smiles:
                             # Execute Rxn-INSIGHT on the rxn SMILES
                             # HACK: This (temporary) solution enables reading the pickled data *without* installing Rxn-INSIGHT into the Saturn environment
                             extraction_result = subprocess.run([
@@ -386,14 +387,14 @@ class Syntheseus(OracleComponent):
                                 "python", 
                                 self.rxn_insight_extraction_script_path, 
                                 # Pass the rxn SMILES extracted from the Syntheseus route
-                                node_data["rxn_smiles"]
+                                rxn_smiles
                             ], capture_output=True, text=True)
 
                             # Check for errors
                             assert extraction_result.returncode == 0, f"Error during Rxn-INSIGHT reaction information extraction: {extraction_result.stderr}"
                             rxn_info = ast.literal_eval(extraction_result.stdout)
 
-                            all_rxns.append((rxn_info["CLASS"], rxn_info["NAME"]))
+                            all_rxns_labels.append((rxn_info["CLASS"], rxn_info["NAME"]))
 
                     # Track all reactions present in the route
                     self.smiles_rxn_tracker[generated_smiles] = {
@@ -402,7 +403,7 @@ class Syntheseus(OracleComponent):
                             "rxn_class": rxn_class,
                             "rxn_name": rxn_name
                         }
-                        for (depth, rxn_smiles), (rxn_class, rxn_name) in zip(reaction_depth_smiles, all_rxns)
+                        for (depth, rxn_smiles), (rxn_class, rxn_name) in zip(reaction_depth_smiles, all_rxns_labels)
                     }
 
                 # Assume the the reaction constraints are not satisfied
@@ -414,7 +415,7 @@ class Syntheseus(OracleComponent):
                     if oracle_calls not in self.matched_generated_smiles_with_rxn:
                         self.matched_generated_smiles_with_rxn[oracle_calls] = []
 
-                    for rxn_class, rxn_name in all_rxns:  # Un-pack each (rxn_class, rxn_name) pair
+                    for rxn_class, rxn_name in all_rxns_labels:  # Un-pack each (rxn_class, rxn_name) pair
                         for enforced_rxn_class in self.enforced_rxn_classes:
                             # Convert to lower-case for more robust string comparison
                             if (enforced_rxn_class.lower() in rxn_class.lower()) or (enforced_rxn_class.lower() in rxn_name.lower()):
@@ -443,7 +444,7 @@ class Syntheseus(OracleComponent):
                     # ------------------------------------------------------------------------
 
                     elif self.enforced_reactions_parameters.enforce_all_reactions:
-                        for rxn_class, rxn_name in all_rxns:   # Un-pack each (rxn_class, rxn_name) pair
+                        for rxn_class, rxn_name in all_rxns_labels:   # Un-pack each (rxn_class, rxn_name) pair
                             for enforced_rxn_class in self.enforced_rxn_classes:
                                 if (enforced_rxn_class.lower() in rxn_class.lower()) or (enforced_rxn_class.lower() in rxn_name.lower()):
                                     break
@@ -478,7 +479,7 @@ class Syntheseus(OracleComponent):
                 if len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0 and int(is_solved[idx]) == 1:
                     avoid_rxn_multiplier = 1.0
                     # Check if specified reaction classes are *avoided*
-                    for rxn_class, rxn_name in all_rxns:
+                    for rxn_class, rxn_name in all_rxns_labels:
                         for avoid_rxn_class in self.enforced_reactions_parameters.avoid_rxn_classes:
                             if (avoid_rxn_class.lower() in rxn_class.lower()) or (avoid_rxn_class.lower() in rxn_name.lower()):
                                 avoid_rxn_multiplier = 0.0
