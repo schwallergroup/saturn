@@ -143,7 +143,7 @@ class Syntheseus(OracleComponent):
         self.matched_generated_smiles = dict()
         self.matched_generated_smiles_with_rxn = dict()
         # Track the evolution of reaction classes/names (if applicable)
-        self.smiles_rxn_tracker = dict()  # Dict[str, List[Tuple[int, str, str]]] --> {smiles: [(depth, rxn_class, rxn_name), ...]}
+        self.smiles_rxn_tracker = dict()  # {smiles: {depth: {rxn_smiles, rxn_class, rxn_name}}
 
     def __call__(
         self, 
