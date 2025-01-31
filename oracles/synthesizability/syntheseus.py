@@ -143,7 +143,7 @@ class Syntheseus(OracleComponent):
         self.matched_generated_smiles = dict()
         self.matched_generated_smiles_with_rxn = dict()
         # Track the evolution of reaction classes/names (if applicable)
-        self.smiles_to_rxn_tracker = dict()  # Dict[str, List[Tuple[int, str, str]]] --> {smiles: [(depth, rxn_class, rxn_name), ...]}
+        self.smiles_rxn_tracker = dict()  # Dict[str, List[Tuple[int, str, str]]] --> {smiles: [(depth, rxn_class, rxn_name), ...]}
 
     def __call__(
         self, 
@@ -276,15 +276,7 @@ class Syntheseus(OracleComponent):
                         max_reward = 0.0
                         max_depth = self._get_max_depth(route)
 
-                        # FIXME: Should be redundant as the generated SMILES is already tracked above
-                        # Loop through the nodes in the route to ensure the root node (generated molecule) is tracked
-                        for node, node_data in route.items():
-                            # First extract the generated molecule
-                            if node_data["depth"] == 0:
-                                generated_smiles = canonicalize_smiles(node_data["smiles"])
-                                break
-
-                        # Loop through the nodes again, this time computing the reward for each node
+                        # Loop through the nodes and compute the reward for each node
                         for node, node_data in route.items():
                             # Skip root node because this is the generated molecule
                             if node_data["depth"] == 0:
@@ -402,6 +394,9 @@ class Syntheseus(OracleComponent):
                             rxn_info = ast.literal_eval(extraction_result.stdout)
 
                             all_rxns.append((rxn_info["CLASS"], rxn_info["NAME"]))
+
+                    # Track all reactions present in the route
+                    self.smiles_rxn_tracker[generated_smiles] = all_rxns
 
                 # Assume the the reaction constraints are not satisfied
                 rxn_multiplier = 0.0
