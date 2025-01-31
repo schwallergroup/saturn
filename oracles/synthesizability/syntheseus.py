@@ -396,7 +396,14 @@ class Syntheseus(OracleComponent):
                             all_rxns.append((rxn_info["CLASS"], rxn_info["NAME"]))
 
                     # Track all reactions present in the route
-                    self.smiles_rxn_tracker[generated_smiles] = all_rxns
+                    self.smiles_rxn_tracker[generated_smiles] = {
+                        depth: {
+                            "rxn_smiles": rxn_smiles,
+                            "rxn_class": rxn_class,
+                            "rxn_name": rxn_name
+                        }
+                        for (depth, rxn_smiles), (rxn_class, rxn_name) in zip(reaction_depth_smiles, all_rxns)
+                    }
 
                 # Assume the the reaction constraints are not satisfied
                 rxn_multiplier = 0.0
@@ -547,7 +554,10 @@ class Syntheseus(OracleComponent):
                 assert len(output) == len(smiles), "Syntheseus output length mismatch."
             return output
 
-    def _write_config(self, dir_path: str) -> None:
+    def _write_config(
+        self, 
+        dir_path: str
+    ) -> None:
         """
         Syntheseus can take as input a yaml file for easy execution. Write this yaml file.
         """
@@ -710,6 +720,13 @@ class Syntheseus(OracleComponent):
         oracle_history.to_csv(os.path.join(self.output_dir, "top_synthesis_graphs", "top_synthesis_graphs.csv"), index=False)
 
         return solved_exists
+    
+    def _write_out_smiles_rxn_tracker(
+        self, 
+        path: str
+    ) -> None:
+        with open(os.path.join(path, "smiles_rxn_tracker.json"), "w") as f:
+            json.dump(self.smiles_rxn_tracker, f, indent=4)
 
     def _extract_syntheseus_route_data(
         self,

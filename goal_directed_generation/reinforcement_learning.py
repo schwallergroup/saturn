@@ -311,6 +311,7 @@ class ReinforcementLearningAgent:
 
         for oracle in self.oracle.oracle:
             if isinstance(oracle, Syntheseus):
+                oracle._write_out_smiles_rxn_tracker(base_save_path)
                 if oracle.save_top_routes:
                     solved_exists = oracle._write_out_top_synthesis_graphs(self.oracle.oracle_history)
                     if not solved_exists:
