@@ -1,0 +1,7 @@
+inventory_smiles_file: "/home/jeff/saturn-dev/tests/oracles/syntheseus/askcos-sigma-aldrich.smi"
+search_targets_file: "/home/jeff/saturn-dev/tests/oracles/syntheseus/testing-syntheseus/random-smiles.smi"
+model_class: "RetroKNN"
+time_limit_s: 180
+num_top_results: 1
+results_dir: "./dump"
+save_graph: false

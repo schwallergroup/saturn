@@ -358,8 +358,8 @@ class Syntheseus(OracleComponent):
                         # Write the reaction SMILES to a temp file
                         temp_rxn_smiles_file = os.path.join(temp_dir, "rxn_smiles.smi")
                         with open(temp_rxn_smiles_file, "w") as f:
-                            for idx, (_, rxn_smiles) in enumerate(reaction_depth_smiles):
-                                if idx < len(reaction_depth_smiles) - 1:
+                            for write_idx, (_, rxn_smiles) in enumerate(reaction_depth_smiles):
+                                if write_idx < len(reaction_depth_smiles) - 1:
                                     f.write(f"{rxn_smiles}\n")
                                 else:
                                     f.write(f"{rxn_smiles}")
