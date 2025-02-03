@@ -37,6 +37,22 @@ from utils.utils import set_seed_everywhere
 #       "2.1.2 Carboxylic acid + amine condensation [N-acylation to amide]"
 # ]
 
+# Expected Rxn-INSIGHT and NameRXN outputs for enforced block molecule
+# Rxn-INSIGHT: [
+#       "Reduction, Reduction of nitro groups to amines", 
+#       "Oxidation, Oxidation or Dehydrogenation of Alcohols to Aldehydes and Ketones", 
+#       "Deprotection, Hydrogenolysis of tertiary amines", 
+#       "Acylation, N-alkylation of secondary amines with alkyl halides", 
+#       "Acylation, Carboxylic acid with primary amine to amide"
+# ]
+# NameRXN: [
+#       "7.1.1 Nitro to amino [Nitro to amine reduction]",
+#       "8.1.5 Alcohol to ketone oxidation [Alcohols to aldehydes]",
+#       "6.1.5 N-Bn deprotection [NH deprotections]",
+#       "2.1.1 Amide Schotten-Baumann [N-acylation to amide]",
+#       "2.1.2 Carboxylic acid + amine condensation [N-acylation to amide]"
+# ]
+
 assert torch.cuda.is_available(), "CUDA is not available"
 set_seed_everywhere(
     seed=0,
@@ -80,7 +96,7 @@ def base_oracle_params() -> dict:
             "building_blocks_file": os.path.join(CURRENT_DIR, "askcos-sigma-aldrich.smi"),
             "enforced_building_blocks": {
                 "enforce_blocks": False,
-                "enforced_building_blocks_file": os.path.join(CURRENT_DIR, "enforced-suzuki-stock-10.smi"),
+                "enforced_building_blocks_file": os.path.join(CURRENT_DIR, "enforced-stock.smi"),
                 "enforce_start": False,
                 "use_dense_reward": True,
                 "reward_type": "tango_fms",
@@ -393,9 +409,11 @@ def test_avoid_rxn_class_synthesizability(aripiprazole_mol, base_oracle_params):
     # Test enforcing all reactions
     shutil.rmtree(base_oracle_params["specific_parameters"]["results_dir"])
     
-def test_enforce_block_synthesizability(enforced_block_mol, base_oracle_params):
+def test_enforced_block_synthesizability(enforced_block_mol, aripiprazole_mol, base_oracle_params):
     """
-    Synthesizability where *all* reactions in the synthesis graph match the user-specified reaction classes.
+    Synthesizability with enforced building block.
+    
+    NOTE: When testing dense reward matching, only TANGO is used.
     """
     # Parameters for reaction enforcing
     base_oracle_params["reward_shaping_function_parameters"] = {
@@ -440,9 +458,172 @@ def test_enforce_block_synthesizability(enforced_block_mol, base_oracle_params):
     # There are no reaction constraints so the matched_generated_smiles_with_rxn should be empty
     assert syntheseus_oracle.matched_generated_smiles_with_rxn == {}
 
+    # Test TANGO (0.5 Tanimoto and 0.5 FMS) dense reward matching
+    base_oracle_params["specific_parameters"]["enforced_building_blocks"]["tango_weights"] = {
+        "tanimoto": 0.50,
+        "fg": 0.50,
+        "fms": 0.50
+    }
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    block_solved = syntheseus_oracle(
+        mols=np.array([aripiprazole_mol, enforced_block_mol]),
+        oracle_calls=1
+    )
+    assert len(block_solved) == 2
+    assert abs(block_solved[0] - 0.33370288) < 1e-6
+    assert block_solved[1] == 1
+
+    # Test TANGO (0.75 Tanimoto and 0.25 FMS) dense reward matching
+    base_oracle_params["specific_parameters"]["enforced_building_blocks"]["tango_weights"] = {
+        "tanimoto": 0.75,
+        "fg": 0.25,
+        "fms": 0.25
+    }
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+
+    block_solved = syntheseus_oracle(
+        mols=np.array([aripiprazole_mol, enforced_block_mol]),
+        oracle_calls=1
+    )
+    assert len(block_solved) == 2
+    assert abs(block_solved[0] - 0.22782705) < 1e-6
+    assert block_solved[1] == 1
+
+    # Test TANGO (1.0 Tanimoto and 0.0 FMS) dense reward matching
+    base_oracle_params["specific_parameters"]["enforced_building_blocks"]["tango_weights"] = {
+        "tanimoto": 1.0,
+        "fg": 0.0,
+        "fms": 0.0
+    }
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+
+    block_solved = syntheseus_oracle(
+        mols=np.array([aripiprazole_mol, enforced_block_mol]),
+        oracle_calls=1
+    )
+    assert len(block_solved) == 2
+    assert abs(block_solved[0] - 0.12195121) < 1e-6
+    assert block_solved[1] == 1
+
     shutil.rmtree(base_oracle_params["specific_parameters"]["results_dir"])
 
+def test_enforced_block_rxn_class_synthesizability(enforced_block_mol, aripiprazole_mol, base_oracle_params):
+    """
+    Synthesizability with enforced building block and reaction class.
+    """
+    # Parameters for reaction enforcing
+    base_oracle_params["reward_shaping_function_parameters"] = {
+        "transformation_function": "no_transformation"
+    }
+    base_oracle_params["specific_parameters"]["enforced_building_blocks"]["enforce_blocks"] = True
+    base_oracle_params["specific_parameters"]["enforced_building_blocks"]["enforced_building_blocks_file"] = os.path.join(CURRENT_DIR, "enforced-stock.smi")
+    base_oracle_params["specific_parameters"]["enforced_building_blocks"]["use_dense_reward"] = True
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_rxn_class_presence"] = True
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["williamson"]
 
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    block_solved = syntheseus_oracle(
+        mols=np.array([aripiprazole_mol]),
+        oracle_calls=1
+    )
+    assert len(block_solved) == 1
+    assert abs(block_solved[0] - 0.33370288) < 1e-6
+
+    assert syntheseus_oracle.matched_generated_smiles == {
+        1: []
+    }
+    # Even though aripirazole's route contains Williamson Ether Reaction, the enforced block reward is not 1.0, so the tracker below should not be populated
+    assert syntheseus_oracle.matched_generated_smiles_with_rxn == {
+        1: []
+    }
+
+    # Test enforced block molecule satisfies both conditions
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["to amide"]
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    block_solved = syntheseus_oracle(
+        mols=np.array([enforced_block_mol]),
+        oracle_calls=1
+    )
+    assert len(block_solved) == 1
+    assert (block_solved == np.array([1])).all()
+
+    assert syntheseus_oracle.matched_generated_smiles == {
+        1: [
+            "Cc1ccc(CC(=O)Nc2ccc(C(=O)N3CCC(=O)C3)o2)cc1",
+        ]
+    }
+    assert syntheseus_oracle.matched_generated_smiles_with_rxn == {
+        1: [
+            "Cc1ccc(CC(=O)Nc2ccc(C(=O)N3CCC(=O)C3)o2)cc1",
+        ]
+    }
+
+    # Test the scenario where the block is matched but the reaction is not
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["wittig"]
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    block_solved = syntheseus_oracle(
+        mols=np.array([enforced_block_mol]),
+        oracle_calls=1
+    )
+    assert len(block_solved) == 1
+    assert (block_solved == np.array([0])).all()  # The block is matched but the reaction is not, so the reward should be 0
+
+    assert syntheseus_oracle.matched_generated_smiles == {
+        1: [
+            "Cc1ccc(CC(=O)Nc2ccc(C(=O)N3CCC(=O)C3)o2)cc1",
+        ]
+    }
+    # The reaction is not in the route, so this tracker should be empty
+    assert syntheseus_oracle.matched_generated_smiles_with_rxn == {
+        1: []
+    }
+
+    # Test the scenario where both block and reaction are matched but this time with NameRXN
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["use_namerxn"] = True
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["amide schotten-baumann"]
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    block_solved = syntheseus_oracle(
+        mols=np.array([enforced_block_mol]),
+        oracle_calls=1
+    )
+    assert len(block_solved) == 1
+    assert (block_solved == np.array([1])).all()
+
+    assert syntheseus_oracle.matched_generated_smiles == {
+        1: [
+            "Cc1ccc(CC(=O)Nc2ccc(C(=O)N3CCC(=O)C3)o2)cc1",
+        ]
+    }
+    assert syntheseus_oracle.matched_generated_smiles_with_rxn == {
+        1: [
+            "Cc1ccc(CC(=O)Nc2ccc(C(=O)N3CCC(=O)C3)o2)cc1",
+        ]
+    }
+
+    # Test enforce start (expect False)
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_rxn_class_presence"] = False
+    base_oracle_params["specific_parameters"]["enforced_building_blocks"]["enforce_start"] = True
+    # Test brute-force matching
+    base_oracle_params["specific_parameters"]["enforced_building_blocks"]["use_dense_reward"] = False
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    block_solved = syntheseus_oracle(
+        mols=np.array([enforced_block_mol]),
+        oracle_calls=1
+    )
+    assert len(block_solved) == 1
+    assert (block_solved == np.array([0])).all()
+
+    # Test dense reward matching
+    base_oracle_params["specific_parameters"]["enforced_building_blocks"]["use_dense_reward"] = True
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    block_solved = syntheseus_oracle(
+        mols=np.array([enforced_block_mol]),
+        oracle_calls=1
+    )
+    assert len(block_solved) == 1
+    assert abs(block_solved[0] - 0.24447174) < 1e-6
+
+    shutil.rmtree(base_oracle_params["specific_parameters"]["results_dir"])
 
 
 
