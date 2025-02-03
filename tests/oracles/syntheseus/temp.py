@@ -45,7 +45,7 @@ def extract_rxn_data(route: Set[Any]) -> Dict[str, Union[str, int]]:
 
     return syntheseus_route_data
 
-file_path = "/home/jeff/saturn-dev/tests/oracles/syntheseus/aripiprazole-route.pkl"
+file_path = "/home/jeff/saturn-dev/tests/oracles/syntheseus/testing-syntheseus/dump/RetroKNN_2025-02-03T09:29:59/route_0.pkl"
 
 data = extract_data(file_path, "rxn")
 print(data)

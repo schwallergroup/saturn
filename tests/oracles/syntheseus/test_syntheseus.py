@@ -1,5 +1,6 @@
 import pytest
 import os
+import shutil
 import pickle
 import torch
 import numpy as np
@@ -16,8 +17,26 @@ from oracles.synthesizability.syntheseus import Syntheseus
 from utils.utils import set_seed_everywhere
 
 # Expected Rxn-INSIGHT and NameRXN output for aripiprazole
-# RXN-INSIGHT: ["Heteroatom Alkylation and Arylation, Williamson Ether Synthesis", "Heteroatom Alkylation and Arylation, N-alkylation of secondary amines with alkyl halides"]
-# NameRXN: ["1.7.9 Williamson ether synthesis [O-substitution]", "1.6.2 Bromo N-alkylation [Heteroaryl N-alkylation]"]
+# Rxn-INSIGHT: [
+#       "Heteroatom Alkylation and Arylation, Williamson Ether Synthesis", 
+#       "Heteroatom Alkylation and Arylation, N-alkylation of secondary amines with alkyl halides"
+# ]
+# NameRXN: [
+#       "1.7.9 Williamson ether synthesis [O-substitution]", 
+#       "1.6.2 Bromo N-alkylation [Heteroaryl N-alkylation]"
+# ]
+
+# Expected Rxn-INSIGHT and NameRXN output for amide
+# Rxn-INSIGHT: [
+#       "Heteroatom Alkylation and Arylation, N-alkylation of secondary amines with alkyl halides", 
+#       "Deprotection, Ester saponification (alkyl deprotection)",
+#       "Acylation, Carboxylic acid with primary amine to amide"
+# ]
+# NameRXN: [
+#       "1.6.4 Chloro N-alkylation [Heteroaryl N-alkylation]",
+#       "6.2.1 CO2H-Et deprotection [RCO2H deprotections]",
+#       "2.1.2 Carboxylic acid + amine condensation [N-acylation to amide]"
+# ]
 
 assert torch.cuda.is_available(), "CUDA is not available"
 set_seed_everywhere(
@@ -136,7 +155,7 @@ def test_normal_synthesizability(aripiprazole_mol, aripiprazole_hexane_chain_mol
     assert len(solved) == 2, "Expected 2 molecules in the SMILES list"
     assert (solved == np.array([2, -99])).all(), "Expected the aripiprazole to be solved and the hexane chain to be unsolvable"
 
-def test_rxn_class_synthesizability(aripiprazole_mol, base_oracle_params):
+def test_rxn_class_synthesizability(aripiprazole_mol, amide_mol, base_oracle_params):
     """
     Synthesizability with a specific reaction class.
     """
@@ -166,11 +185,22 @@ def test_rxn_class_synthesizability(aripiprazole_mol, base_oracle_params):
     )
     assert len(rxn_insight_solved) == 2, "Expected 2 molecules in the SMILES list"
     assert (rxn_insight_solved == np.array([1, 0])).all(), "Expected amide molecule to not contain Williamson Ether Reaction"
+
+    # Test aripiprazole does not contain Amide reaction and that the Amide molecule does
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["to amide"]
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    rxn_insight_solved = syntheseus_oracle(
+        mols=np.array([aripiprazole_mol, amide_mol]),
+        oracle_calls=1
+    )
+    assert len(rxn_insight_solved) == 2, "Expected 2 molecules in the SMILES list"
+    assert (rxn_insight_solved == np.array([0, 1])).all(), "Expected aripiprazole to not contain Amide Reaction and that the Amide molecule does"
     
     # ------------
     # Test NameRXN
     # ------------
     base_oracle_params["specific_parameters"]["enforced_reactions"]["use_namerxn"] = True
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["williamson"]
     syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
     namerxn_solved = syntheseus_oracle(
         mols=np.array([aripiprazole_mol]),
@@ -185,3 +215,15 @@ def test_rxn_class_synthesizability(aripiprazole_mol, base_oracle_params):
     )
     assert len(namerxn_solved) == 2, "Expected 2 molecules in the SMILES list"
     assert (namerxn_solved == np.array([1, 0])).all(), "Expected amide molecule to not contain Williamson Ether Reaction"
+
+    # Test aripiprazole does not contain Amide reaction and that the Amide molecule does
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["to amide"]
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    namerxn_solved = syntheseus_oracle(
+        mols=np.array([aripiprazole_mol, amide_mol]),
+        oracle_calls=1
+    )
+    assert len(namerxn_solved) == 2, "Expected 2 molecules in the SMILES list"
+    assert (namerxn_solved == np.array([0, 1])).all(), "Expected aripiprazole to not contain Amide Reaction and that the Amide molecule does"
+
+    shutil.rmtree(base_oracle_params["specific_parameters"]["results_dir"])
