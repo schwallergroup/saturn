@@ -20288,3 +20288,6 @@ O=S(=O)(F)Oc1ccc(S(=O)(=O)c2ccc(OS(=O)(=O)F)cc2)cc1
 CC1(C)OC(=O)C(c2c(F)c(F)nc(F)c2F)=C(O)O1
 O=C1OC2(CCCCC2)OC(O)=C1c1c([N+](=O)[O-])ccc(F)c1F
 O=S(=O)(O)C(O)CCCC(O)S(=O)(=O)O
+Nc1oc(C(O)=O)cc1
+c1(CNC2)c2cncn1
+O=C(O)Cc1ccc(C)cc1

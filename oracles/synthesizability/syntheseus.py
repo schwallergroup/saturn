@@ -134,10 +134,7 @@ class Syntheseus(OracleComponent):
         self.smiles = None
 
         # Guard against invalid combination of parameters
-        if (not self.enforced_building_blocks_parameters.enforce_blocks) and \
-           (not self.enforced_reactions_parameters.enforce_rxn_class_presence) and \
-           (len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0):
-            assert self.parameters.reward_shaping_function_parameters["transformation_function"] == "binary", "The run specifies to enforce neither building blocks nor reaction classes, please use the Binary Reward Shaping function."
+        self._guard_against_invalid_parameters()
 
         # Trackers for matched SMILES under building block and reaction class constraints
         self.matched_generated_smiles = dict()
@@ -200,8 +197,8 @@ class Syntheseus(OracleComponent):
         # 3. Write the SMILES to the temporary directory
         with open(os.path.join(temp_dir, "smiles.smi"), "w") as f:
             # Syntheseus does not accept empty lines
-            for idx, s in enumerate(smiles):
-                if idx < len(smiles) - 1:
+            for batch_idx, s in enumerate(smiles):
+                if batch_idx < len(smiles) - 1:
                     f.write(f"{s}\n")
                 else:
                     f.write(f"{s}")
@@ -341,6 +338,9 @@ class Syntheseus(OracleComponent):
                 if (self.enforced_reactions_parameters.enforce_rxn_class_presence and int(is_solved[idx]) == 1) or \
                    (self.enforced_reactions_parameters.avoid_rxn_classes and int(is_solved[idx]) == 1):
 
+                    if oracle_calls not in self.matched_generated_smiles_with_rxn:
+                        self.matched_generated_smiles_with_rxn[oracle_calls] = []
+
                     route = self._extract_syntheseus_route_data(
                         route_path=os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
                         data_type="rxn"
@@ -411,10 +411,6 @@ class Syntheseus(OracleComponent):
 
                 # If the molecule is solved *and* the user specified to enforce that a set of reaction classes appears in the synthesis graph
                 if self.enforced_reactions_parameters.enforce_rxn_class_presence and int(is_solved[idx]) == 1:
-
-                    if oracle_calls not in self.matched_generated_smiles_with_rxn:
-                        self.matched_generated_smiles_with_rxn[oracle_calls] = []
-
                     for rxn_class, rxn_name in all_rxns_labels:  # Un-pack each (rxn_class, rxn_name) pair
                         for enforced_rxn_class in self.enforced_rxn_classes:
                             # Convert to lower-case for more robust string comparison
@@ -505,12 +501,11 @@ class Syntheseus(OracleComponent):
                                 node_rewards[idx] = 1.0
                             else:
                                 node_rewards[idx] = node_rewards[idx] * 1.0
-
+ 
                     if node_rewards[idx] == 1.0:
                         self.matched_generated_smiles_with_rxn[oracle_calls].append(canonicalize_smiles(generated_smiles))
                         with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
                             json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)          
-
 
             # HACK: In case a molecule is in the building blocks stock, Syntheseus returns 0. 
             #       Set these to 1 to work with Binary Reward Shaping
@@ -792,3 +787,18 @@ class Syntheseus(OracleComponent):
         else:
             # TODO: Support all the models in Syntheseus 
             raise ValueError(f"Model name {model_name} not recognized or not supported yet.")
+
+    def _guard_against_invalid_parameters(self) -> None:
+        """
+        Guard against invalid combinations of parameters.
+        """
+        if (not self.enforced_building_blocks_parameters.enforce_blocks) and \
+           (not self.enforced_reactions_parameters.enforce_rxn_class_presence) and \
+           (len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0):
+            assert self.parameters.reward_shaping_function_parameters["transformation_function"] == "binary", "The run specifies to enforce neither building blocks nor reaction classes, please use the Binary Reward Shaping function. A Reverse Sigmoid Reward Shaping function can also be used to incentivize minimizing path length."
+
+        if self.enforced_reactions_parameters.enforce_rxn_class_presence and len(self.enforced_reactions_parameters.enforced_rxn_classes) == 0:
+            raise ValueError("The run specifies to enforce a reaction class but no reaction classes were provided.")
+
+        if self.enforced_reactions_parameters.enforce_all_reactions and len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0:
+            raise ValueError("The run specifies to enforce all reactions but also specifies to avoid certain reaction classes. Enforcing all reactions implies reactions not in the list are avoided. Please set `avoid_rxn_classes` to an empty list when enforcing all reactions.")

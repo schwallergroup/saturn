@@ -121,18 +121,21 @@ class ReinforcementLearningAgent:
             # 1. Sample unique SMILES from the Agent
             seqs, smiles, _ = sample_unique_sequences(self.agent, self.batch_size)
 
-            # 2. Compute Validity and guard against Agent drift leading to invalid SMILES
+            # 2. Remove molecules with radicals
+            smiles = chemistry_utils.remove_molecules_with_radicals(smiles)
+
+            # 3. Compute Validity and guard against Agent drift leading to invalid SMILES
             # NOTE: This is a rare occurrence and has been observed with repeated 0 reward batches
             # This has also been reported in https://link.springer.com/article/10.1007/s10994-024-06519-w
             reset, validity = self._validity_drift_guard(smiles)
             if reset:
                 continue
 
-            # 3. Beam Enumeration: Filter SMILES using the Beam Enumeration pool
+            # 4. Beam Enumeration: Filter SMILES using the Beam Enumeration pool
             if (self.execute_beam_enumeration) and (len(self.beam_enumeration.pool) != 0):
                 seqs, smiles = self.beam_enumeration.filter_batch(seqs, smiles)
 
-            # 4. Beam Enumeration: If all SMILES are filtered, proceed to generate a new batch
+            # 5. Beam Enumeration: If all SMILES are filtered, proceed to generate a new batch
             if len(smiles) == 0:
                 self.beam_enumeration.filtered_epoch_updates()
                 if self.beam_enumeration.patience_limit_reached():
@@ -140,11 +143,11 @@ class ReinforcementLearningAgent:
                     break
                 continue
 
-            # 5. Oracle call on sampled batch
+            # 6. Oracle call on sampled batch
             #    Rewards are already penalized by the Diversity Filter
             smiles, penalized_rewards = self.oracle(smiles, self.diversity_filter)
 
-            # 6. Beam Enumeration: Check whether to execute Beam Enumeration
+            # 7. Beam Enumeration: Check whether to execute Beam Enumeration
             #    NOTE: Beam Enumeration execution criterion is based only on the *sampled* batch
             if self.execute_beam_enumeration:
                 self.beam_enumeration.epoch_updates(
@@ -154,12 +157,12 @@ class ReinforcementLearningAgent:
                     oracle_calls=self.oracle.calls
                 )
 
-            # 7. Hallucinated Memory: Hallucinate new SMILES from the Replay Buffer
+            # 8. Hallucinated Memory: Hallucinate new SMILES from the Replay Buffer
             if (self.execute_hallucinated_memory) and (len(self.replay_buffer.memory) == self.replay_buffer.memory_size):
                 hallucinated_smiles = self.hallucinator.hallucinate(self.replay_buffer.memory)
-                # 8. Hallucinated Memory: Oracle call on hallucinated batch
+                # 9. Hallucinated Memory: Oracle call on hallucinated batch
                 hallucinated_smiles, hallucinated_penalized_rewards = self.oracle(hallucinated_smiles, self.diversity_filter, is_hallucinated_batch=True)
-                # 9. Update the hallucination history
+                # 10. Update the hallucination history
                 self.hallucinator.epoch_updates(
                     oracle_calls=self.oracle.calls,
                     buffer_rewards=self.replay_buffer.memory["reward"],
@@ -169,33 +172,33 @@ class ReinforcementLearningAgent:
             else:
                 hallucinated_smiles, hallucinated_penalized_rewards = np.array([]), np.array([])
 
-            # 10. Concatenate sampled batch with hallucinated batch
+            # 11. Concatenate sampled batch with hallucinated batch
             # TODO: Hallucinated SMILES' loss could be scaled via Importance Sampling
             smiles = np.concatenate((smiles, hallucinated_smiles), 0)
             penalized_rewards = np.concatenate((penalized_rewards, hallucinated_penalized_rewards), 0)
 
-            # 11. Compute the loss
+            # 12. Compute the loss
             #     "smiles" contains the concatenated sampled and hallucinated SMILES
             loss = self.compute_loss(smiles, penalized_rewards)
 
-            # 12. Update Replay Buffer
+            # 13. Update Replay Buffer
             self.replay_buffer.add(
                 smiles=smiles,
                 rewards=penalized_rewards
             )
 
-            # 13. Add experience replay to the loss
+            # 14. Add experience replay to the loss
             #     NOTE: this is done *after* updating the Replay Buffer so new best-so-far sampled *and* hallucinated SMILES can be sampled
             er_smiles, er_rewards = self.replay_buffer.sample_memory()
 
-            # 14. Compute the loss for the experience replay SMILES
+            # 15. Compute the loss for the experience replay SMILES
             er_loss = self.compute_loss(er_smiles, er_rewards)
         
-            # 15. Concatenate losses to get the total loss and backpropagate
+            # 16. Concatenate losses to get the total loss and backpropagate
             loss = torch.cat((loss, er_loss), 0)
             self.backpropagate(loss)
 
-            # 16. Augmented Memory
+            # 17. Augmented Memory
             if self.augmented_memory and len(self.replay_buffer.memory) > 0:
                 # NOTE: *Highly* recommended that Selective Memory Purge is enabled
                 #       All penalized scaffolds are removed from the Replay Buffer *before* executing Augmented Memory
@@ -212,14 +215,14 @@ class ReinforcementLearningAgent:
                     loss = torch.cat((loss, augmented_memory_loss), 0)
                     self.backpropagate(loss)
 
-            # 17. Intermediate results write-out
+            # 18. Intermediate results write-out
             if self.oracle.calls > self.logging_frequency * self.logging_multiple:
                 logging.info(f"Logging intermediate results at {self.oracle.calls} oracle calls.")
                 self._write_out_results()
                 self.agent.save(os.path.join(self.model_checkpoints_dir, f"{self.agent.model_architecture}_{self.oracle.calls}_agent.ckpt"))
                 self.logging_multiple += 1
 
-            # 18. Checkpoint best Agent (by average reward)
+            # 19. Checkpoint best Agent (by average reward)
             if (np.mean(penalized_rewards) > self.best_agent_reward) and (validity > 0.5):
                 self.best_agent_reward = np.mean(penalized_rewards)
                 self.agent.save(os.path.join(self.model_checkpoints_dir, "best_agent.ckpt"))

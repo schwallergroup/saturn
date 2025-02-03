@@ -102,3 +102,13 @@ def construct_morgan_fingerprints_batch_from_file(file_path: str) -> List[np.nda
     with open(file_path, "r") as f:
         smiles_batch = f.readlines()
     return construct_morgan_fingerprints_batch(smiles_batch)
+
+def remove_molecules_with_radicals(smiles_batch: np.ndarray[str]) -> np.ndarray[str]:
+    """
+    Remove molecules with radicals from a batch of SMILES strings.
+    """
+    def has_radicals(smiles: str) -> bool:
+        mol = Chem.MolFromSmiles(smiles)
+        return any(atom.GetNumRadicalElectrons() > 0 for atom in mol.GetAtoms())
+
+    return np.array([smiles for smiles in smiles_batch if not has_radicals(smiles)])
