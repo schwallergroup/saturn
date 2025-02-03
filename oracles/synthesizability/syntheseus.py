@@ -297,13 +297,10 @@ class Syntheseus(OracleComponent):
                                 enforced_building_blocks_file=self.enforced_building_blocks_file
                             )
                             if is_matched:
-                                self.matched_generated_smiles[oracle_calls].append(canonicalize_smiles(matched_block_smiles))
+                                self.matched_generated_smiles[oracle_calls].append(canonicalize_smiles(generated_smiles))
                                 break
                     
                         node_rewards[idx] = max_reward
-
-                        with open(os.path.join(self.output_dir, "matched_generated_smiles.json"), "w") as f:
-                            json.dump(self.matched_generated_smiles, f, indent=4)
                     
                     # Otherwise, match *exactly*
                     else:
@@ -323,10 +320,14 @@ class Syntheseus(OracleComponent):
                                 enforced_building_blocks_file=self.enforced_building_blocks_file
                             )
                             if is_matched:
+                                self.matched_generated_smiles[oracle_calls].append(canonicalize_smiles(generated_smiles))
                                 break
 
                         is_solved[idx] = int(is_matched)
                         steps[idx] = steps[idx] if is_matched else 99
+
+                    with open(os.path.join(self.output_dir, "matched_generated_smiles.json"), "w") as f:
+                        json.dump(self.matched_generated_smiles, f, indent=4)
 
                 # ------------------
                 # ENFORCED REACTIONS
@@ -533,14 +534,19 @@ class Syntheseus(OracleComponent):
         shutil.rmtree(temp_dir)
 
         # 9. Prepare and/or return the output
-        if self.enforced_building_blocks_parameters.enforce_blocks or \
-           self.enforced_reactions_parameters.enforce_rxn_class_presence or \
+        if (self.enforced_building_blocks_parameters.enforce_blocks) or \
+           (self.enforced_reactions_parameters.enforce_rxn_class_presence) or \
            len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0:
 
-            if not self.parallelize:
-                assert len(node_rewards) == len(smiles), "Syntheseus output length mismatch."
+            if not self.enforced_building_blocks_parameters.use_dense_reward:
+                assert len(is_solved) == len(smiles), "Syntheseus output length mismatch."
+                return is_solved
 
-            return node_rewards
+            else:
+                if not self.parallelize:
+                    assert len(node_rewards) == len(smiles), "Syntheseus output length mismatch."
+
+                return node_rewards
 
         elif self.optimize_path_length:
             if not self.parallelize:
