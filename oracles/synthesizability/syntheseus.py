@@ -300,7 +300,7 @@ class Syntheseus(OracleComponent):
                                 enforced_building_blocks_file=self.enforced_building_blocks_file
                             )
                             if is_matched:
-                                self.matched_generated_smiles[oracle_calls].append(generated_smiles)
+                                self.matched_generated_smiles[oracle_calls].append(canonicalize_smiles(matched_block_smiles))
                                 break
                     
                         node_rewards[idx] = max_reward
@@ -420,8 +420,7 @@ class Syntheseus(OracleComponent):
                             # Convert to lower-case for more robust string comparison
                             if (enforced_rxn_class.lower() in rxn_class.lower()) or (enforced_rxn_class.lower() in rxn_name.lower()):
                                 rxn_multiplier = 1.0
-                            # If not enforcing all reactions, then finding *a* match is sufficient
-                            if (rxn_multiplier == 1.0) and (not self.enforced_reactions_parameters.enforce_all_reactions):
+                            if rxn_multiplier == 1.0:
                                 break
 
                     # -----------------------------------------------------------------------------------------------
@@ -432,35 +431,42 @@ class Syntheseus(OracleComponent):
                         # Check if the node exactly matches an enforced building block
                         if self.enforced_building_blocks_parameters.enforce_blocks: 
                             if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                                self.matched_generated_smiles_with_rxn[oracle_calls].append(canonicalize_smiles(generated_smiles))
 
                         elif not self.enforced_building_blocks_parameters.enforce_blocks:
                             # If the reaction class is matched, then the node reward is 1
                             if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                                self.matched_generated_smiles_with_rxn[oracle_calls].append(canonicalize_smiles(generated_smiles))
 
                     # ------------------------------------------------------------------------
                     # NOTE: This block of code is only relevant when enforcing *all* reactions
                     # ------------------------------------------------------------------------
 
                     elif self.enforced_reactions_parameters.enforce_all_reactions:
-                        for rxn_class, rxn_name in all_rxns_labels:   # Un-pack each (rxn_class, rxn_name) pair
-                            for enforced_rxn_class in self.enforced_rxn_classes:
-                                if (enforced_rxn_class.lower() in rxn_class.lower()) or (enforced_rxn_class.lower() in rxn_name.lower()):
-                                    break
-                                else:
+                        # Previously, *any* reaction match was checked and a match was assigned rxn_multiplier = 1.0, 
+                        # if rxn_multiplier = 0.0, that implies that it is *impossible* for all reactions to be matched
+                        if rxn_multiplier == 1.0:
+                            # Check each reaction in the route matches at least one enforced reaction
+                            for rxn_class, rxn_name in all_rxns_labels:
+                                matched_current_rxn = False
+                                for enforced_rxn_class in self.enforced_rxn_classes:
+                                    if (enforced_rxn_class.lower() in rxn_class.lower()) or (enforced_rxn_class.lower() in rxn_name.lower()):
+                                        matched_current_rxn = True
+                                        break
+                                # If the reaction does not match any enforced reaction, set multiplier to 0
+                                if not matched_current_rxn:
                                     rxn_multiplier = 0.0
                                     break
                         
                         # Enforcing blocks and *all* reactions
                         if self.enforced_building_blocks_parameters.enforce_blocks:
                             if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                                self.matched_generated_smiles_with_rxn[oracle_calls].append(canonicalize_smiles(generated_smiles))
 
                         # Only enforcing *all* reactions
                         else:
                             if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                                self.matched_generated_smiles_with_rxn[oracle_calls].append(canonicalize_smiles(generated_smiles))
 
                     # Reaching this code requires that there is a solved route
                     # This truncates the node reward to 0 if the reaction class is not matched (assuming enforced blocks are also being considered)
@@ -501,7 +507,7 @@ class Syntheseus(OracleComponent):
                                 node_rewards[idx] = node_rewards[idx] * 1.0
 
                     if node_rewards[idx] == 1.0:
-                        self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                        self.matched_generated_smiles_with_rxn[oracle_calls].append(canonicalize_smiles(generated_smiles))
                         with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
                             json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)          
 

@@ -7,7 +7,6 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import Mol
 
-
 import sys
 sys.path.append("../../../")
 
@@ -16,7 +15,7 @@ from oracles.synthesizability.syntheseus import Syntheseus
 
 from utils.utils import set_seed_everywhere
 
-# Expected Rxn-INSIGHT and NameRXN output for aripiprazole
+# Expected Rxn-INSIGHT and NameRXN outputs for aripiprazole
 # Rxn-INSIGHT: [
 #       "Heteroatom Alkylation and Arylation, Williamson Ether Synthesis", 
 #       "Heteroatom Alkylation and Arylation, N-alkylation of secondary amines with alkyl halides"
@@ -26,7 +25,7 @@ from utils.utils import set_seed_everywhere
 #       "1.6.2 Bromo N-alkylation [Heteroaryl N-alkylation]"
 # ]
 
-# Expected Rxn-INSIGHT and NameRXN output for amide
+# Expected Rxn-INSIGHT and NameRXN outputs for amide molecule
 # Rxn-INSIGHT: [
 #       "Heteroatom Alkylation and Arylation, N-alkylation of secondary amines with alkyl halides", 
 #       "Deprotection, Ester saponification (alkyl deprotection)",
@@ -48,18 +47,18 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @pytest.fixture
 def aripiprazole_mol() -> Mol:
-    return Chem.MolFromSmiles("C1CC(=O)NC2=C1C=CC(=C2)OCCCCN3CCN(CC3)C4=C(C(=CC=C4)Cl)Cl")
+    return Chem.MolFromSmiles("O=C1CCc2ccc(OCCCCN3CCN(c4cccc(Cl)c4Cl)CC3)cc2N1")
 
 @pytest.fixture
 def aripiprazole_hexane_chain_mol() -> Mol:
     """
     Arbitrarily added a hexane chain to aripiprazole as a *non-solvable* control molecule.
     """
-    return Chem.MolFromSmiles("CCCCCCC1CC(=O)NC2=C1C=CC(=C2)OCCCCN3CCN(CC3)C4=C(C(=CC=C4)Cl)Cl")
+    return Chem.MolFromSmiles("CCCCCCC1CC(=O)Nc2cc(OCCCCN3CCN(c4cccc(Cl)c4Cl)CC3)ccc21")
 
 @pytest.fixture
 def amide_mol() -> Mol:
-    return Chem.MolFromSmiles("N(C1CCCCC1)C(C1CN(Cc2ccccc2)CCC1)=O")
+    return Chem.MolFromSmiles("O=C(NC1CCCCC1)C1CCCN(Cc2ccccc2)C1")
 
 @pytest.fixture
 def route_file() -> str:
@@ -130,7 +129,7 @@ def test_route_data(route_file):
             }
     
     # Check there are 5 molecule nodes
-    assert len(syntheseus_route_data) == 5, "Expected 5 molecule nodes in the route"
+    assert len(syntheseus_route_data) == 5
 
 def test_normal_synthesizability(aripiprazole_mol, aripiprazole_hexane_chain_mol, base_oracle_params):
     """
@@ -175,16 +174,16 @@ def test_rxn_class_synthesizability(aripiprazole_mol, amide_mol, base_oracle_par
         mols=np.array([aripiprazole_mol]),
         oracle_calls=1
     )
-    assert len(rxn_insight_solved) == 1, "Expected 1 molecule in the SMILES list"
-    assert (rxn_insight_solved == np.array([1])).all(), "Expected aripiprazole to contain Williamson Ether Reaction"
+    assert len(rxn_insight_solved) == 1
+    assert (rxn_insight_solved == np.array([1])).all()
 
     # Test 2 molecules
     rxn_insight_solved = syntheseus_oracle(
         mols=np.array([aripiprazole_mol, amide_mol]),
         oracle_calls=1
     )
-    assert len(rxn_insight_solved) == 2, "Expected 2 molecules in the SMILES list"
-    assert (rxn_insight_solved == np.array([1, 0])).all(), "Expected amide molecule to not contain Williamson Ether Reaction"
+    assert len(rxn_insight_solved) == 2
+    assert (rxn_insight_solved == np.array([1, 0])).all()
 
     # Test aripiprazole does not contain Amide reaction and that the Amide molecule does
     base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["to amide"]
@@ -193,8 +192,8 @@ def test_rxn_class_synthesizability(aripiprazole_mol, amide_mol, base_oracle_par
         mols=np.array([aripiprazole_mol, amide_mol]),
         oracle_calls=1
     )
-    assert len(rxn_insight_solved) == 2, "Expected 2 molecules in the SMILES list"
-    assert (rxn_insight_solved == np.array([0, 1])).all(), "Expected aripiprazole to not contain Amide Reaction and that the Amide molecule does"
+    assert len(rxn_insight_solved) == 2
+    assert (rxn_insight_solved == np.array([0, 1])).all()
     
     # ------------
     # Test NameRXN
@@ -205,16 +204,16 @@ def test_rxn_class_synthesizability(aripiprazole_mol, amide_mol, base_oracle_par
     namerxn_solved = syntheseus_oracle(
         mols=np.array([aripiprazole_mol]),
         oracle_calls=1)
-    assert len(namerxn_solved) == 1, "Expected 1 molecule in the SMILES list"
-    assert (namerxn_solved == np.array([1])).all(), "Expected aripiprazole to contain Williamson Ether Reaction"
+    assert len(namerxn_solved) == 1
+    assert (namerxn_solved == np.array([1])).all()
 
     # Test 2 molecules
     namerxn_solved = syntheseus_oracle(
         mols=np.array([aripiprazole_mol, amide_mol]),
         oracle_calls=1
     )
-    assert len(namerxn_solved) == 2, "Expected 2 molecules in the SMILES list"
-    assert (namerxn_solved == np.array([1, 0])).all(), "Expected amide molecule to not contain Williamson Ether Reaction"
+    assert len(namerxn_solved) == 2
+    assert (namerxn_solved == np.array([1, 0])).all()
 
     # Test aripiprazole does not contain Amide reaction and that the Amide molecule does
     base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["to amide"]
@@ -224,6 +223,117 @@ def test_rxn_class_synthesizability(aripiprazole_mol, amide_mol, base_oracle_par
         oracle_calls=1
     )
     assert len(namerxn_solved) == 2, "Expected 2 molecules in the SMILES list"
-    assert (namerxn_solved == np.array([0, 1])).all(), "Expected aripiprazole to not contain Amide Reaction and that the Amide molecule does"
+    assert (namerxn_solved == np.array([0, 1])).all()
+
+    assert syntheseus_oracle.matched_generated_smiles_with_rxn == {
+        1: [
+            "O=C(NC1CCCCC1)C1CCCN(Cc2ccccc2)C1"
+        ]
+    }
 
     shutil.rmtree(base_oracle_params["specific_parameters"]["results_dir"])
+
+def test_all_rxn_class_synthesizability(aripiprazole_mol, amide_mol, base_oracle_params):
+    """
+    Synthesizability where *all* reactions in the synthesis graph match the user-specified reaction classes.
+    """
+    # Parameters for reaction enforcing
+    base_oracle_params["reward_shaping_function_parameters"] = {
+        "transformation_function": "no_transformation"
+    }
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_rxn_class_presence"] = True
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_all_reactions"] = True
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["alkylation"]
+
+    # ----------------
+    # Test Rxn-INSIGHT
+    # ----------------
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["use_namerxn"] = False
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    rxn_insight_solved = syntheseus_oracle(
+        mols=np.array([aripiprazole_mol, amide_mol]),
+        oracle_calls=1
+    )
+    assert len(rxn_insight_solved) == 2
+    assert (rxn_insight_solved == np.array([1, 0])).all()
+
+    assert syntheseus_oracle.matched_generated_smiles_with_rxn == {
+        1: [
+            "O=C1CCc2ccc(OCCCCN3CCN(c4cccc(Cl)c4Cl)CC3)cc2N1",
+        ]
+    }
+
+    # Negative control
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["suzuki"]
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    rxn_insight_solved = syntheseus_oracle(
+        mols=np.array([aripiprazole_mol]),
+        oracle_calls=1
+    )
+    assert len(rxn_insight_solved) == 1
+    assert (rxn_insight_solved == np.array([0])).all()
+
+    assert syntheseus_oracle.matched_generated_smiles_with_rxn == {
+        1: []
+    }
+    
+    # ------------
+    # Test NameRXN
+    # ------------
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["use_namerxn"] = True
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["alkylation"]
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    namerxn_solved = syntheseus_oracle(
+        mols=np.array([aripiprazole_mol]),
+        oracle_calls=1
+    )
+    assert len(namerxn_solved) == 1
+    assert (namerxn_solved == np.array([0])).all()  # NameRXN's label for the Williamson Ether Reaction does not reference "alkylation"
+
+    # Positive control
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["williamson", "alkylation"]
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    namerxn_solved = syntheseus_oracle(
+        mols=np.array([aripiprazole_mol]),
+        oracle_calls=1
+    )
+    assert len(namerxn_solved) == 1
+    assert (namerxn_solved == np.array([1])).all()
+
+    assert syntheseus_oracle.matched_generated_smiles_with_rxn == {
+        1: [
+            "O=C1CCc2ccc(OCCCCN3CCN(c4cccc(Cl)c4Cl)CC3)cc2N1"
+        ]
+    }
+
+    # Test that the matched SMILES tracker tracks both SMILES
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["williamson", "alkylation", "deprotection", "to amide"]
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    namerxn_solved = syntheseus_oracle(
+        mols=np.array([aripiprazole_mol, amide_mol]),
+        oracle_calls=1
+    )
+    assert len(namerxn_solved) == 2
+    assert (namerxn_solved == np.array([1, 1])).all()
+
+    assert syntheseus_oracle.matched_generated_smiles_with_rxn == {
+        1: [
+            "O=C1CCc2ccc(OCCCCN3CCN(c4cccc(Cl)c4Cl)CC3)cc2N1",
+            "O=C(NC1CCCCC1)C1CCCN(Cc2ccccc2)C1"
+        ]
+    }
+
+    shutil.rmtree(base_oracle_params["specific_parameters"]["results_dir"])
+
+
+# avoid reaction
+# avoid reaction while enforcing a reaction
+# avoid reaction with enforcing all reactions
+
+# enforce block
+# enforce block + a reaction
+# enforce block + all reactions
+# enforce block + avoid reaction
+# enforce block + a reaction + avoid reaction
+
+# test the trackers as well
