@@ -101,8 +101,14 @@ def sample_products(
                 oracle_calls=1
             )
 
-            solved_smiles = [smiles for smiles, reward in 
-                            zip(smiles_batch, syntheseus_rewards) if reward == 1]
+            # Case where the user wants to enforce blocks *and* reactions
+            # TODO: Implement enumeration with enforced blocks in the future
+            if syntheseus_oracle.enforced_building_blocks_parameters.enforce_blocks and syntheseus_oracle.enforced_reactions_parameters.enforce_reactions:
+                solved_smiles = [smiles for smiles, reward in 
+                                 zip(smiles_batch, syntheseus_rewards) if reward != 0]
+            else:
+                solved_smiles = [smiles for smiles, reward in 
+                                 zip(smiles_batch, syntheseus_rewards) if reward == 1]
 
             enumerated_smiles.update(solved_smiles)
 
