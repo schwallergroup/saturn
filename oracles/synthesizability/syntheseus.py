@@ -297,6 +297,7 @@ class Syntheseus(OracleComponent):
                                 enforced_building_blocks_file=self.enforced_building_blocks_file
                             )
                             if is_matched:
+                                assert max_reward == 1.0
                                 self.matched_generated_smiles[oracle_calls].append(canonicalize_smiles(generated_smiles))
                                 break
                     
@@ -420,11 +421,11 @@ class Syntheseus(OracleComponent):
                             if rxn_multiplier == 1.0:
                                 break
 
-                    # -----------------------------------------------------------------------------------------------
-                    # NOTE: This block of code is only relevant when enforcing building blocks *and* reaction classes
-                    # -----------------------------------------------------------------------------------------------
+                    # -----------------------------------------------------------------------------------------------------------------------------------
+                    # NOTE: This block of code is only relevant when enforcing building blocks *and* reaction classes *and not* avoiding reaction classes
+                    # -----------------------------------------------------------------------------------------------------------------------------------
 
-                    if not self.enforced_reactions_parameters.enforce_all_reactions:
+                    if (not self.enforced_reactions_parameters.enforce_all_reactions) and (not self.enforced_reactions_parameters.avoid_rxn_classes):
                         # Check if the node exactly matches an enforced building block
                         if self.enforced_building_blocks_parameters.enforce_blocks: 
                             if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
@@ -495,18 +496,25 @@ class Syntheseus(OracleComponent):
                     else:
                         # Being very careful here: if the avoid_rxn_multiplier is 0.0, then the reward can automatically be set to 0.0
                         if avoid_rxn_multiplier == 0.0:
-                            node_rewards[idx] = 0.0
+                            if (self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_building_blocks_parameters.use_dense_reward):
+                                is_solved[idx] = 0.0
+                            else:
+                                node_rewards[idx] = 0.0
                         # But if the avoid_rxn_multiplier is 1.0, then the reward might still be 0.0 if the user *also* wants to enforce reaction classes and this constraint is not satisfied
                         elif avoid_rxn_multiplier == 1.0:
                             if not self.enforced_reactions_parameters.enforce_rxn_class_presence:
                                 node_rewards[idx] = 1.0
                             else:
                                 node_rewards[idx] = node_rewards[idx] * 1.0
- 
+
                     if node_rewards[idx] == 1.0:
                         self.matched_generated_smiles_with_rxn[oracle_calls].append(canonicalize_smiles(generated_smiles))
-                        with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
-                            json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)          
+
+                    elif (self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_building_blocks_parameters.use_dense_reward) and is_solved[idx] == 1:
+                        self.matched_generated_smiles_with_rxn[oracle_calls].append(canonicalize_smiles(generated_smiles))
+
+                    with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
+                        json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)          
 
             # HACK: In case a molecule is in the building blocks stock, Syntheseus returns 0. 
             #       Set these to 1 to work with Binary Reward Shaping
