@@ -98,7 +98,7 @@ def sample_products(
             # Compute the reward with the oracle and append valid SMILES
             syntheseus_rewards = syntheseus_oracle(
                 mols=[Chem.MolFromSmiles(smiles) for smiles in smiles_batch],  # Redundant 
-                oracle_calls=0
+                oracle_calls=-1  # Tagging the tracker with -1
             )
 
             # TODO: Implement enumeration with enforced blocks in the future

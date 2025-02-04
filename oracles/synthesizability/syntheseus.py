@@ -327,6 +327,8 @@ class Syntheseus(OracleComponent):
                         is_solved[idx] = int(is_matched)
                         steps[idx] = steps[idx] if is_matched else 99
 
+                    # In case of redundancy
+                    self.matched_generated_smiles[oracle_calls] = list(set(self.matched_generated_smiles[oracle_calls]))
                     with open(os.path.join(self.output_dir, "matched_generated_smiles.json"), "w") as f:
                         json.dump(self.matched_generated_smiles, f, indent=4)
 
@@ -471,6 +473,8 @@ class Syntheseus(OracleComponent):
                     # If *not* enforcing blocks, then the reward is 1.0 * rxn_multiplier because the route is solved in the first place and the user specified to enforce *only* reaction classes
                     node_rewards[idx] = node_rewards[idx] * rxn_multiplier if self.enforced_building_blocks_parameters.enforce_blocks else 1.0 * rxn_multiplier
 
+                    # In case of redundancy
+                    self.matched_generated_smiles_with_rxn[oracle_calls] = list(set(self.matched_generated_smiles_with_rxn[oracle_calls]))
                     # Write out the matched generated SMILES with reaction classes if not also avoiding reaction classes (otherwise, wait to check this)
                     if len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
                         with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
@@ -513,6 +517,8 @@ class Syntheseus(OracleComponent):
                     elif (self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_building_blocks_parameters.use_dense_reward) and is_solved[idx] == 1:
                         self.matched_generated_smiles_with_rxn[oracle_calls].append(canonicalize_smiles(generated_smiles))
 
+                    # In case of redundancy
+                    self.matched_generated_smiles_with_rxn[oracle_calls] = list(set(self.matched_generated_smiles_with_rxn[oracle_calls]))
                     with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
                         json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)          
 

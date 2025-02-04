@@ -338,12 +338,11 @@ def test_all_rxn_class_synthesizability(aripiprazole_mol, amide_mol, base_oracle
     assert len(namerxn_solved) == 2
     assert (namerxn_solved == np.array([1, 1])).all()
 
-    assert syntheseus_oracle.matched_generated_smiles_with_rxn == {
-        1: [
-            "O=C1CCc2ccc(OCCCCN3CCN(c4cccc(Cl)c4Cl)CC3)cc2N1",
-            "O=C(NC1CCCCC1)C1CCCN(Cc2ccccc2)C1"
-        ]
-    }
+    # Sort in case set and list operators change the order
+    assert sorted(syntheseus_oracle.matched_generated_smiles_with_rxn[1]) == sorted([
+        "O=C1CCc2ccc(OCCCCN3CCN(c4cccc(Cl)c4Cl)CC3)cc2N1",
+        "O=C(NC1CCCCC1)C1CCCN(Cc2ccccc2)C1"
+    ])
 
     shutil.rmtree(base_oracle_params["specific_parameters"]["results_dir"])
 
