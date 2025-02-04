@@ -737,11 +737,8 @@ class Syntheseus(OracleComponent):
 
         return solved_exists
     
-    def _write_out_smiles_rxn_tracker(
-        self, 
-        path: str
-    ) -> None:
-        with open(os.path.join(path, "smiles_rxn_tracker.json"), "w") as f:
+    def _write_out_smiles_rxn_tracker(self) -> None:
+        with open(os.path.join(self.output_dir, "smiles_rxn_tracker.json"), "w") as f:
             json.dump(self.smiles_rxn_tracker, f, indent=4)
 
     def _extract_syntheseus_route_data(
