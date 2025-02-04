@@ -109,6 +109,9 @@ def remove_molecules_with_radicals(smiles_batch: np.ndarray[str]) -> np.ndarray[
     """
     def has_radicals(smiles: str) -> bool:
         mol = Chem.MolFromSmiles(smiles)
-        return any(atom.GetNumRadicalElectrons() > 0 for atom in mol.GetAtoms())
+        if mol is not None:
+            return any(atom.GetNumRadicalElectrons() > 0 for atom in mol.GetAtoms())
+        else:
+            return True
 
     return np.array([smiles for smiles in smiles_batch if not has_radicals(smiles)])
