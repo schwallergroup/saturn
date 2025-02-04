@@ -72,7 +72,7 @@ def sample_products(
         smiles_batch = []
 
         # Sample batch of reactions
-        sampled_reactions = random.choices(reactions, k=(n_seeds - len(enumerated_smiles) + 10))
+        sampled_reactions = random.choices(reactions, k=(n_seeds - len(enumerated_smiles) + 20))
 
         # Sample SMILES
         for reaction in sampled_reactions:
