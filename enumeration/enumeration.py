@@ -72,7 +72,7 @@ def sample_products(
         smiles_batch = []
 
         # Sample batch of reactions
-        sampled_reactions = random.choices(reactions, k=(n_seeds - len(enumerated_smiles)))
+        sampled_reactions = random.choices(reactions, k=(n_seeds - len(enumerated_smiles) + 10))
 
         # Sample SMILES
         for reaction in sampled_reactions:
@@ -101,14 +101,13 @@ def sample_products(
                 oracle_calls=1
             )
 
-            # Case where the user wants to enforce blocks *and* reactions
             # TODO: Implement enumeration with enforced blocks in the future
-            if syntheseus_oracle.enforced_building_blocks_parameters.enforce_blocks and syntheseus_oracle.enforced_reactions_parameters.enforce_reactions:
-                solved_smiles = [smiles for smiles, reward in 
-                                 zip(smiles_batch, syntheseus_rewards) if reward != 0]
-            else:
-                solved_smiles = [smiles for smiles, reward in 
-                                 zip(smiles_batch, syntheseus_rewards) if reward == 1]
+            # If only enforcing reactions, successfully meeting the reaction constraints yields a reward of 1.
+            # If enforcing blocks, a dense reward should be returned. Additionally adding on a reaction constraints should therefore also yield a dense reward.
+            # Therefore, checking for reward != 0 covers both cases
+            solved_smiles = [smiles for smiles, reward in 
+                             zip(smiles_batch, syntheseus_rewards) if reward != 0]
+
 
             enumerated_smiles.update(solved_smiles)
 
