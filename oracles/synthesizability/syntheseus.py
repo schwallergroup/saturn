@@ -401,14 +401,14 @@ class Syntheseus(OracleComponent):
                             all_rxns_labels.append((rxn_info["CLASS"], rxn_info["NAME"]))
 
                     # Track all reactions present in the route
-                    self.smiles_rxn_tracker[generated_smiles] = {
-                        depth: {
+                    rxn_dict = {"oracle_calls": oracle_calls}
+                    for (depth, rxn_smiles), (rxn_class, rxn_name) in zip(reaction_depth_smiles, all_rxns_labels):
+                        rxn_dict[depth] = {
                             "rxn_smiles": rxn_smiles,
                             "rxn_class": rxn_class,
                             "rxn_name": rxn_name
                         }
-                        for (depth, rxn_smiles), (rxn_class, rxn_name) in zip(reaction_depth_smiles, all_rxns_labels)
-                    }
+                    self.smiles_rxn_tracker[generated_smiles] = rxn_dict
 
                 # Assume the the reaction constraints are not satisfied
                 rxn_multiplier = 0.0
