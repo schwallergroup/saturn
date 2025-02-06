@@ -17,7 +17,6 @@ def run_namerxn(
         "-nomap", "-nocan",
         rxn_smiles_file_path
     ], capture_output=True)
-
     output = output.stdout.decode().strip().split('\n')
 
     # Extract reaction data into list

@@ -187,9 +187,9 @@ def test_rxn_class_synthesizability(aripiprazole_mol, amide_mol, base_oracle_par
     base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_rxn_class_presence"] = True
     base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["williamson"]
 
-    # ----------------
-    # Test Rxn-INSIGHT
-    # ----------------
+    # # ----------------
+    # # Test Rxn-INSIGHT
+    # # ----------------
     base_oracle_params["specific_parameters"]["enforced_reactions"]["use_namerxn"] = False
     syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
     rxn_insight_solved = syntheseus_oracle(
@@ -226,6 +226,7 @@ def test_rxn_class_synthesizability(aripiprazole_mol, amide_mol, base_oracle_par
     namerxn_solved = syntheseus_oracle(
         mols=np.array([aripiprazole_mol]),
         oracle_calls=1)
+
     assert len(namerxn_solved) == 1
     assert (namerxn_solved == np.array([1])).all()
 

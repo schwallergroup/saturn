@@ -10,4 +10,15 @@ synth/
 constrained-docking/
 boost_1_85_0
 Vina-GPU-2.1
+tango_experiments/
+exps
+test_dev/
+data/
+output/
+*.xyz
+*.png
 *.ipynb
+*.log
+*.smi
+debug_enumeration/*
+*.ckpt

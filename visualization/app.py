@@ -108,7 +108,7 @@ def create_synthesis_graph(molecule_data: Dict[str, Union[str, float]]
 
 # Load and parse data
 top_graphs_folder = st.secrets["file_path"]
-experiment_files = [f for f in os.listdir(top_graphs_folder) if f.endswith("top_graphs.json")]
+experiment_files = [f for f in os.listdir(top_graphs_folder) if f.endswith("graphs.json")]
 
 # Sidebar for selecting experiment
 st.sidebar.header("Select experiment")
