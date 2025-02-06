@@ -60,7 +60,7 @@ set_seed_everywhere(
 )
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-
+print(CURRENT_DIR)
 @pytest.fixture
 def route_file() -> str:
     return os.path.join(CURRENT_DIR, "aripiprazole-route.pkl")
@@ -137,6 +137,7 @@ def test_route_data(route_file):
     """
     Test the syntheseus-full environment can unpickle the route data correctly.
     """
+
     # Load the pickle file
     with open(route_file, "rb") as f:
         route = pickle.load(f)
