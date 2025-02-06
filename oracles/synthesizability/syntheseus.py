@@ -298,7 +298,7 @@ class Syntheseus(OracleComponent):
                             )
                             if is_matched:
                                 assert max_reward == 1.0
-                                self.matched_generated_smiles[oracle_calls].append(canonicalize_smiles(generated_smiles))
+                                self.matched_generated_smiles[oracle_calls].append(generated_smiles)
                                 break
                     
                         node_rewards[idx] = max_reward
@@ -321,7 +321,7 @@ class Syntheseus(OracleComponent):
                                 enforced_building_blocks_file=self.enforced_building_blocks_file
                             )
                             if is_matched:
-                                self.matched_generated_smiles[oracle_calls].append(canonicalize_smiles(generated_smiles))
+                                self.matched_generated_smiles[oracle_calls].append(generated_smiles)
                                 break
 
                         is_solved[idx] = int(is_matched)
@@ -431,12 +431,12 @@ class Syntheseus(OracleComponent):
                         # Check if the node exactly matches an enforced building block
                         if self.enforced_building_blocks_parameters.enforce_blocks: 
                             if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                self.matched_generated_smiles_with_rxn[oracle_calls].append(canonicalize_smiles(generated_smiles))
+                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
                         elif not self.enforced_building_blocks_parameters.enforce_blocks:
                             # If the reaction class is matched, then the node reward is 1
                             if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                self.matched_generated_smiles_with_rxn[oracle_calls].append(canonicalize_smiles(generated_smiles))
+                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
                     # ------------------------------------------------------------------------
                     # NOTE: This block of code is only relevant when enforcing *all* reactions
@@ -461,12 +461,12 @@ class Syntheseus(OracleComponent):
                         # Enforcing blocks and *all* reactions
                         if self.enforced_building_blocks_parameters.enforce_blocks:
                             if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                self.matched_generated_smiles_with_rxn[oracle_calls].append(canonicalize_smiles(generated_smiles))
+                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
                         # Only enforcing *all* reactions
                         else:
                             if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                self.matched_generated_smiles_with_rxn[oracle_calls].append(canonicalize_smiles(generated_smiles))
+                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
                     # Reaching this code requires that there is a solved route
                     # This truncates the node reward to 0 if the reaction class is not matched (assuming enforced blocks are also being considered)
@@ -512,10 +512,10 @@ class Syntheseus(OracleComponent):
                                 node_rewards[idx] = node_rewards[idx] * 1.0
 
                     if node_rewards[idx] == 1.0:
-                        self.matched_generated_smiles_with_rxn[oracle_calls].append(canonicalize_smiles(generated_smiles))
+                        self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
                     elif (self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_building_blocks_parameters.use_dense_reward) and is_solved[idx] == 1:
-                        self.matched_generated_smiles_with_rxn[oracle_calls].append(canonicalize_smiles(generated_smiles))
+                        self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
                     # In case of redundancy
                     self.matched_generated_smiles_with_rxn[oracle_calls] = list(set(self.matched_generated_smiles_with_rxn[oracle_calls]))
