@@ -322,7 +322,11 @@ class Oracle:
 
     def write_out_repeat_history(self, path: str):
         """Write out the repeated SMILES histories as JSON."""
-        with open(os.path.join(path, "repeated_sampled_smiles_history.json"), "w") as f:
-            json.dump(self.repeated_sampled_smiles, f, indent=2)
-        with open(os.path.join(path, "repeated_hallucinated_smiles_history.json"), "w") as f:
-            json.dump(self.repeated_hallucinated_smiles, f, indent=2)
+        # FIXME: Reproduce json dump error
+        try:
+            with open(os.path.join(path, "repeated_sampled_smiles_history.json"), "w") as f:
+                json.dump(self.repeated_sampled_smiles, f, indent=2)
+            with open(os.path.join(path, "repeated_hallucinated_smiles_history.json"), "w") as f:
+                json.dump(self.repeated_hallucinated_smiles, f, indent=2)
+        except Exception:
+            print("Failed to write out repeat histories.")

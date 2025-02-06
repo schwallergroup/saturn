@@ -402,6 +402,7 @@ class Syntheseus(OracleComponent):
 
                     # Track all reactions present in the route
                     rxn_dict = {"oracle_calls": oracle_calls}
+                    rxn_dict = {"rxn_steps": int(steps[idx])}
                     for (depth, rxn_smiles), (rxn_class, rxn_name) in zip(reaction_depth_smiles, all_rxns_labels):
                         rxn_dict[depth] = {
                             "rxn_smiles": rxn_smiles,
