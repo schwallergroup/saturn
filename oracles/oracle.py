@@ -296,9 +296,9 @@ class Oracle:
                 "reward": rewards, 
                 "penalized_reward": penalized_rewards 
             })
-        df = pd.concat([df, oracle_components_df], axis=1)  
+        df = pd.concat([df, oracle_components_df], axis=1)
 
-        self.oracle_history = pd.concat([self.oracle_history, df])
+        self.oracle_history = pd.concat([self.oracle_history, df]) if len(self.oracle_history) > 0 else df
 
     @staticmethod
     def de_duplicate_smiles(smiles: np.ndarray[str]) -> np.ndarray[str]:

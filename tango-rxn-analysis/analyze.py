@@ -52,7 +52,8 @@ def get_docking_score_enum(docking_oracle: str) -> str:
 # Fixed utility script paths
 SATURN_BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROUTE_EXTRACTION_SCRIPT = os.path.join(SATURN_BASE_PATH, "oracles/synthesizability/utils/extract_syntheseus_route_data.py")
-RXN_INFO_EXTRACTION_SCRIPT = os.path.join(SATURN_BASE_PATH, "oracles/synthesizability/utils/extract_rxn_info.py")
+RXN_INSIGHT_EXTRACTION_SCRIPT = os.path.join(SATURN_BASE_PATH, "oracles/synthesizability/utils/extract_rxn_insight_info.py")
+NAME_RXN_EXTRACTION_SCRIPT = os.path.join(SATURN_BASE_PATH, "oracles/synthesizability/utils/extract_namerxn_info.py")
 
 def log_synthesizable_metrics(seeds: List[str]) -> None:
     """Log number of synthesizable molecules."""
@@ -261,14 +262,13 @@ def log_molecule_and_rxn_metrics(
         for df, seed in top_oracle_histories:
 
             syntheseus_path = os.path.join(seed, "syntheseus_results")
-            # TODO: Check why the number of solved molecules does not match with the one if syntheseus_raw_values == 1
             extracted_graph = write_out_top_syntheseus_graphs(
                 oracle_history=df,
                 syntheseus_folder=syntheseus_path,
                 enforce_building_blocks=enforce_building_blocks,
                 enforced_building_blocks_file=enforced_building_blocks_file,
                 syntheseus_path_script=ROUTE_EXTRACTION_SCRIPT,
-                rxn_info_path_script=RXN_INFO_EXTRACTION_SCRIPT
+                rxn_info_path_script=RXN_INSIGHT_EXTRACTION_SCRIPT
             )
         
             top_graphs.update(extracted_graph)

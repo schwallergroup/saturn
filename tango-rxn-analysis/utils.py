@@ -34,17 +34,16 @@ MORGAN_BITS = 1024
 # General Utility Functions
 # -------------------------
 def setup_logging(logging_path: str):
-    """Sets up logging to a file and console"""
+    """Sets up logging to a file and console."""
     logging.basicConfig(filename=logging_path, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
     console.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     logging.getLogger("").addHandler(console)
 
-
 def canonicalize_smiles(smiles: str) -> str:
     """
-    Canonicalize the given SMILES string
+    Canonicalize the given SMILES string.
     """
     try:
         mol = Chem.MolFromSmiles(smiles)
@@ -52,26 +51,23 @@ def canonicalize_smiles(smiles: str) -> str:
     except Exception:
         return smiles
 
-
 def df_remove_duplicate_smiles(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Remove duplicate SMILES from the given DataFrame
+    Remove duplicate SMILES from the given DataFrame.
     """
     df["canonical_smiles"] = df["smiles"].apply(lambda x: canonicalize_smiles(x) if x is not None and x != "" else None)
     df = df.drop_duplicates(subset=["canonical_smiles"])
     return df
 
-
 def get_morgan_fingerprints(mols: List[Mol], as_list: bool = False) -> Union[list, np.array]:
     """
-    Get the Morgan fingerprints for the given molecules
+    Get the Morgan fingerprints for the given molecules.
     """
     fps = [AllChem.GetMorganFingerprintAsBitVect(m, MORGAN_RADIUS, MORGAN_BITS) for m in mols]
     if as_list:
         return fps
     else:
         return np.array(fps)
-
 
 def get_wall_time(lines: List[str]) -> float:
     total_time = float(lines[-1].split()[-2])
@@ -96,7 +92,7 @@ def ligand_efficiency(
     docking_scores: List[float]
 ) -> List[float]:
     """
-    Calculate the ligand efficiencies for the molecules
+    Calculate the ligand efficiencies for the molecules.
     """
     ligand_efficiencies = []
     for idx, mol in enumerate(mols):
@@ -114,7 +110,7 @@ def ligand_efficiency(
 # ---------------------------
 def num_unique_murcko_scaffolds(mols: List[Mol]) -> int:
     """
-    Count the number of unique Murcko scaffolds in the input SMILES list
+    Count the number of unique Murcko scaffolds in the input SMILES list.
     """
     scaffolds = set()
     for mol in mols:
@@ -125,7 +121,6 @@ def num_unique_murcko_scaffolds(mols: List[Mol]) -> int:
             continue
 
     return len(scaffolds)
-
 
 # From https://github.com/molecularsets/moses/blob/master/moses/metrics/metrics.py
 def average_agg_tanimoto(
@@ -171,7 +166,6 @@ def average_agg_tanimoto(
         agg_tanimoto = (agg_tanimoto)**(1/p)
     return np.mean(agg_tanimoto)
 
-
 # From https://github.com/molecularsets/moses/blob/master/moses/metrics/metrics.py
 def internal_diversity(
     mols: List[Mol], 
@@ -187,18 +181,15 @@ def internal_diversity(
     """
     fps = get_morgan_fingerprints(mols)
     return 1 - (average_agg_tanimoto(fps, fps, agg="mean", device=device, p=p)).mean()
-
         
 def get_ncircle(df):
     if "FPS" not in df:
         df["FPS"] = [AllChem.GetMorganFingerprintAsBitVect((mol), 2, 1024) for mol in df["MOL"]]
     return NCircles().measure(df["FPS"])
 
-
 def similarity_matrix_tanimoto(fps1, fps2):
     similarities = [DataStructs.BulkTanimotoSimilarity(fp, fps2) for fp in fps1]
     return np.array(similarities)
-
 
 class NCircles():
     def __init__(self, threshold=0.75):
@@ -229,14 +220,14 @@ class NCircles():
         vecs = self.get_circles((vecs, self.sim_mat_func, self.t))
         return len(vecs)
 
-
 def write_out_top_syntheseus_graphs(
     oracle_history: pd.DataFrame,
     syntheseus_folder: str,
     enforce_building_blocks: bool,
     enforced_building_blocks_file: str,
     syntheseus_path_script: str,
-    rxn_info_path_script: str
+    rxn_insight_path_script: str,
+    name_rxn_path_script: str
 ) -> None:
     """
     Extract the Syntheseus synthesis graph PDF files for the highest reward molecules (given they satisfy all reaction constraints).
@@ -322,7 +313,7 @@ def write_out_top_syntheseus_graphs(
                     "-n",
                     "rxn-insight", 
                     "python", 
-                    rxn_info_path_script, 
+                    rxn_insight_path_script, 
                     # Pass the rxn SMILES extracted from the Syntheseus route
                     node_data["rxn_smiles"]
                 ], capture_output=True, text=True)
@@ -340,7 +331,6 @@ def write_out_top_syntheseus_graphs(
             "enforced_block": specific_enforced_block
         }
     return output
-
 
 def extract_syntheseus_route_data(
     route_path: str,
@@ -368,10 +358,9 @@ def extract_syntheseus_route_data(
 
     return route
 
-
 def get_run_data(path: str) -> Tuple[bool, bool, str]:
     """
-    Take run .json file and get info related to reaction and building blocks
+    Take run .json file and get info related to reaction and building blocks.
     """
     files = os.listdir(path)
     
@@ -390,10 +379,9 @@ def get_run_data(path: str) -> Tuple[bool, bool, str]:
     
     return enforce_reactions, enforce_building_blocks, enforced_building_blocks_file
 
-
 def count_rxn_graph(top_graphs: Dict[str, Union[str, float]]) -> Union[Dict[str, int], List[int]]:
     """
-    Count number of reaction classes and number of reaction steps for each top graph
+    Count number of reaction classes and number of reaction steps for each top graph.
     """
     rxn_count = dict()
     rxn_steps = []
@@ -417,13 +405,12 @@ def count_rxn_graph(top_graphs: Dict[str, Union[str, float]]) -> Union[Dict[str,
     
     return rxn_count, rxn_steps
 
-
 def plot_rxn_classes(
     rxn_count: Dict[str, int],
     save_dir: str,
     experiment_name: str
 ) -> None:
-    """Plot reaction class distribution and save barplot"""
+    """Plot reaction class distribution and save barplot."""
     # Save the raw counts
     with open(os.path.join(save_dir, f"{experiment_name}-rxn-distribution.json"), "w") as f:
         json.dump(rxn_count, f, indent=4)
