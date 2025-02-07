@@ -227,6 +227,8 @@ def write_out_top_syntheseus_graphs(
     enforced_building_blocks_file: str,
     syntheseus_path_script: str,
     rxn_insight_path_script: str,
+    use_namerxn: bool,
+    namerxn_binary_path: str,
     name_rxn_path_script: str
 ) -> None:
     """
