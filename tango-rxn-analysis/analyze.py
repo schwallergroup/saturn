@@ -258,7 +258,6 @@ def log_molecule_and_rxn_metrics(
         # For each DataFrame, slice the top % and save routes for visualization
         for df, seed in top_oracle_histories:
 
-            # FIXME: This is redundant since all reaction information is already extracted in the smiles_rxn_tracker.json file
             syntheseus_path = os.path.join(seed, "syntheseus_results")
             extracted_graph = write_out_top_syntheseus_graphs(
                 oracle_history=df,
