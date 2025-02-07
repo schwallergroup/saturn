@@ -154,8 +154,6 @@ def log_molecule_and_rxn_metrics(
     experiment_name: str,
     save_top_graphs: bool,
     save_top_percentage_routes: float,
-    use_namerxn: bool,
-    namerxn_binary_path: str,
     save_dir: str = "./top_graphs/"
 ) -> None:
     """Log molecule and reaction metrics."""
@@ -180,15 +178,11 @@ def log_molecule_and_rxn_metrics(
             continue
             
         # Load and canonicalize SMILES from JSON files
-        rxn_json = json.load(open(os.path.join( 
-                                seed, 
-                                "syntheseus_results", 
-                                "matched_generated_smiles_with_rxn.json"), 
-                                "r"
-                            )
-                        )
-        
+        rxn_json = json.load(open(os.path.join(seed, "syntheseus_results", "matched_generated_smiles_with_rxn.json"), "r"))
         enforced_rxn_smiles = set([canonicalize_smiles(s) for smiles_list in rxn_json.values() for s in smiles_list if s])
+
+        # Load smiles_rxn_tracker.json
+        smiles_rxn_tracker = json.load(open(os.path.join(seed, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
 
         if len(enforced_rxn_smiles) > 0:
             N_rxn += 1
@@ -269,13 +263,8 @@ def log_molecule_and_rxn_metrics(
             extracted_graph = write_out_top_syntheseus_graphs(
                 oracle_history=df,
                 syntheseus_folder=syntheseus_path,
-                enforce_building_blocks=enforce_building_blocks,
-                enforced_building_blocks_file=enforced_building_blocks_file,
                 syntheseus_path_script=ROUTE_EXTRACTION_SCRIPT,
-                rxn_insight_path_script=RXN_INSIGHT_EXTRACTION_SCRIPT,
-                use_namerxn=use_namerxn,
-                namerxn_binary_path=namerxn_binary_path,
-                name_rxn_path_script=NAME_RXN_EXTRACTION_SCRIPT
+                smiles_rxn_tracker=smiles_rxn_tracker
             )
         
             top_graphs.update(extracted_graph)
@@ -341,27 +330,11 @@ if __name__ == "__main__":
         choices=["quickvina", "quickvina2", "gnina"],
         help="Docking oracle used in the reward function."
     )
-    parser.add_argument(
-        "--use_namerxn",
-        action="store_true",
-        default=False,
-        help="Use NameRXN to generate reaction names. Default is False."
-    )
-    parser.add_argument(
-        "--namerxn_binary_path",
-        type=str,
-        required=False,
-        help="Path to the NameRXN binary."
-    )
-
     args = parser.parse_args()
 
     # Setup logging
     setup_logging("./metrics.log")
     logging.info(f"Saving top graphs: {args.save_top_graphs} - If True, top {args.save_top_percentage_routes * 100}% of routes will be saved.")
-    logging.info(f"Use NameRXN: {args.use_namerxn} - If True and also --save_top_graphs is True, the reaction classes and names of the top graphs will be extracted with NameRXN.")
-    if args.use_namerxn:
-        assert args.namerxn_binary_path is not None, "Path to NameRXN binary is required since --use_namerxn is True."
     
     start_time = time.perf_counter()
 
@@ -388,9 +361,7 @@ if __name__ == "__main__":
             seeds=seeds,
             experiment_name=experiment_name,
             save_top_graphs=args.save_top_graphs,
-            save_top_percentage_routes=args.save_top_percentage_routes,
-            use_namerxn=args.use_namerxn,
-            namerxn_binary_path=args.namerxn_binary_path
+            save_top_percentage_routes=args.save_top_percentage_routes
         )
 
         experiment_end_time = time.perf_counter()

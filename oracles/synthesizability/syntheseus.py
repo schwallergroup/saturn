@@ -401,8 +401,11 @@ class Syntheseus(OracleComponent):
                             all_rxns_labels.append((rxn_info["CLASS"], rxn_info["NAME"]))
 
                     # Track all reactions present in the route
+                    # NOTE: This is for *all* generated molecules that have a solved route
                     rxn_dict = {"oracle_calls": oracle_calls}
                     rxn_dict = {"rxn_steps": int(steps[idx])}
+                    # NOTE: Even if the user is enforcing blocks, matched_block_smiles can be None if no match is found
+                    rxn_dict["enforced_block"] = matched_block_smiles if self.enforced_building_blocks_parameters.enforce_blocks else None
                     for (depth, rxn_smiles), (rxn_class, rxn_name) in zip(reaction_depth_smiles, all_rxns_labels):
                         rxn_dict[depth] = {
                             "rxn_smiles": rxn_smiles,
