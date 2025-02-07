@@ -411,7 +411,7 @@ class Syntheseus(OracleComponent):
                         }
                     self.smiles_rxn_tracker[generated_smiles] = rxn_dict
 
-                # Assume the the reaction constraints are not satisfied
+                # Assume the reaction constraints are not satisfied
                 rxn_multiplier = 0.0
 
                 # If the molecule is solved *and* the user specified to enforce that a set of reaction classes appears in the synthesis graph
