@@ -24,6 +24,7 @@ from utils import (
     internal_diversity,
     NCircles,
     write_out_top_syntheseus_graphs,
+    plot_rxn_evolution,
     count_rxn_graph,
     plot_rxn_classes
 )
@@ -248,6 +249,14 @@ def log_molecule_and_rxn_metrics(
     # Highest Reward
     metrics_highest_reward = [(smiles, dock, qed) for smiles, dock, qed in top_enforced_rxn_metrics]
     log_pooled_molecules_metrics(metrics_highest_reward, f"Top {save_top_percentage_routes * 100}% by Reward, Docking Scores:")
+
+    # Plot evolution of reaction classes
+    plot_rxn_evolution(
+        smiles_rxn_tracker=smiles_rxn_tracker,
+        enforced_rxn=experiment_name,
+        save_dir=save_dir,
+        experiment_name=experiment_name
+    )
     
     # If save_top_graphs, iterate over graphs, save them and plot reaction distribution
     if save_top_graphs:

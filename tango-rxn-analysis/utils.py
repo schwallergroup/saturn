@@ -20,6 +20,7 @@ from rdkit import DataStructs
 import matplotlib.pyplot as plt
 import more_itertools as mit
 from matplotlib import pyplot as plt
+from collections import defaultdict
 
 import warnings
 from rdkit import RDLogger
@@ -359,6 +360,76 @@ def get_run_data(path: str) -> Tuple[bool, bool, str]:
     enforced_building_blocks_file = syntheseus_info["enforced_building_blocks"]["enforced_building_blocks_file"]
     
     return enforce_reactions, enforce_building_blocks, enforced_building_blocks_file
+
+def plot_rxn_evolution(
+    smiles_rxn_tracker: Dict[str, Dict[str, str]],
+    enforced_rxn: str,
+    save_dir: str,
+    experiment_name: str
+) -> None:
+    """Plot evolution of reaction classes."""
+    # Load data
+    seed = 1
+    experiment_path = f"test_files/{enforced_rxn}/seed{seed}"
+    oracle_history = pd.read_csv(f"{experiment_path}/oracle_history.csv")
+    oracle_history["canonical_smiles"] = oracle_history["smiles"].apply(canonicalize_smiles)
+
+    # Track reactions by class over time
+    stats = defaultdict(list)
+    rxn_smiles = defaultdict(list)
+
+    for smiles, rxn_info in smiles_rxn_tracker.items():
+        oracle_calls = rxn_info["oracle_calls"]
+        for depth, info in rxn_info.items():
+            rxn_class = info["rxn_class"]
+            rxn_name = info["rxn_name"]
+                
+            if oracle_calls is not None and rxn_class != "Unrecognized":
+                stats[(rxn_class, rxn_name)].append(oracle_calls)
+                rxn_smiles[(rxn_class, rxn_name)].append(info["rxn_smiles"])
+
+    # Sort each reaction class by oracle calls
+    for rxn_class_name in stats:
+        stats[rxn_class_name] = sorted(stats[rxn_class_name])
+
+    # Sort reaction classes by count in descending order
+    sorted_stats = sorted(stats.items(), key=lambda x: len(x[1]), reverse=True)
+
+    # Filter for reactions with count > 500 and take top 10
+    sorted_stats = [(k,v) for k,v in sorted_stats if len(v) > 500][:10]
+
+    colours = [
+        "#2ecc71", "#3498db", "#9b59b6", "#f1c40f", "#e67e22", 
+        "#1abc9c", "#34495e", "#95a5a6", "#d35400", "#c0392b"
+    ]
+    enforced_colour = "#e74c3c"  # Bright red for enforced reaction
+
+    # Plot cumulative reactions over time
+    plt.figure(figsize=(16,8))
+
+    # Add legend entry explaining format
+    plt.plot([], [], " ", label="<Reaction Class>\n<Reaction Name>")
+
+    # Plot filtered reaction classes
+    for idx, ((rxn_class, rxn_name), calls) in enumerate(sorted_stats):
+        if enforced_rxn.lower() in rxn_class.lower() or enforced_rxn.lower() in rxn_name.lower():
+            plt.plot(calls, range(1, len(calls)+1), 
+                    label=f"{rxn_class}\n{rxn_name} (n={len(calls)})", 
+                    color=enforced_colour, alpha=1.0, linewidth=3)
+        else:
+            plt.plot(calls, range(1, len(calls)+1), 
+                    label=f"{rxn_class}\n{rxn_name} (n={len(calls)})", 
+                    color=colours[idx], alpha=1.0, linewidth=1)
+
+    plt.xlabel("Number of Oracle Calls", fontsize=12, fontweight="bold")
+    plt.ylabel("Cumulative Number of Reactions", fontsize=12, fontweight="bold")
+    plt.title("Cumulative Growth of Different Reaction Types", fontsize=14, fontweight="bold")
+    plt.grid(True)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=12)
+    plt.tight_layout()
+    
+    plt.savefig(os.path.join(save_dir, f"{experiment_name}-rxn-evolution.png"))
+
 
 def count_rxn_graph(top_graphs: Dict[str, Union[str, float]]) -> Union[Dict[str, int], List[int]]:
     """
