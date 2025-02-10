@@ -147,14 +147,13 @@ def log_pooled_molecules_metrics(
 def log_molecule_and_rxn_metrics(
     seeds: List[str],    
     experiment_name: str,
-    save_top_graphs: bool,
     save_top_percentage_routes: float,
     save_dir: str = "./top_graphs/"
 ) -> None:
     """Log molecule and reaction metrics."""
-    # If top graphs should be saved 
-    if save_top_graphs:
-        top_oracle_histories = [] # Store DataFrames with top molecules
+
+    # Store DataFrames with top molecules
+    top_oracle_histories = []
 
     N_rxn = 0
     num_enforced_rxn = []
@@ -216,8 +215,8 @@ def log_molecule_and_rxn_metrics(
             df_top_enforced_rxn[QED_ENUM]
         ))
 
-        if save_top_graphs:
-            top_oracle_histories.append((df_top_enforced_rxn, seed))
+        # Store top molecules
+        top_oracle_histories.append((df_top_enforced_rxn, seed))
 
     logging.info(f"# Enforced Blocks (if applicable) and Reaction (N={N_rxn}): {int(np.mean(num_enforced_rxn))} ± {int(np.std(num_enforced_rxn))}\n")
 
@@ -245,53 +244,52 @@ def log_molecule_and_rxn_metrics(
     log_pooled_molecules_metrics(metrics_highest_reward, f"Top {save_top_percentage_routes * 100}% by Reward, Docking Scores:")
 
     # Plot evolution of reaction classes
-    #plot_rxn_evolution(
-    #    smiles_rxn_tracker=smiles_rxn_tracker,
-    #    enforced_rxn=experiment_name,
-    #    save_dir=save_dir,
-    #    experiment_name=experiment_name
-    #)
+    plot_rxn_evolution(
+        smiles_rxn_tracker=smiles_rxn_tracker,
+        enforced_rxn=experiment_name,
+        save_dir=save_dir,
+        experiment_name=experiment_name
+    )
     
-    # If save_top_graphs, iterate over graphs, save them and plot reaction distribution
-    if save_top_graphs:
-        logging.info(f"Saving top {save_top_percentage_routes * 100}% of routes for experiment: {experiment_name}")
+    # Iterate over top molecules and save routes for visualization
+    logging.info(f"Saving top {save_top_percentage_routes * 100}% of routes for experiment: {experiment_name}")
 
-        top_graphs = {}
+    top_graphs = {}
 
-        # For each DataFrame, slice the top % and save routes for visualization
-        for df, seed in top_oracle_histories:
+    # For each DataFrame, slice the top % and save routes for visualization
+    for df, seed in top_oracle_histories:
 
-            extracted_graph = write_out_top_syntheseus_graphs(
-                top_oracle_history=df,
-                smiles_rxn_tracker=smiles_rxn_tracker
-            )
-        
-            top_graphs.update(extracted_graph)
-        
-        # Save top graphs
-        os.makedirs(save_dir, exist_ok=True)
-
-        with open(os.path.join(save_dir, f"{experiment_name}-top-graphs.json"), "w") as f:
-            json.dump(top_graphs, f, indent=4)
-
-        # Count number of unique enforced blocks amongst top graphs
-        if enforce_building_blocks:
-            unique_enforced_blocks = set()
-            for graph in top_graphs.values():
-                unique_enforced_blocks.add(graph["enforced_block"])
-
-            total_num_enforced_blocks = len(set([canonicalize_smiles(s) for s in open(enforced_building_blocks_file).readlines()]))
-            logging.info(f"Unique Enforced Blocks: {len(unique_enforced_blocks)}/{total_num_enforced_blocks}")
-
-        # Plot reactions
-        rxn_count, rxn_steps = count_rxn_graph(top_graphs)
-        logging.info(f"Top Graphs Reaction Steps: {np.mean(rxn_steps):.2f} ± {np.std(rxn_steps):.2f}")
-
-        plot_rxn_classes(
-            rxn_count=rxn_count,
-            save_dir=save_dir,
-            experiment_name=experiment_name
+        extracted_graph = write_out_top_syntheseus_graphs(
+            top_oracle_history=df,
+            smiles_rxn_tracker=smiles_rxn_tracker
         )
+    
+        top_graphs.update(extracted_graph)
+    
+    # Save top graphs
+    os.makedirs(save_dir, exist_ok=True)
+
+    with open(os.path.join(save_dir, f"{experiment_name}-top-graphs.json"), "w") as f:
+        json.dump(top_graphs, f, indent=4)
+
+    # Count number of unique enforced blocks amongst top graphs
+    if enforce_building_blocks:
+        unique_enforced_blocks = set()
+        for graph in top_graphs.values():
+            unique_enforced_blocks.add(graph["enforced_block"])
+
+        total_num_enforced_blocks = len(set([canonicalize_smiles(s) for s in open(enforced_building_blocks_file).readlines()]))
+        logging.info(f"Unique Enforced Blocks: {len(unique_enforced_blocks)}/{total_num_enforced_blocks}")
+
+    # Plot reactions
+    rxn_count, rxn_steps = count_rxn_graph(top_graphs)
+    logging.info(f"Top Graphs Reaction Steps: {np.mean(rxn_steps):.2f} ± {np.std(rxn_steps):.2f}")
+
+    plot_rxn_classes(
+        rxn_count=rxn_count,
+        save_dir=save_dir,
+        experiment_name=experiment_name
+    )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -311,12 +309,6 @@ if __name__ == "__main__":
         help="Names of the experiment folders to analyze."
     )
     parser.add_argument(
-        "--save_top_graphs",
-        action="store_true",
-        default=False,
-        help="Extract and save synthesis graphs for top molecules. Default is False."
-    )
-    parser.add_argument(
         "--save_top_percentage_routes",
         type=float,
         default=0.005,
@@ -333,7 +325,7 @@ if __name__ == "__main__":
 
     # Setup logging
     setup_logging("./metrics.log")
-    logging.info(f"Saving top graphs: {args.save_top_graphs} - If True, top {args.save_top_percentage_routes * 100}% of routes will be saved.")
+    logging.info(f"The script will save the top {args.save_top_percentage_routes * 100}% of routes for each experiment.")
     
     start_time = time.perf_counter()
 
@@ -342,8 +334,8 @@ if __name__ == "__main__":
         logging.info(f"Starting analysis for experiment: {experiment_name}\n")
 
         path = os.path.join(args.experiment_path, experiment_name)
-        seeds = [os.path.join(path, f"seed{seed}") for seed in range(1) if os.path.exists(os.path.join(path, f"seed{seed}"))]
-        #assert len(seeds) == 5, f"Expected 5 seeds, found {len(seeds)} for experiment {experiment_name}."
+        seeds = [os.path.join(path, folder) for folder in os.listdir(path) if folder.startswith("seed") and os.path.isdir(os.path.join(path, folder))]
+        assert len(seeds) > 0, f"No seeds found for experiment {experiment_name}."
 
         logging.info(f"----- Results for: {experiment_name} -----")
 
@@ -359,7 +351,6 @@ if __name__ == "__main__":
         log_molecule_and_rxn_metrics(
             seeds=seeds,
             experiment_name=experiment_name,
-            save_top_graphs=args.save_top_graphs,
             save_top_percentage_routes=args.save_top_percentage_routes
         )
 
