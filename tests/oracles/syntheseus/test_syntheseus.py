@@ -122,9 +122,6 @@ def base_oracle_params() -> dict:
                 "seed_reactions_file_folder": os.path.join(CURRENT_DIR, "../../../test/mitsunobu-seeding-preprocessed")
             },
             "route_extraction_script_path": os.path.join(CURRENT_DIR, "../../../oracles/synthesizability/utils/extract_syntheseus_route_data.py"),
-            "save_top_routes": False,
-            "percentage_to_save": 0.005,
-            "include_rxn_info": False,
             "time_limit_s": 180,
             "optimize_path_length": False,
             "parallelize": False,

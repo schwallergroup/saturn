@@ -1,0 +1,8 @@
+{
+  "index": 0,
+  "smiles": "O=C1CCc2ccc(OCCCCN3CCN(c4cccc(Cl)c4Cl)CC3)cc2N1",
+  "rxn_model_calls_used": 2,
+  "num_nodes_in_final_tree": 7,
+  "soln_time_rxn_model_calls": 2,
+  "soln_time_wallclock": 0.369226
+}

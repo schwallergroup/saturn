@@ -81,8 +81,6 @@ class Syntheseus(OracleComponent):
         self.enforced_reactions_parameters = EnforcedReactionsParameters(
             **self.parameters.specific_parameters.get("enforced_reactions", None)
         )
-
-        self.include_rxn_info = self.parameters.specific_parameters.get("include_rxn_info", False)
         
         if self.enforced_reactions_parameters.enforce_rxn_class_presence:
             self.enforce_all_reactions = self.enforced_reactions_parameters.enforce_all_reactions
@@ -114,11 +112,6 @@ class Syntheseus(OracleComponent):
         self.route_extraction_script_path = self.parameters.specific_parameters.get("route_extraction_script_path", None)
         # TODO: Avoid certain building blocks/reagents
         assert self.route_extraction_script_path is not None, "The run specifies to enforce/avoid building blocks and/or reactions, please provide the path to the script that extracts the SMILES and depth from the Syntheseus route pickle file."
-
-        # Save top percentage routes
-        self.save_top_routes = self.parameters.specific_parameters.get("save_top_routes", False)
-        self.percentage_to_save = self.parameters.specific_parameters.get("percentage_to_save", 0.005)  # Default to top 0.5%
-        assert self.percentage_to_save > 0.0 and self.percentage_to_save <= 1.0, "The save top percentage routes must be between 0.0 and 1.0."
 
         # Search time limit
         self.time_limit_s = self.parameters.specific_parameters.get("time_limit_s", 180)  # Default to 3 minutes per molecule
@@ -251,6 +244,11 @@ class Syntheseus(OracleComponent):
                 generated_smiles = canonicalize_smiles(smiles[idx])
 
                 if int(is_solved[idx]) == 1:
+
+                    # Satisfying either of the below conditions means the route data is needed
+                    if self.enforced_building_blocks_parameters.enforce_blocks or self.enforced_reactions_parameters.enforce_rxn_class_presence or len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0:
+                        route = self._extract_syntheseus_route_data(os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"))
+
                     # ------------------------
                     # ENFORCED BUILDING BLOCKS
                     # ------------------------
@@ -260,11 +258,6 @@ class Syntheseus(OracleComponent):
 
                         if oracle_calls not in self.matched_generated_smiles:
                             self.matched_generated_smiles[oracle_calls] = []
-
-                        route = self._extract_syntheseus_route_data(
-                            route_path=os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
-                            data_type="mol"
-                        )
 
                         # Track the synthesis pathway contains an enforced building block
                         is_matched = False
@@ -276,31 +269,32 @@ class Syntheseus(OracleComponent):
 
                             # Loop through the nodes and compute the reward for each node
                             for node, node_data in route.items():
-                                # Skip root node because this is the generated molecule
-                                if node_data["depth"] == 0:
-                                    continue
-                                # If the user specified that enforced building blocks must appear in the nodes at max depth (starting-material)
-                                if self.enforce_start:
-                                    if not node_data["depth"] == max_depth:
+                                if node_data["is_mol"]:
+                                    # Skip root node because this is the generated molecule
+                                    if node_data["depth"] == 0:
                                         continue
-                                # Compute the node's reward
-                                node_reward = get_node_reward(
-                                    reward_type=self.reward_type,
-                                    query_smiles=canonicalize_smiles(node_data["smiles"]),
-                                    enforce_blocks_fps=self.enforced_building_blocks_fps,
-                                    enforced_blocks_functional_groups=self.enforced_building_blocks_functional_groups,
-                                    tango_weights=self.tango_weights
-                                )
-                                max_reward = max(max_reward, node_reward)
-                                # Check if the node exactly matches an enforced building block
-                                is_matched, matched_block_smiles = match_stock(
-                                    query_smiles=canonicalize_smiles(node_data["smiles"]),
-                                    enforced_building_blocks_file=self.enforced_building_blocks_file
-                                )
-                                if is_matched:
-                                    assert max_reward == 1.0
-                                    self.matched_generated_smiles[oracle_calls].append(generated_smiles)
-                                    break
+                                    # If the user specified that enforced building blocks must appear in the nodes at max depth (starting-material)
+                                    if self.enforce_start:
+                                        if not node_data["depth"] == max_depth:
+                                            continue
+                                    # Compute the node's reward
+                                    node_reward = get_node_reward(
+                                        reward_type=self.reward_type,
+                                        query_smiles=canonicalize_smiles(node_data["mol_smiles"]),
+                                        enforce_blocks_fps=self.enforced_building_blocks_fps,
+                                        enforced_blocks_functional_groups=self.enforced_building_blocks_functional_groups,
+                                        tango_weights=self.tango_weights
+                                    )
+                                    max_reward = max(max_reward, node_reward)
+                                    # Check if the node exactly matches an enforced building block
+                                    is_matched, matched_block_smiles = match_stock(
+                                        query_smiles=canonicalize_smiles(node_data["mol_smiles"]),
+                                        enforced_building_blocks_file=self.enforced_building_blocks_file
+                                    )
+                                    if is_matched:
+                                        assert max_reward == 1.0
+                                        self.matched_generated_smiles[oracle_calls].append(generated_smiles)
+                                        break
                         
                             node_rewards[idx] = max_reward
                         
@@ -308,22 +302,23 @@ class Syntheseus(OracleComponent):
                         else:
                             max_depth = self._get_max_depth(route)
                             for node, node_data in route.items():
-                                # Skip root node because this is the generated molecule
-                                if node_data["depth"] == 0:
-                                    continue
-                                # If the user specified that enforced building blocks must appear in the *leaf* nodes
-                                if self.enforce_start:
-                                    if not node_data["depth"] == max_depth:
+                                if node_data["is_mol"]:
+                                    # Skip root node because this is the generated molecule
+                                    if node_data["depth"] == 0:
                                         continue
-                                # Otherwise, just check if *any* node has a matching SMILES in the enforced building blocks file
-                                # NOTE: this means that the enforced building blocks appear *somewhere* in the synthesis graph
-                                is_matched, matched_block_smiles = match_stock(
-                                    query_smiles=canonicalize_smiles(node_data["smiles"]), 
-                                    enforced_building_blocks_file=self.enforced_building_blocks_file
-                                )
-                                if is_matched:
-                                    self.matched_generated_smiles[oracle_calls].append(generated_smiles)
-                                    break
+                                    # If the user specified that enforced building blocks must appear in the *leaf* nodes
+                                    if self.enforce_start:
+                                        if not node_data["depth"] == max_depth:
+                                            continue
+                                    # Otherwise, just check if *any* node has a matching SMILES in the enforced building blocks file
+                                    # NOTE: this means that the enforced building blocks appear *somewhere* in the synthesis graph
+                                    is_matched, matched_block_smiles = match_stock(
+                                        query_smiles=canonicalize_smiles(node_data["mol_smiles"]), 
+                                        enforced_building_blocks_file=self.enforced_building_blocks_file
+                                    )
+                                    if is_matched:
+                                        self.matched_generated_smiles[oracle_calls].append(generated_smiles)
+                                        break
 
                             is_solved[idx] = int(is_matched)
                             steps[idx] = steps[idx] if is_matched else 99
@@ -344,11 +339,6 @@ class Syntheseus(OracleComponent):
 
                         if oracle_calls not in self.matched_generated_smiles_with_rxn:
                             self.matched_generated_smiles_with_rxn[oracle_calls] = []
-
-                        route = self._extract_syntheseus_route_data(
-                            route_path=os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
-                            data_type="all"
-                        ) 
                         
                         # The returned nodes are all Reaction nodes - extract reaction information from them
                         reaction_depth_smiles = []  # [(depth, rxn_smiles), ...]
@@ -530,7 +520,7 @@ class Syntheseus(OracleComponent):
                         if node_rewards[idx] == 1.0:
                             self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
-                        elif (self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_building_blocks_parameters.use_dense_reward) and is_solved[idx] == 1:
+                        elif (self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_building_blocks_parameters.use_dense_reward):
                             self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
                         # In case of redundancy
@@ -617,147 +607,6 @@ class Syntheseus(OracleComponent):
         # Write the data to the YAML file
         with open(os.path.join(dir_path, "config.yml"), "w") as f:
             yaml.dump(config, f, default_flow_style=False)
-
-    def _write_out_top_synthesis_graphs(
-        self,
-        oracle_history: pd.DataFrame,
-    ) -> bool:
-        """
-        Sort the Oracle History by reward and extract the corresponding Syntheseus synthesis graphs PDF files. 
-        The purpose of this function is to automatically allow the user to visualize the synthesis routes for the top molecules.
-
-        Returns:
-            True if there are any solved molecules, False otherwise
-        """
-        # Output JSON with all relevant metrics and information
-        output = {}
-        
-        # Keep only syntheseus_reward = 1, as these are the solved molecules
-        oracle_history = oracle_history.loc[oracle_history["syntheseus_reward"] == 1]
-        # If there are no solved molecules, return
-        solved_exists = len(oracle_history) > 0
-        if not solved_exists:
-            return solved_exists
-        
-        # Sort the Oracle History by reward and extract the top percentage
-        oracle_history = oracle_history.sort_values(by="reward", ascending=False)
-        oracle_history = oracle_history.head(int(self.percentage_to_save * len(oracle_history)))
-        
-        # Loop through each top generated SMILES, extract the Syntheseus graph, and track which enforced smiles is visited (if applicable)
-        enforced_blocks = []
-        syntheseus_outputs = os.listdir(self.output_dir)
-        pdf_paths = []
-
-        for idx, (_, row) in enumerate(oracle_history.iterrows()):
-            oracle_calls = int(row["oracle_calls"])
-            generated_smiles = row["smiles"]
-            # Extract the Oracle raw values
-            reward = {
-                "reward": row["reward"],
-                **{col: row[col] for col in row.index if "raw_values" in col}
-            }
-            
-            # Find the syntheseus output folder with the closest *smaller* number of oracle calls
-            # FIXME: This is because currently, oracle calls is incremented before the Oracle History is updated. Fix this in the future. This is inelegant
-            closest_smaller_oracle_calls_folder = max(
-                [
-                    folder for folder in syntheseus_outputs 
-                    if not folder.endswith(".json") and 
-                    not folder.endswith(".pdf") and 
-                    not "graphs" in folder and
-                    int(folder.split("_")[-1]) < oracle_calls
-                ],
-                key=lambda x: int(x.split("_")[-1])
-            )
-
-            # All the Mols matching the oracle calls
-            mol_folder = os.listdir(os.path.join(self.output_dir, closest_smaller_oracle_calls_folder))
-            # Loop through each to find the correct molecule
-            for individual_mol_folder in mol_folder:
-                added = False
-                all_output_files = os.listdir(os.path.join(self.output_dir, closest_smaller_oracle_calls_folder, individual_mol_folder))
-                # Check if the Mol is solved
-                if "route_0.pkl" in all_output_files:
-                    # Extract the route Mol data
-                    route = self._extract_syntheseus_route_data(
-                        route_path=os.path.join(self.output_dir, closest_smaller_oracle_calls_folder, individual_mol_folder, "route_0.pkl"),
-                        data_type="mol"
-                    )
-                    # Track which enforced block is visited (if applicable)
-                    specific_enforced_block = None
-
-                    for node, node_data in route.items():
-                        # Check if the generated SMILES is in the route
-                        if node_data["depth"] == 0 and canonicalize_smiles(node_data["smiles"]) == canonicalize_smiles(generated_smiles):
-                            pdf_paths.append(os.path.join(self.output_dir, closest_smaller_oracle_calls_folder, individual_mol_folder, "route_0.pdf"))
-                            added = True  
-                            if self.enforced_building_blocks_parameters.enforce_blocks:
-                                # Extract which enforced block is present
-                                for intermediate_node, intermediate_node_data in route.items():
-                                    canonical_intermediate_smiles = canonicalize_smiles(intermediate_node_data["smiles"])  # Canonicalize in case
-                                    if canonical_intermediate_smiles in self.enforced_building_blocks_smiles:
-                                        enforced_blocks.append(canonical_intermediate_smiles)
-                                        specific_enforced_block = canonical_intermediate_smiles
-                                        break
-                            if added:
-                                break
-                    if added:
-                        break
-
-            # Get Synthesis data
-            synthesis_data = self._extract_syntheseus_route_data(
-                route_path=os.path.join(self.output_dir, closest_smaller_oracle_calls_folder, individual_mol_folder, "route_0.pkl"),
-                data_type="all"
-            )     
-
-            # For each Reaction node (is_rxn = True), extract the reaction information if the user specified to include reaction information
-            if self.include_rxn_info:
-                for node, node_data in synthesis_data.items():
-                    if node_data["is_rxn"]:
-                        extraction_result = subprocess.run([
-                            "conda",
-                            "run", 
-                            "-n",
-                            self.rxn_insight_env_name, 
-                            "python", 
-                            self.rxn_insight_extraction_script_path, 
-                            # Pass the rxn SMILES extracted from the Syntheseus route
-                            node_data["rxn_smiles"]
-                        ], capture_output=True, text=True)
-
-                        # Check for errors
-                        assert extraction_result.returncode == 0, f"Error during Rxn-INSIGHT reaction information extraction: {extraction_result.stderr}"
-                        rxn_info = ast.literal_eval(extraction_result.stdout)
-                        node_data["rxn_class"] = rxn_info["CLASS"]
-                        node_data["rxn_name"] = rxn_info["NAME"]
-
-            # Construct the JSON for the current molecule
-            output[generated_smiles] = {
-                "reward": reward,
-                "synthesis_data": synthesis_data,
-                "enforced_block": specific_enforced_block
-            }
-
-        # Save the output JSON
-        os.makedirs(os.path.join(self.output_dir, "top_synthesis_graphs"), exist_ok=True)
-        with open(os.path.join(self.output_dir, "top_synthesis_graphs", "top_synthesis_graphs.json"), "w") as f:
-            json.dump(output, f, indent=4)
-
-        # Loop through each successful path and copy the "route_0.pdf" the syntheseus results directory
-        for idx, path in enumerate(pdf_paths):
-            os.system(f"cp {path} {os.path.join(self.output_dir, f'top_synthesis_graphs/route_{idx+1}.pdf')}")
-
-        # Add the enforced blocks to the oracle history
-        if self.enforced_building_blocks_parameters.enforce_blocks:
-            try:
-                oracle_history["enforced_blocks"] = enforced_blocks
-            except Exception as e:
-                print(f"Error adding enforced blocks to oracle history: {e}")
-                oracle_history["enforced_blocks"] = ["nan"] * len(oracle_history)
-
-        oracle_history.to_csv(os.path.join(self.output_dir, "top_synthesis_graphs", "top_synthesis_graphs.csv"), index=False)
-
-        return solved_exists
     
     def _write_out_smiles_rxn_tracker(self) -> None:
         with open(os.path.join(self.output_dir, "smiles_rxn_tracker.json"), "w") as f:
@@ -766,7 +615,6 @@ class Syntheseus(OracleComponent):
     def _extract_syntheseus_route_data(
         self,
         route_path: str,
-        data_type: str
     ) -> Dict[str, Union[str, int]]:
         # Read Syntheseus route data from the pickle file and extract the Mols or Reactions
         # HACK: This (temporary) solution enables reading the pickled data *without* installing Syntheseus into the Saturn environment
@@ -779,11 +627,10 @@ class Syntheseus(OracleComponent):
             self.route_extraction_script_path, 
             # NOTE: We set Syntheseus to terminate after 1 route is found, so the index is always 0
             route_path,
-            data_type,  # "mol", "rxn", or "all"
         ], capture_output=True, text=True)
 
         # Check for errors
-        assert extraction_result.returncode == 0, f"Error during Syntheseus route ({data_type}) data extraction: {extraction_result.stderr}"
+        assert extraction_result.returncode == 0, f"Error during Syntheseus route data extraction: {extraction_result.stderr}"
         route = json.loads(extraction_result.stdout)
 
         return route

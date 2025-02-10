@@ -246,9 +246,9 @@ def write_out_top_syntheseus_graphs(
         # Construct the JSON for the current molecule
         output[generated_smiles] = {
             "reward": reward,
+            "enforced_block": synthesis_data["enforced_block"],
             # FIXME: This is due to the current GUI expecting a certain data structure
             "synthesis_data": {k:v for k,v in synthesis_data.items() if k != "enforced_block"},
-            "enforced_block": synthesis_data["enforced_block"],
         }
 
     return output
