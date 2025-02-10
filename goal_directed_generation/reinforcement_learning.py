@@ -123,6 +123,9 @@ class ReinforcementLearningAgent:
 
             # 2. Remove molecules with radicals
             smiles = chemistry_utils.remove_molecules_with_radicals(smiles)
+            if len(smiles) == 0:
+                logging.info("No valid SMILES in this batch. Generating a new batch.")
+                continue
 
             # 3. Compute Validity and guard against Agent drift leading to invalid SMILES
             # NOTE: This is a rare occurrence and has been observed with repeated 0 reward batches
