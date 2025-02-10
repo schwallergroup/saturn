@@ -222,11 +222,9 @@ class NCircles():
         return len(vecs)
 
 def write_out_top_syntheseus_graphs(
-    oracle_history: pd.DataFrame,
-    syntheseus_folder: str,
-    syntheseus_path_script: str,
+    top_oracle_history: pd.DataFrame,
     smiles_rxn_tracker: dict
-) -> None:
+) -> Dict[str, Dict[str, Union[str, int]]]:
     """
     Extract the Syntheseus synthesis graph information for the highest reward molecules (given they satisfy all reaction constraints).
     The purpose of this function is to automatically allow the user to visualize the synthesis routes for the top molecules.
@@ -234,84 +232,25 @@ def write_out_top_syntheseus_graphs(
     # Output JSON with all relevant metrics and information
     output = {}
 
-    syntheseus_outputs = os.listdir(syntheseus_folder)
-
-    for idx, (_, row) in enumerate(oracle_history.iterrows()):
-        oracle_calls = int(row["oracle_calls"])
-        generated_smiles = row["smiles"]
-        # Extract the Oracle raw values
+    for idx, (_, row) in enumerate(top_oracle_history.iterrows()):
+        generated_smiles = canonicalize_smiles(row["smiles"])
+        # Extract the Oracle raw reward values
         reward = {
             "reward": row["reward"],
             **{col: row[col] for col in row.index if "raw_values" in col}
         }
-        
-        # NOTE: This code is used to find the exact path to the syntheseus output for the generated molecule
-        # Find the Syntheseus output folder with the closest *smaller* number of oracle calls
-        # FIXME: This is because currently, oracle calls is incremented before the Oracle History is updated. Fix this in the future. This is inelegant
-        closest_smaller_oracle_calls_folder = max(
-            [
-                folder for folder in syntheseus_outputs 
-                if not folder.endswith(".json") and 
-                not folder.endswith(".pdf") and 
-                not "graphs" in folder and
-                int(folder.split("_")[-1]) < oracle_calls
-            ],
-            key=lambda x: int(x.split("_")[-1])
-        )
 
-        # All the Mols matching the oracle calls
-        mol_folder = os.listdir(os.path.join(syntheseus_folder, closest_smaller_oracle_calls_folder))
-        # Loop through each to find the correct molecule
-        for individual_mol_folder in mol_folder:
-            added = False
-            all_output_files = os.listdir(os.path.join(syntheseus_folder, closest_smaller_oracle_calls_folder, individual_mol_folder))
-            # Check if the Mol is solved
-            if "route_0.pkl" in all_output_files:
-                # Extract the route Mol data
-                route = extract_syntheseus_route_data(
-                    route_path=os.path.join(syntheseus_folder, closest_smaller_oracle_calls_folder, individual_mol_folder, "route_0.pkl"),
-                    data_type="mol",
-                    syntheseus_script_path=syntheseus_path_script,
-                )
-                for node, node_data in route.items():
-                    # Check if the generated SMILES is in the route
-                    if node_data["depth"] == 0 and canonicalize_smiles(node_data["smiles"]) == canonicalize_smiles(generated_smiles):
-                        added = True  
-                        if added:
-                            break
-                if added:
-                    break
-
-        # Get Synthesis data
-        synthesis_data = extract_syntheseus_route_data(
-            route_path=os.path.join(syntheseus_folder, closest_smaller_oracle_calls_folder, individual_mol_folder, "route_0.pkl"),
-            data_type="all",
-            syntheseus_script_path=syntheseus_path_script
-        )     
-
-        # For each Reaction node (is_rxn = True), extract the reaction information if the user specified to include reaction information
-        for node, node_data in synthesis_data.items():
-            # Nodes are traversed from the root because the extraction script above sorts them by depth so the first one should alwayas be the generated molecule
-            # FIXME: Canonicalization calls below should be redundant
-            if node_data["depth"] == 0:
-                generated_smiles = canonicalize_smiles(node_data["mol_smiles"])
-            elif node_data["is_rxn"]:
-                # Extract the enforced block, rxn_class, and rxn_name based on the matching rxn_smiles
-                rxn_info = smiles_rxn_tracker[generated_smiles]
-                specific_enforced_block = rxn_info["enforced_block"]
-
-                for depth, individual_rxn_info in rxn_info.items():
-                    if individual_rxn_info["rxn_smiles"] == node_data["rxn_smiles"]:
-                        node_data["rxn_class"] = individual_rxn_info["rxn_class"]
-                        node_data["rxn_name"] = individual_rxn_info["rxn_name"]
-                        break
+        # Extract the synthesis constraints information (enforced block and/or reaction)
+        synthesis_data = smiles_rxn_tracker[generated_smiles]
 
         # Construct the JSON for the current molecule
         output[generated_smiles] = {
             "reward": reward,
-            "synthesis_data": synthesis_data,
-            "enforced_block": specific_enforced_block
+            # FIXME: This is due to the current GUI expecting a certain data structure
+            "synthesis_data": {k:v for k,v in synthesis_data.items() if k != "enforced_block"},
+            "enforced_block": synthesis_data["enforced_block"],
         }
+
     return output
 
 def extract_syntheseus_route_data(
@@ -528,6 +467,7 @@ def legacy(
             **{col: row[col] for col in row.index if "raw_values" in col}
         }
         
+        # NOTE: This code is used to find the exact path to the syntheseus output for the generated molecule
         # Find the Syntheseus output folder with the closest *smaller* number of oracle calls
         # FIXME: This is because currently, oracle calls is incremented before the Oracle History is updated. Fix this in the future. This is inelegant
         closest_smaller_oracle_calls_folder = max(

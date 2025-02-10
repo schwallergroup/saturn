@@ -267,11 +267,8 @@ def log_molecule_and_rxn_metrics(
         # For each DataFrame, slice the top % and save routes for visualization
         for df, seed in top_oracle_histories:
 
-            syntheseus_path = os.path.join(seed, "syntheseus_results")
             extracted_graph = write_out_top_syntheseus_graphs(
-                oracle_history=df,
-                syntheseus_folder=syntheseus_path,
-                syntheseus_path_script=ROUTE_EXTRACTION_SCRIPT,
+                top_oracle_history=df,
                 smiles_rxn_tracker=smiles_rxn_tracker
             )
         
