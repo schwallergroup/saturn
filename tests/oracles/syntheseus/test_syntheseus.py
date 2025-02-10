@@ -163,7 +163,7 @@ def test_normal_synthesizability(aripiprazole_mol, aripiprazole_hexane_chain_mol
         oracle_calls=1
     )
     assert len(solved) == 1, "Expected 1 molecule in the SMILES list"
-    assert (solved == np.array([2])).all(), "Expected the aripiprazole to be solved"
+    assert (solved == np.array([2])).all(), "Expected aripiprazole to be solved"
 
     # Test 2 molecules since Syntheseus results parsing is difference when > 1 input molecules
     solved = syntheseus_oracle(
@@ -171,7 +171,7 @@ def test_normal_synthesizability(aripiprazole_mol, aripiprazole_hexane_chain_mol
         oracle_calls=1
     )
     assert len(solved) == 2, "Expected 2 molecules in the SMILES list"
-    assert (solved == np.array([2, -99])).all(), "Expected the aripiprazole to be solved and the hexane chain to be unsolvable"
+    assert (solved == np.array([2, -99])).all(), "Expected aripiprazole to be solved and the hexane chain to be unsolvable"
 
 def test_rxn_class_synthesizability(aripiprazole_mol, amide_mol, base_oracle_params):
     """
