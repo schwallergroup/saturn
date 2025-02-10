@@ -2,9 +2,7 @@
 from typing import Dict, List, Tuple, Union
 import os
 import logging
-import subprocess
 import json
-import ast
 import random
 import datetime
 import pandas as pd
@@ -253,32 +251,6 @@ def write_out_top_syntheseus_graphs(
 
     return output
 
-def extract_syntheseus_route_data(
-    route_path: str,
-    data_type: str,
-    syntheseus_script_path: str
-) -> Dict[str, Union[str, int]]:
-    
-    # Read Syntheseus route data from the pickle file and extract the Mols or Reactions
-    # HACK: This (temporary) solution enables reading the pickled data *without* installing Syntheseus into the Saturn environment
-    extraction_result = subprocess.run([
-        "conda", 
-        "run", 
-        "-n",
-        "syntheseus-full", 
-        "python", 
-        syntheseus_script_path, 
-        # NOTE: We set Syntheseus to terminate after 1 route is found, so the index is always 0
-        route_path,
-        data_type,  # "mol", "rxn", or "all"
-    ], capture_output=True, text=True)
-
-    # Check for errors
-    assert extraction_result.returncode == 0, f"Error during Syntheseus route ({data_type}) data extraction: {extraction_result.stderr}"
-    route = json.loads(extraction_result.stdout)
-
-    return route
-
 def get_run_data(path: str) -> Tuple[bool, bool, str]:
     """
     Take run .json file and get info related to reaction and building blocks.
@@ -432,119 +404,3 @@ def plot_rxn_classes(
     plt.tight_layout()
 
     plt.savefig(os.path.join(save_dir, f"{experiment_name}-rxn-distribution.png"))
-
-# NOTE: Legacy function: not used anymore
-def legacy(
-    oracle_history: pd.DataFrame,
-    syntheseus_folder: str,
-    enforce_building_blocks: bool,
-    enforced_building_blocks_file: str,
-    syntheseus_path_script: str,
-    rxn_insight_path_script: str,
-    use_namerxn: bool,
-    namerxn_binary_path: str,
-    name_rxn_path_script: str
-) -> None:
-    """
-    Extract the Syntheseus synthesis graph PDF files for the highest reward molecules (given they satisfy all reaction constraints).
-    The purpose of this function is to automatically allow the user to visualize the synthesis routes for the top molecules.
-    """
-    # Output JSON with all relevant metrics and information
-    output = {}
-    
-    # Loop through each top generated SMILES, extract the Syntheseus graph, and track which enforced smiles is visited (if applicable)
-    if enforce_building_blocks:
-        enforced_building_blocks_smiles = set([canonicalize_smiles(s) for s in open(enforced_building_blocks_file).readlines()])
-
-    syntheseus_outputs = os.listdir(syntheseus_folder)
-
-    for idx, (_, row) in enumerate(oracle_history.iterrows()):
-        oracle_calls = int(row["oracle_calls"])
-        generated_smiles = row["smiles"]
-        # Extract the Oracle raw values
-        reward = {
-            "reward": row["reward"],
-            **{col: row[col] for col in row.index if "raw_values" in col}
-        }
-        
-        # NOTE: This code is used to find the exact path to the syntheseus output for the generated molecule
-        # Find the Syntheseus output folder with the closest *smaller* number of oracle calls
-        # FIXME: This is because currently, oracle calls is incremented before the Oracle History is updated. Fix this in the future. This is inelegant
-        closest_smaller_oracle_calls_folder = max(
-            [
-                folder for folder in syntheseus_outputs 
-                if not folder.endswith(".json") and 
-                not folder.endswith(".pdf") and 
-                not "graphs" in folder and
-                int(folder.split("_")[-1]) < oracle_calls
-            ],
-            key=lambda x: int(x.split("_")[-1])
-        )
-
-        # All the Mols matching the oracle calls
-        mol_folder = os.listdir(os.path.join(syntheseus_folder, closest_smaller_oracle_calls_folder))
-        # Loop through each to find the correct molecule
-        for individual_mol_folder in mol_folder:
-            added = False
-            all_output_files = os.listdir(os.path.join(syntheseus_folder, closest_smaller_oracle_calls_folder, individual_mol_folder))
-            # Check if the Mol is solved
-            if "route_0.pkl" in all_output_files:
-                # Extract the route Mol data
-                route = extract_syntheseus_route_data(
-                    route_path=os.path.join(syntheseus_folder, closest_smaller_oracle_calls_folder, individual_mol_folder, "route_0.pkl"),
-                    data_type="mol",
-                    syntheseus_script_path=syntheseus_path_script,
-                )
-                # Track which enforced block is visited (if applicable)
-                specific_enforced_block = None
-
-                for node, node_data in route.items():
-                    # Check if the generated SMILES is in the route
-                    if node_data["depth"] == 0 and canonicalize_smiles(node_data["smiles"]) == canonicalize_smiles(generated_smiles):
-                        added = True  
-                        if enforce_building_blocks:
-                            # Extract which enforced block is present
-                            for intermediate_node, intermediate_node_data in route.items():
-                                canonical_intermediate_smiles = canonicalize_smiles(intermediate_node_data["smiles"])  # Canonicalize in case
-                                if canonical_intermediate_smiles in enforced_building_blocks_smiles:
-                                    specific_enforced_block = canonical_intermediate_smiles
-                                    break
-                        if added:
-                            break
-                if added:
-                    break
-
-        # Get Synthesis data
-        synthesis_data = extract_syntheseus_route_data(
-            route_path=os.path.join(syntheseus_folder, closest_smaller_oracle_calls_folder, individual_mol_folder, "route_0.pkl"),
-            data_type="all",
-            syntheseus_script_path=syntheseus_path_script
-        )     
-
-        # For each Reaction node (is_rxn = True), extract the reaction information if the user specified to include reaction information
-        for node, node_data in synthesis_data.items():
-            if node_data["is_rxn"]:
-                extraction_result = subprocess.run([
-                    "conda",
-                    "run", 
-                    "-n",
-                    "rxn-insight", 
-                    "python", 
-                    rxn_insight_path_script, 
-                    # Pass the rxn SMILES extracted from the Syntheseus route
-                    node_data["rxn_smiles"]
-                ], capture_output=True, text=True)
-
-                # Check for errors
-                assert extraction_result.returncode == 0, f"Error during Rxn-INSIGHT reaction information extraction: {extraction_result.stderr}"
-                rxn_info = ast.literal_eval(extraction_result.stdout)
-                node_data["rxn_class"] = rxn_info["CLASS"]
-                node_data["rxn_name"] = rxn_info["NAME"]
-
-        # Construct the JSON for the current molecule
-        output[generated_smiles] = {
-            "reward": reward,
-            "synthesis_data": synthesis_data,
-            "enforced_block": specific_enforced_block
-        }
-    return output

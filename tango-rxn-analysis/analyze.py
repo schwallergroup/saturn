@@ -50,12 +50,6 @@ def get_docking_score_enum(docking_oracle: str) -> str:
     else:
         raise ValueError(f"Docking oracle {docking_oracle} not supported")
 
-# Fixed utility script paths
-SATURN_BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ROUTE_EXTRACTION_SCRIPT = os.path.join(SATURN_BASE_PATH, "oracles/synthesizability/utils/extract_syntheseus_route_data.py")
-RXN_INSIGHT_EXTRACTION_SCRIPT = os.path.join(SATURN_BASE_PATH, "oracles/synthesizability/utils/extract_rxn_insight_info.py")
-NAME_RXN_EXTRACTION_SCRIPT = os.path.join(SATURN_BASE_PATH, "oracles/synthesizability/utils/extract_namerxn_info.py")
-
 def log_synthesizable_metrics(seeds: List[str]) -> None:
     """Log number of synthesizable molecules."""
     N = 0
