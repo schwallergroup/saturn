@@ -251,12 +251,12 @@ def log_molecule_and_rxn_metrics(
     log_pooled_molecules_metrics(metrics_highest_reward, f"Top {save_top_percentage_routes * 100}% by Reward, Docking Scores:")
 
     # Plot evolution of reaction classes
-    plot_rxn_evolution(
-        smiles_rxn_tracker=smiles_rxn_tracker,
-        enforced_rxn=experiment_name,
-        save_dir=save_dir,
-        experiment_name=experiment_name
-    )
+    #plot_rxn_evolution(
+    #    smiles_rxn_tracker=smiles_rxn_tracker,
+    #    enforced_rxn=experiment_name,
+    #    save_dir=save_dir,
+    #    experiment_name=experiment_name
+    #)
     
     # If save_top_graphs, iterate over graphs, save them and plot reaction distribution
     if save_top_graphs:
@@ -308,16 +308,16 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "--experiments",
-        nargs="+",
-        required=True,
-        help="Names of the experiment folders to analyze."
-    )
-    parser.add_argument(
         "--experiment_path",
         type=str,
         required=True,
         help="Path to parent directory containing the experiment folders."
+    )
+    parser.add_argument(
+        "--experiments",
+        nargs="+",
+        required=True,
+        help="Names of the experiment folders to analyze."
     )
     parser.add_argument(
         "--save_top_graphs",
@@ -351,8 +351,8 @@ if __name__ == "__main__":
         logging.info(f"Starting analysis for experiment: {experiment_name}\n")
 
         path = os.path.join(args.experiment_path, experiment_name)
-        seeds = [os.path.join(path, f"seed{seed}") for seed in range(5) if os.path.exists(os.path.join(path, f"seed{seed}"))]
-        assert len(seeds) == 5, f"Expected 5 seeds, found {len(seeds)} for experiment {experiment_name}."
+        seeds = [os.path.join(path, f"seed{seed}") for seed in range(1) if os.path.exists(os.path.join(path, f"seed{seed}"))]
+        #assert len(seeds) == 5, f"Expected 5 seeds, found {len(seeds)} for experiment {experiment_name}."
 
         logging.info(f"----- Results for: {experiment_name} -----")
 

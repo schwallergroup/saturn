@@ -368,8 +368,9 @@ def plot_rxn_evolution(
     experiment_name: str
 ) -> None:
     """Plot evolution of reaction classes."""
+    # TODO: subplot for each seed
     # Load data
-    seed = 1
+    seed = 0
     experiment_path = f"test_files/{enforced_rxn}/seed{seed}"
     oracle_history = pd.read_csv(f"{experiment_path}/oracle_history.csv")
     oracle_history["canonical_smiles"] = oracle_history["smiles"].apply(canonicalize_smiles)
@@ -429,7 +430,6 @@ def plot_rxn_evolution(
     plt.tight_layout()
     
     plt.savefig(os.path.join(save_dir, f"{experiment_name}-rxn-evolution.png"))
-
 
 def count_rxn_graph(top_graphs: Dict[str, Union[str, float]]) -> Union[Dict[str, int], List[int]]:
     """
