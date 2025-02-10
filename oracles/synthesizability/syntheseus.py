@@ -347,13 +347,14 @@ class Syntheseus(OracleComponent):
 
                         route = self._extract_syntheseus_route_data(
                             route_path=os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
-                            data_type="rxn"
+                            data_type="all"
                         ) 
                         
                         # The returned nodes are all Reaction nodes - extract reaction information from them
                         reaction_depth_smiles = []  # [(depth, rxn_smiles), ...]
                         for node, node_data in route.items():
-                            reaction_depth_smiles.append((node_data["depth"], node_data["rxn_smiles"]))
+                            if node_data["is_rxn"]:
+                                reaction_depth_smiles.append((node_data["depth"], node_data["rxn_smiles"]))
 
                         all_rxns_labels = []  # List[Tuple[str, str]] --> (rxn_class, rxn_name)
                 
@@ -400,7 +401,7 @@ class Syntheseus(OracleComponent):
 
                                 all_rxns_labels.append((rxn_info["CLASS"], rxn_info["NAME"]))
 
-                        # Track all reactions present in the route
+                        # Track all reaction information for the route
                         # NOTE: This is for *all* generated molecules that have a solved route
                         rxn_dict = {
                             "oracle_calls": oracle_calls,
@@ -408,13 +409,22 @@ class Syntheseus(OracleComponent):
                         }
                         # NOTE: Even if the user is enforcing blocks, matched_block_smiles can be None if no match is found
                         rxn_dict["enforced_block"] = matched_block_smiles if self.enforced_building_blocks_parameters.enforce_blocks else None
-                        for (depth, rxn_smiles), (rxn_class, rxn_name) in zip(reaction_depth_smiles, all_rxns_labels):
-                            rxn_dict[depth] = {
-                                "rxn_smiles": rxn_smiles,
-                                "rxn_class": rxn_class,
-                                "rxn_name": rxn_name
-                            }
-                        self.smiles_rxn_tracker[generated_smiles] = rxn_dict
+                        # All the information required to re-construct the synthesis graph
+                        for node, node_data in route.items():
+                            if node_data["is_rxn"]:
+                                for (depth, rxn_smiles), (rxn_class, rxn_name) in zip(reaction_depth_smiles, all_rxns_labels):
+                                    if depth == node_data["depth"]:
+                                        if rxn_smiles == node_data["rxn_smiles"]:
+                                            node_data["rxn_class"] = rxn_class
+                                            node_data["rxn_name"] = rxn_name
+
+                        # Double check that all reaction classes and names are assigned
+                        for node, node_data in route.items():
+                            if node_data["is_rxn"]:
+                                assert node_data["rxn_class"] is not None
+                                assert node_data["rxn_name"] is not None
+                        
+                        self.smiles_rxn_tracker[generated_smiles] = {**rxn_dict, **route}
 
                     # Assume the reaction constraints are not satisfied
                     rxn_multiplier = 0.0
