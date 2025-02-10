@@ -397,7 +397,10 @@ class Syntheseus(OracleComponent):
                             "rxn_steps": int(steps[idx])
                         }
                         # NOTE: Even if the user is enforcing blocks, matched_block_smiles can be None if no match is found
-                        rxn_dict["enforced_block"] = matched_block_smiles if self.enforced_building_blocks_parameters.enforce_blocks else None
+                        if self.enforced_building_blocks_parameters.enforce_blocks:
+                            rxn_dict["enforced_block"] = matched_block_smiles
+                        else:
+                            rxn_dict["enforced_block"] = None
                         # All the information required to re-construct the synthesis graph
                         for node, node_data in route.items():
                             if node_data["is_rxn"]:

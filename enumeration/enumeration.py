@@ -46,7 +46,6 @@ def sample_react(rxn: Dict[str, Union[List, str]]) -> str:
 
     return product 
 
-
 def sample_products(
     rxns: Dict[str, List],
     n_seeds: int,
@@ -108,21 +107,19 @@ def sample_products(
             solved_smiles = [smiles for smiles, reward in 
                              zip(smiles_batch, syntheseus_rewards) if reward != 0]
 
-
             enumerated_smiles.update(solved_smiles)
 
     end_time = time.perf_counter()
     print(f"Enumeration seeding time: {end_time - start_time} seconds")
     
-    return list(enumerated_smiles)
-
+    return list(enumerated_smiles)[:n_seeds]
 
 def rxn_based_enumeration(
     prior_path: str,
     device: str,
     syntheseus_params: Dict[str, str],
     syntheseus_oracle: Syntheseus,
-    n_seeds: int = 100,
+    n_seeds: int
 ) -> List[str]:
     """
     Enumerate molecules using specified reactions and building blocks.
