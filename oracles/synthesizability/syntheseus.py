@@ -250,281 +250,283 @@ class Syntheseus(OracleComponent):
                 # Store the current generated SMILES being considered
                 generated_smiles = canonicalize_smiles(smiles[idx])
 
-                # ------------------------
-                # ENFORCED BUILDING BLOCKS
-                # ------------------------
+                if int(is_solved[idx]) == 1:
+                    # ------------------------
+                    # ENFORCED BUILDING BLOCKS
+                    # ------------------------
 
-                # If the molecule is solved *and* the user specified to enforce that a set of building blocks appears in the synthesis graph
-                if self.enforced_building_blocks_parameters.enforce_blocks and int(is_solved[idx]) == 1:
+                    # If the molecule is solved *and* the user specified to enforce that a set of building blocks appears in the synthesis graph
+                    if self.enforced_building_blocks_parameters.enforce_blocks:
 
-                    if oracle_calls not in self.matched_generated_smiles:
-                        self.matched_generated_smiles[oracle_calls] = []
+                        if oracle_calls not in self.matched_generated_smiles:
+                            self.matched_generated_smiles[oracle_calls] = []
 
-                    route = self._extract_syntheseus_route_data(
-                        route_path=os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
-                        data_type="mol"
-                    )
+                        route = self._extract_syntheseus_route_data(
+                            route_path=os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
+                            data_type="mol"
+                        )
 
-                    # Track the synthesis pathway contains an enforced building block
-                    is_matched = False
-                    
-                    # Check whether to use dense reward
-                    if self.use_dense_reward:
-                        max_reward = 0.0
-                        max_depth = self._get_max_depth(route)
+                        # Track the synthesis pathway contains an enforced building block
+                        is_matched = False
+                        
+                        # Check whether to use dense reward
+                        if self.use_dense_reward:
+                            max_reward = 0.0
+                            max_depth = self._get_max_depth(route)
 
-                        # Loop through the nodes and compute the reward for each node
-                        for node, node_data in route.items():
-                            # Skip root node because this is the generated molecule
-                            if node_data["depth"] == 0:
-                                continue
-                            # If the user specified that enforced building blocks must appear in the nodes at max depth (starting-material)
-                            if self.enforce_start:
-                                if not node_data["depth"] == max_depth:
+                            # Loop through the nodes and compute the reward for each node
+                            for node, node_data in route.items():
+                                # Skip root node because this is the generated molecule
+                                if node_data["depth"] == 0:
                                     continue
-                            # Compute the node's reward
-                            node_reward = get_node_reward(
-                                reward_type=self.reward_type,
-                                query_smiles=canonicalize_smiles(node_data["smiles"]),
-                                enforce_blocks_fps=self.enforced_building_blocks_fps,
-                                enforced_blocks_functional_groups=self.enforced_building_blocks_functional_groups,
-                                tango_weights=self.tango_weights
-                            )
-                            max_reward = max(max_reward, node_reward)
-                            # Check if the node exactly matches an enforced building block
-                            is_matched, matched_block_smiles = match_stock(
-                                query_smiles=canonicalize_smiles(node_data["smiles"]),
-                                enforced_building_blocks_file=self.enforced_building_blocks_file
-                            )
-                            if is_matched:
-                                assert max_reward == 1.0
-                                self.matched_generated_smiles[oracle_calls].append(generated_smiles)
-                                break
-                    
-                        node_rewards[idx] = max_reward
-                    
-                    # Otherwise, match *exactly*
-                    else:
-                        max_depth = self._get_max_depth(route)
-                        for node, node_data in route.items():
-                            # Skip root node because this is the generated molecule
-                            if node_data["depth"] == 0:
-                                continue
-                            # If the user specified that enforced building blocks must appear in the *leaf* nodes
-                            if self.enforce_start:
-                                if not node_data["depth"] == max_depth:
+                                # If the user specified that enforced building blocks must appear in the nodes at max depth (starting-material)
+                                if self.enforce_start:
+                                    if not node_data["depth"] == max_depth:
+                                        continue
+                                # Compute the node's reward
+                                node_reward = get_node_reward(
+                                    reward_type=self.reward_type,
+                                    query_smiles=canonicalize_smiles(node_data["smiles"]),
+                                    enforce_blocks_fps=self.enforced_building_blocks_fps,
+                                    enforced_blocks_functional_groups=self.enforced_building_blocks_functional_groups,
+                                    tango_weights=self.tango_weights
+                                )
+                                max_reward = max(max_reward, node_reward)
+                                # Check if the node exactly matches an enforced building block
+                                is_matched, matched_block_smiles = match_stock(
+                                    query_smiles=canonicalize_smiles(node_data["smiles"]),
+                                    enforced_building_blocks_file=self.enforced_building_blocks_file
+                                )
+                                if is_matched:
+                                    assert max_reward == 1.0
+                                    self.matched_generated_smiles[oracle_calls].append(generated_smiles)
+                                    break
+                        
+                            node_rewards[idx] = max_reward
+                        
+                        # Otherwise, match *exactly*
+                        else:
+                            max_depth = self._get_max_depth(route)
+                            for node, node_data in route.items():
+                                # Skip root node because this is the generated molecule
+                                if node_data["depth"] == 0:
                                     continue
-                            # Otherwise, just check if *any* node has a matching SMILES in the enforced building blocks file
-                            # NOTE: this means that the enforced building blocks appear *somewhere* in the synthesis graph
-                            is_matched, matched_block_smiles = match_stock(
-                                query_smiles=canonicalize_smiles(node_data["smiles"]), 
-                                enforced_building_blocks_file=self.enforced_building_blocks_file
-                            )
-                            if is_matched:
-                                self.matched_generated_smiles[oracle_calls].append(generated_smiles)
-                                break
+                                # If the user specified that enforced building blocks must appear in the *leaf* nodes
+                                if self.enforce_start:
+                                    if not node_data["depth"] == max_depth:
+                                        continue
+                                # Otherwise, just check if *any* node has a matching SMILES in the enforced building blocks file
+                                # NOTE: this means that the enforced building blocks appear *somewhere* in the synthesis graph
+                                is_matched, matched_block_smiles = match_stock(
+                                    query_smiles=canonicalize_smiles(node_data["smiles"]), 
+                                    enforced_building_blocks_file=self.enforced_building_blocks_file
+                                )
+                                if is_matched:
+                                    self.matched_generated_smiles[oracle_calls].append(generated_smiles)
+                                    break
 
-                        is_solved[idx] = int(is_matched)
-                        steps[idx] = steps[idx] if is_matched else 99
+                            is_solved[idx] = int(is_matched)
+                            steps[idx] = steps[idx] if is_matched else 99
 
-                    # In case of redundancy
-                    self.matched_generated_smiles[oracle_calls] = list(set(self.matched_generated_smiles[oracle_calls]))
-                    with open(os.path.join(self.output_dir, "matched_generated_smiles.json"), "w") as f:
-                        json.dump(self.matched_generated_smiles, f, indent=4)
+                        # In case of redundancy
+                        self.matched_generated_smiles[oracle_calls] = list(set(self.matched_generated_smiles[oracle_calls]))
+                        with open(os.path.join(self.output_dir, "matched_generated_smiles.json"), "w") as f:
+                            json.dump(self.matched_generated_smiles, f, indent=4)
 
-                # ------------------
-                # ENFORCED REACTIONS
-                # ------------------
+                    # ------------------
+                    # ENFORCED REACTIONS
+                    # ------------------
 
-                # Extract all reactions in the Syntheseus route if this information is required - either:
-                #   1. Enforcing reaction classes
-                #   2. Avoiding reaction classes
-                if (self.enforced_reactions_parameters.enforce_rxn_class_presence and int(is_solved[idx]) == 1) or \
-                   (self.enforced_reactions_parameters.avoid_rxn_classes and int(is_solved[idx]) == 1):
+                    # Extract all reactions in the Syntheseus route if this information is required - either:
+                    #   1. Enforcing reaction classes
+                    #   2. Avoiding reaction classes
+                    if (self.enforced_reactions_parameters.enforce_rxn_class_presence) or (self.enforced_reactions_parameters.avoid_rxn_classes):
 
-                    if oracle_calls not in self.matched_generated_smiles_with_rxn:
-                        self.matched_generated_smiles_with_rxn[oracle_calls] = []
+                        if oracle_calls not in self.matched_generated_smiles_with_rxn:
+                            self.matched_generated_smiles_with_rxn[oracle_calls] = []
 
-                    route = self._extract_syntheseus_route_data(
-                        route_path=os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
-                        data_type="rxn"
-                    ) 
-                    
-                    # The returned nodes are all Reaction nodes - extract reaction information from them
-                    reaction_depth_smiles = []  # [(depth, rxn_smiles), ...]
-                    for node, node_data in route.items():
-                        reaction_depth_smiles.append((node_data["depth"], node_data["rxn_smiles"]))
+                        route = self._extract_syntheseus_route_data(
+                            route_path=os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"),
+                            data_type="rxn"
+                        ) 
+                        
+                        # The returned nodes are all Reaction nodes - extract reaction information from them
+                        reaction_depth_smiles = []  # [(depth, rxn_smiles), ...]
+                        for node, node_data in route.items():
+                            reaction_depth_smiles.append((node_data["depth"], node_data["rxn_smiles"]))
 
-                    all_rxns_labels = []  # List[Tuple[str, str]] --> (rxn_class, rxn_name)
-            
-                    # NameRXN classification of every reaction in the route
-                    if self.enforced_reactions_parameters.use_namerxn:
-                        # Write the reaction SMILES to a temp file
-                        temp_rxn_smiles_file = os.path.join(temp_dir, "rxn_smiles.smi")
-                        with open(temp_rxn_smiles_file, "w") as f:
-                            for write_idx, (_, rxn_smiles) in enumerate(reaction_depth_smiles):
-                                if write_idx < len(reaction_depth_smiles) - 1:
-                                    f.write(f"{rxn_smiles}\n")
-                                else:
-                                    f.write(f"{rxn_smiles}")
+                        all_rxns_labels = []  # List[Tuple[str, str]] --> (rxn_class, rxn_name)
+                
+                        # NameRXN classification of every reaction in the route
+                        if self.enforced_reactions_parameters.use_namerxn:
+                            # Write the reaction SMILES to a temp file
+                            temp_rxn_smiles_file = os.path.join(temp_dir, "rxn_smiles.smi")
+                            with open(temp_rxn_smiles_file, "w") as f:
+                                for write_idx, (_, rxn_smiles) in enumerate(reaction_depth_smiles):
+                                    if write_idx < len(reaction_depth_smiles) - 1:
+                                        f.write(f"{rxn_smiles}\n")
+                                    else:
+                                        f.write(f"{rxn_smiles}")
 
-                        all_rxns_labels = subprocess.run([
-                            "python",
-                            self.namerxn_extraction_script_path,
-                            self.namerxn_binary_path,
-                            temp_rxn_smiles_file
-                        ], capture_output=True, text=True)
-
-                        # Check for errors
-                        assert all_rxns_labels.returncode == 0, f"Error during NameRXN reaction information extraction: {all_rxns_labels.stderr}"
-                        all_rxns_labels = ast.literal_eval(all_rxns_labels.stdout)
-
-                    else:
-                        for _, rxn_smiles in reaction_depth_smiles:
-                            # Execute Rxn-INSIGHT on the rxn SMILES
-                            # HACK: This (temporary) solution enables reading the pickled data *without* installing Rxn-INSIGHT into the Saturn environment
-                            extraction_result = subprocess.run([
-                                "conda",
-                                "run", 
-                                "-n",
-                                self.rxn_insight_env_name, 
-                                "python", 
-                                self.rxn_insight_extraction_script_path, 
-                                # Pass the rxn SMILES extracted from the Syntheseus route
-                                rxn_smiles
+                            all_rxns_labels = subprocess.run([
+                                "python",
+                                self.namerxn_extraction_script_path,
+                                self.namerxn_binary_path,
+                                temp_rxn_smiles_file
                             ], capture_output=True, text=True)
 
                             # Check for errors
-                            assert extraction_result.returncode == 0, f"Error during Rxn-INSIGHT reaction information extraction: {extraction_result.stderr}"
-                            rxn_info = ast.literal_eval(extraction_result.stdout)
+                            assert all_rxns_labels.returncode == 0, f"Error during NameRXN reaction information extraction: {all_rxns_labels.stderr}"
+                            all_rxns_labels = ast.literal_eval(all_rxns_labels.stdout)
 
-                            all_rxns_labels.append((rxn_info["CLASS"], rxn_info["NAME"]))
+                        else:
+                            for _, rxn_smiles in reaction_depth_smiles:
+                                # Execute Rxn-INSIGHT on the rxn SMILES
+                                # HACK: This (temporary) solution enables reading the pickled data *without* installing Rxn-INSIGHT into the Saturn environment
+                                extraction_result = subprocess.run([
+                                    "conda",
+                                    "run", 
+                                    "-n",
+                                    self.rxn_insight_env_name, 
+                                    "python", 
+                                    self.rxn_insight_extraction_script_path, 
+                                    # Pass the rxn SMILES extracted from the Syntheseus route
+                                    rxn_smiles
+                                ], capture_output=True, text=True)
 
-                    # Track all reactions present in the route
-                    # NOTE: This is for *all* generated molecules that have a solved route
-                    rxn_dict = {"oracle_calls": oracle_calls}
-                    rxn_dict = {"rxn_steps": int(steps[idx])}
-                    # NOTE: Even if the user is enforcing blocks, matched_block_smiles can be None if no match is found
-                    rxn_dict["enforced_block"] = matched_block_smiles if self.enforced_building_blocks_parameters.enforce_blocks else None
-                    for (depth, rxn_smiles), (rxn_class, rxn_name) in zip(reaction_depth_smiles, all_rxns_labels):
-                        rxn_dict[depth] = {
-                            "rxn_smiles": rxn_smiles,
-                            "rxn_class": rxn_class,
-                            "rxn_name": rxn_name
+                                # Check for errors
+                                assert extraction_result.returncode == 0, f"Error during Rxn-INSIGHT reaction information extraction: {extraction_result.stderr}"
+                                rxn_info = ast.literal_eval(extraction_result.stdout)
+
+                                all_rxns_labels.append((rxn_info["CLASS"], rxn_info["NAME"]))
+
+                        # Track all reactions present in the route
+                        # NOTE: This is for *all* generated molecules that have a solved route
+                        rxn_dict = {
+                            "oracle_calls": oracle_calls,
+                            "rxn_steps": int(steps[idx])
                         }
-                    self.smiles_rxn_tracker[generated_smiles] = rxn_dict
+                        # NOTE: Even if the user is enforcing blocks, matched_block_smiles can be None if no match is found
+                        rxn_dict["enforced_block"] = matched_block_smiles if self.enforced_building_blocks_parameters.enforce_blocks else None
+                        for (depth, rxn_smiles), (rxn_class, rxn_name) in zip(reaction_depth_smiles, all_rxns_labels):
+                            rxn_dict[depth] = {
+                                "rxn_smiles": rxn_smiles,
+                                "rxn_class": rxn_class,
+                                "rxn_name": rxn_name
+                            }
+                        self.smiles_rxn_tracker[generated_smiles] = rxn_dict
 
-                # Assume the reaction constraints are not satisfied
-                rxn_multiplier = 0.0
+                    # Assume the reaction constraints are not satisfied
+                    rxn_multiplier = 0.0
 
-                # If the molecule is solved *and* the user specified to enforce that a set of reaction classes appears in the synthesis graph
-                if self.enforced_reactions_parameters.enforce_rxn_class_presence and int(is_solved[idx]) == 1:
-                    for rxn_class, rxn_name in all_rxns_labels:  # Un-pack each (rxn_class, rxn_name) pair
-                        for enforced_rxn_class in self.enforced_rxn_classes:
-                            # Convert to lower-case for more robust string comparison
-                            if (enforced_rxn_class.lower() in rxn_class.lower()) or (enforced_rxn_class.lower() in rxn_name.lower()):
-                                rxn_multiplier = 1.0
+                    # If the molecule is solved *and* the user specified to enforce that a set of reaction classes appears in the synthesis graph
+                    if self.enforced_reactions_parameters.enforce_rxn_class_presence:
+                        for rxn_class, rxn_name in all_rxns_labels:  # Un-pack each (rxn_class, rxn_name) pair
+                            for enforced_rxn_class in self.enforced_rxn_classes:
+                                # Convert to lower-case for more robust string comparison
+                                if (enforced_rxn_class.lower() in rxn_class.lower()) or (enforced_rxn_class.lower() in rxn_name.lower()):
+                                    rxn_multiplier = 1.0
+                                if rxn_multiplier == 1.0:
+                                    break
+
+                        # -----------------------------------------------------------------------------------------------------------------------------------
+                        # NOTE: This block of code is only relevant when enforcing building blocks *and* reaction classes *and not* avoiding reaction classes
+                        # -----------------------------------------------------------------------------------------------------------------------------------
+
+                        if (not self.enforced_reactions_parameters.enforce_all_reactions) and (not self.enforced_reactions_parameters.avoid_rxn_classes):
+                            # Check if the node exactly matches an enforced building block
+                            if self.enforced_building_blocks_parameters.enforce_blocks: 
+                                if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
+                                    self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+
+                            elif not self.enforced_building_blocks_parameters.enforce_blocks:
+                                # If the reaction class is matched, then the node reward is 1
+                                if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
+                                    self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+
+                        # ------------------------------------------------------------------------
+                        # NOTE: This block of code is only relevant when enforcing *all* reactions
+                        # ------------------------------------------------------------------------
+
+                        elif self.enforced_reactions_parameters.enforce_all_reactions:
+                            # Previously, *any* reaction match was checked and a match was assigned rxn_multiplier = 1.0, 
+                            # if rxn_multiplier = 0.0, that implies that it is *impossible* for all reactions to be matched
                             if rxn_multiplier == 1.0:
-                                break
-
-                    # -----------------------------------------------------------------------------------------------------------------------------------
-                    # NOTE: This block of code is only relevant when enforcing building blocks *and* reaction classes *and not* avoiding reaction classes
-                    # -----------------------------------------------------------------------------------------------------------------------------------
-
-                    if (not self.enforced_reactions_parameters.enforce_all_reactions) and (not self.enforced_reactions_parameters.avoid_rxn_classes):
-                        # Check if the node exactly matches an enforced building block
-                        if self.enforced_building_blocks_parameters.enforce_blocks: 
-                            if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
-
-                        elif not self.enforced_building_blocks_parameters.enforce_blocks:
-                            # If the reaction class is matched, then the node reward is 1
-                            if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
-
-                    # ------------------------------------------------------------------------
-                    # NOTE: This block of code is only relevant when enforcing *all* reactions
-                    # ------------------------------------------------------------------------
-
-                    elif self.enforced_reactions_parameters.enforce_all_reactions:
-                        # Previously, *any* reaction match was checked and a match was assigned rxn_multiplier = 1.0, 
-                        # if rxn_multiplier = 0.0, that implies that it is *impossible* for all reactions to be matched
-                        if rxn_multiplier == 1.0:
-                            # Check each reaction in the route matches at least one enforced reaction
-                            for rxn_class, rxn_name in all_rxns_labels:
-                                matched_current_rxn = False
-                                for enforced_rxn_class in self.enforced_rxn_classes:
-                                    if (enforced_rxn_class.lower() in rxn_class.lower()) or (enforced_rxn_class.lower() in rxn_name.lower()):
-                                        matched_current_rxn = True
+                                # Check each reaction in the route matches at least one enforced reaction
+                                for rxn_class, rxn_name in all_rxns_labels:
+                                    matched_current_rxn = False
+                                    for enforced_rxn_class in self.enforced_rxn_classes:
+                                        if (enforced_rxn_class.lower() in rxn_class.lower()) or (enforced_rxn_class.lower() in rxn_name.lower()):
+                                            matched_current_rxn = True
+                                            break
+                                    # If the reaction does not match any enforced reaction, set multiplier to 0
+                                    if not matched_current_rxn:
+                                        rxn_multiplier = 0.0
                                         break
-                                # If the reaction does not match any enforced reaction, set multiplier to 0
-                                if not matched_current_rxn:
-                                    rxn_multiplier = 0.0
+                            
+                            # Enforcing blocks and *all* reactions
+                            if self.enforced_building_blocks_parameters.enforce_blocks:
+                                if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
+                                    self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+
+                            # Only enforcing *all* reactions
+                            else:
+                                if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
+                                    self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+
+                        # Reaching this code requires that there is a solved route
+                        # This truncates the node reward to 0 if the reaction class is not matched (assuming enforced blocks are also being considered)
+                        # If *not* enforcing blocks, then the reward is 1.0 * rxn_multiplier because the route is solved in the first place and the user specified to enforce *only* reaction classes
+                        node_rewards[idx] = node_rewards[idx] * rxn_multiplier if self.enforced_building_blocks_parameters.enforce_blocks else 1.0 * rxn_multiplier
+
+                        # In case of redundancy
+                        self.matched_generated_smiles_with_rxn[oracle_calls] = list(set(self.matched_generated_smiles_with_rxn[oracle_calls]))
+                        # Write out the matched generated SMILES with reaction classes if not also avoiding reaction classes (otherwise, wait to check this)
+                        if len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
+                            with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
+                                json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)          
+
+                    # -----------------------------------------------------------------------------------------------
+                    # NOTE: This block of code is only relevant when *avoiding* a set of reaction classes
+                    # -----------------------------------------------------------------------------------------------
+
+                    if len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0:
+                        avoid_rxn_multiplier = 1.0
+                        # Check if specified reaction classes are *avoided*
+                        for rxn_class, rxn_name in all_rxns_labels:
+                            for avoid_rxn_class in self.enforced_reactions_parameters.avoid_rxn_classes:
+                                if (avoid_rxn_class.lower() in rxn_class.lower()) or (avoid_rxn_class.lower() in rxn_name.lower()):
+                                    avoid_rxn_multiplier = 0.0
                                     break
                         
-                        # Enforcing blocks and *all* reactions
+                        # In the scenario with enforcing reaction classes and the SMILES does not satisfy this constraint, the node_reward[idx] would already have been truncated to 0.
+                        # Therefore, initializing another multiplier = 1.0 above would not change this outcome and is a safe operation
                         if self.enforced_building_blocks_parameters.enforce_blocks:
-                            if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
-
-                        # Only enforcing *all* reactions
+                            node_rewards[idx] = node_rewards[idx] * avoid_rxn_multiplier
                         else:
-                            if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                            # Being very careful here: if the avoid_rxn_multiplier is 0.0, then the reward can automatically be set to 0.0
+                            if avoid_rxn_multiplier == 0.0:
+                                if (self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_building_blocks_parameters.use_dense_reward):
+                                    is_solved[idx] = 0.0
+                                else:
+                                    node_rewards[idx] = 0.0
+                            # But if the avoid_rxn_multiplier is 1.0, then the reward might still be 0.0 if the user *also* wants to enforce reaction classes and this constraint is not satisfied
+                            elif avoid_rxn_multiplier == 1.0:
+                                if not self.enforced_reactions_parameters.enforce_rxn_class_presence:
+                                    node_rewards[idx] = 1.0
+                                else:
+                                    node_rewards[idx] = node_rewards[idx] * 1.0
 
-                    # Reaching this code requires that there is a solved route
-                    # This truncates the node reward to 0 if the reaction class is not matched (assuming enforced blocks are also being considered)
-                    # If *not* enforcing blocks, then the reward is 1.0 * rxn_multiplier because the route is solved in the first place and the user specified to enforce *only* reaction classes
-                    node_rewards[idx] = node_rewards[idx] * rxn_multiplier if self.enforced_building_blocks_parameters.enforce_blocks else 1.0 * rxn_multiplier
+                        if node_rewards[idx] == 1.0:
+                            self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
-                    # In case of redundancy
-                    self.matched_generated_smiles_with_rxn[oracle_calls] = list(set(self.matched_generated_smiles_with_rxn[oracle_calls]))
-                    # Write out the matched generated SMILES with reaction classes if not also avoiding reaction classes (otherwise, wait to check this)
-                    if len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
+                        elif (self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_building_blocks_parameters.use_dense_reward) and is_solved[idx] == 1:
+                            self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+
+                        # In case of redundancy
+                        self.matched_generated_smiles_with_rxn[oracle_calls] = list(set(self.matched_generated_smiles_with_rxn[oracle_calls]))
                         with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
                             json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)          
-
-                # -----------------------------------------------------------------------------------------------
-                # NOTE: This block of code is only relevant when *avoiding* a set of reaction classes
-                # -----------------------------------------------------------------------------------------------
-
-                if len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0 and int(is_solved[idx]) == 1:
-                    avoid_rxn_multiplier = 1.0
-                    # Check if specified reaction classes are *avoided*
-                    for rxn_class, rxn_name in all_rxns_labels:
-                        for avoid_rxn_class in self.enforced_reactions_parameters.avoid_rxn_classes:
-                            if (avoid_rxn_class.lower() in rxn_class.lower()) or (avoid_rxn_class.lower() in rxn_name.lower()):
-                                avoid_rxn_multiplier = 0.0
-                                break
-                    
-                    # In the scenario with enforcing reaction classes and the SMILES does not satisfy this constraint, the node_reward[idx] would already have been truncated to 0.
-                    # Therefore, initializing another multiplier = 1.0 above would not change this outcome and is a safe operation
-                    if self.enforced_building_blocks_parameters.enforce_blocks:
-                        node_rewards[idx] = node_rewards[idx] * avoid_rxn_multiplier
-                    else:
-                        # Being very careful here: if the avoid_rxn_multiplier is 0.0, then the reward can automatically be set to 0.0
-                        if avoid_rxn_multiplier == 0.0:
-                            if (self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_building_blocks_parameters.use_dense_reward):
-                                is_solved[idx] = 0.0
-                            else:
-                                node_rewards[idx] = 0.0
-                        # But if the avoid_rxn_multiplier is 1.0, then the reward might still be 0.0 if the user *also* wants to enforce reaction classes and this constraint is not satisfied
-                        elif avoid_rxn_multiplier == 1.0:
-                            if not self.enforced_reactions_parameters.enforce_rxn_class_presence:
-                                node_rewards[idx] = 1.0
-                            else:
-                                node_rewards[idx] = node_rewards[idx] * 1.0
-
-                    if node_rewards[idx] == 1.0:
-                        self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
-
-                    elif (self.enforced_building_blocks_parameters.enforce_blocks) and (not self.enforced_building_blocks_parameters.use_dense_reward) and is_solved[idx] == 1:
-                        self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
-
-                    # In case of redundancy
-                    self.matched_generated_smiles_with_rxn[oracle_calls] = list(set(self.matched_generated_smiles_with_rxn[oracle_calls]))
-                    with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
-                        json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)          
 
             # HACK: In case a molecule is in the building blocks stock, Syntheseus returns 0. 
             #       Set these to 1 to work with Binary Reward Shaping
