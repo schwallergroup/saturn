@@ -258,6 +258,7 @@ def get_run_data(path: str) -> Tuple[bool, bool, str]:
     files = os.listdir(path)
     
     # Get JSON with file
+    # TODO: Make the run configuration string matching more robust
     file = [file for file in files if file.endswith(".json") and "run" in file][0]
 
     with open(os.path.join(path, file), "r") as f:
@@ -276,71 +277,77 @@ def plot_rxn_evolution(
     smiles_rxn_tracker: Dict[str, Dict[str, str]],
     enforced_rxn: str,
     save_dir: str,
-    experiment_name: str
+    experiment_name: str,
+    num_seeds: int
 ) -> None:
     """Plot evolution of reaction classes."""
-    # TODO: subplot for each seed
     # Load data
-    seed = 0
-    experiment_path = f"test_files/{enforced_rxn}/seed{seed}"
-    oracle_history = pd.read_csv(f"{experiment_path}/oracle_history.csv")
-    oracle_history["canonical_smiles"] = oracle_history["smiles"].apply(canonicalize_smiles)
+    for seed in range(num_seeds):
+        experiment_path = f"test_files/{enforced_rxn}/seed{seed}"
+        oracle_history = pd.read_csv(f"{experiment_path}/oracle_history.csv")
+        oracle_history["canonical_smiles"] = oracle_history["smiles"].apply(canonicalize_smiles)
 
-    # Track reactions by class over time
-    stats = defaultdict(list)
-    rxn_smiles = defaultdict(list)
+        # Track reactions by class over time
+        rxn_stats = defaultdict(list)
+        all_rxn_steps = []
 
-    for smiles, rxn_info in smiles_rxn_tracker.items():
-        oracle_calls = rxn_info["oracle_calls"]
-        for depth, info in rxn_info.items():
-            rxn_class = info["rxn_class"]
-            rxn_name = info["rxn_name"]
-                
-            if oracle_calls is not None and rxn_class != "Unrecognized":
-                stats[(rxn_class, rxn_name)].append(oracle_calls)
-                rxn_smiles[(rxn_class, rxn_name)].append(info["rxn_smiles"])
+        for smiles, rxn_info in smiles_rxn_tracker.items():
+            for attribute, attribute_value in rxn_info.items():
+                if attribute == "oracle_calls":
+                    oracle_calls = attribute_value
+                elif attribute == "rxn_steps":
+                    rxn_steps = attribute_value
+                    all_rxn_steps.append(rxn_steps)
+                elif isinstance(attribute_value, dict):
+                    if attribute_value["is_rxn"]:
+                        rxn_class = attribute_value["rxn_class"]
+                        rxn_name = attribute_value["rxn_name"]
+                        if oracle_calls is not None and rxn_class != "Unrecognized":
+                            rxn_stats[(rxn_class, rxn_name)].append(oracle_calls)
+                    
+        logging.info(f"{experiment_name} seed {seed} all synthesizable molecules: # reaction steps (N={len(all_rxn_steps)}): {round(np.mean(all_rxn_steps), 2)} ± {round(np.std(all_rxn_steps), 2)}")
+        
+        # Sort each reaction class by oracle calls
+        for rxn_class_name in rxn_stats:
+            rxn_stats[rxn_class_name] = sorted(rxn_stats[rxn_class_name])
 
-    # Sort each reaction class by oracle calls
-    for rxn_class_name in stats:
-        stats[rxn_class_name] = sorted(stats[rxn_class_name])
+        # Sort reaction classes by count in descending order
+        sorted_stats = sorted(rxn_stats.items(), key=lambda x: len(x[1]), reverse=True)
 
-    # Sort reaction classes by count in descending order
-    sorted_stats = sorted(stats.items(), key=lambda x: len(x[1]), reverse=True)
+        # Filter for reactions with count > 500 and take top 10
+        sorted_stats = [(k,v) for k,v in sorted_stats if len(v) > 500][:10]
 
-    # Filter for reactions with count > 500 and take top 10
-    sorted_stats = [(k,v) for k,v in sorted_stats if len(v) > 500][:10]
+        colours = [
+            "#2ecc71", "#3498db", "#9b59b6", "#f1c40f", "#e67e22", 
+            "#1abc9c", "#34495e", "#95a5a6", "#d35400", "#c0392b"
+        ]
+        enforced_colour = "#e74c3c"  # Bright red for enforced reaction
 
-    colours = [
-        "#2ecc71", "#3498db", "#9b59b6", "#f1c40f", "#e67e22", 
-        "#1abc9c", "#34495e", "#95a5a6", "#d35400", "#c0392b"
-    ]
-    enforced_colour = "#e74c3c"  # Bright red for enforced reaction
+        # Plot cumulative reactions over time
+        plt.figure(figsize=(16,8))
 
-    # Plot cumulative reactions over time
-    plt.figure(figsize=(16,8))
+        # Add legend entry explaining format
+        plt.plot([], [], " ", label="<Reaction Class>\n<Reaction Name>")
 
-    # Add legend entry explaining format
-    plt.plot([], [], " ", label="<Reaction Class>\n<Reaction Name>")
+        # Plot filtered reaction classes
+        for idx, ((rxn_class, rxn_name), calls) in enumerate(sorted_stats):
+            if enforced_rxn.lower() in rxn_class.lower() or enforced_rxn.lower() in rxn_name.lower():
+                plt.plot(calls, range(1, len(calls)+1), 
+                        label=f"{rxn_class}\n{rxn_name} (n={len(calls)})", 
+                        color=enforced_colour, alpha=1.0, linewidth=3)
+            else:
+                plt.plot(calls, range(1, len(calls)+1), 
+                        label=f"{rxn_class}\n{rxn_name} (n={len(calls)})", 
+                        color=colours[idx], alpha=1.0, linewidth=1)
 
-    # Plot filtered reaction classes
-    for idx, ((rxn_class, rxn_name), calls) in enumerate(sorted_stats):
-        if enforced_rxn.lower() in rxn_class.lower() or enforced_rxn.lower() in rxn_name.lower():
-            plt.plot(calls, range(1, len(calls)+1), 
-                    label=f"{rxn_class}\n{rxn_name} (n={len(calls)})", 
-                    color=enforced_colour, alpha=1.0, linewidth=3)
-        else:
-            plt.plot(calls, range(1, len(calls)+1), 
-                    label=f"{rxn_class}\n{rxn_name} (n={len(calls)})", 
-                    color=colours[idx], alpha=1.0, linewidth=1)
-
-    plt.xlabel("Number of Oracle Calls", fontsize=12, fontweight="bold")
-    plt.ylabel("Cumulative Number of Reactions", fontsize=12, fontweight="bold")
-    plt.title("Cumulative Growth of Different Reaction Types", fontsize=14, fontweight="bold")
-    plt.grid(True)
-    plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=12)
-    plt.tight_layout()
-    
-    plt.savefig(os.path.join(save_dir, f"{experiment_name}-rxn-evolution.png"))
+        plt.xlabel("Number of Oracle Calls", fontsize=12, fontweight="bold")
+        plt.ylabel("Cumulative Number of Reactions", fontsize=12, fontweight="bold")
+        plt.title("Cumulative Growth of Different Reaction Types", fontsize=14, fontweight="bold")
+        plt.grid(True)
+        plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=12)
+        plt.tight_layout()
+        
+        plt.savefig(os.path.join(save_dir, f"{experiment_name}-seed{seed}-rxn-evolution.png"))
 
 def count_rxn_graph(top_graphs: Dict[str, Union[str, float]]) -> Union[Dict[str, int], List[int]]:
     """
@@ -351,12 +358,12 @@ def count_rxn_graph(top_graphs: Dict[str, Union[str, float]]) -> Union[Dict[str,
 
     for key, value in top_graphs.items():
 
-        synthesis_graph = top_graphs[key]["synthesis_data"]
+        synthesis_graph = {k:v for k,v in top_graphs[key]["synthesis_data"].items() if "node" in k}
         steps = 0
 
-        for node, value in synthesis_graph.items():
-            if value["is_rxn"]:
-                rxn_name = value["rxn_name"]
+        for node, attributes in synthesis_graph.items():
+            if attributes["is_rxn"]:
+                rxn_name = attributes["rxn_name"]
                 if rxn_name not in rxn_count:
                     rxn_count[rxn_name] = 1
                 else:
@@ -368,14 +375,14 @@ def count_rxn_graph(top_graphs: Dict[str, Union[str, float]]) -> Union[Dict[str,
     
     return rxn_count, rxn_steps
 
-def plot_rxn_classes(
+def plot_top_graphs_rxn_classes(
     rxn_count: Dict[str, int],
     save_dir: str,
     experiment_name: str
 ) -> None:
     """Plot reaction class distribution and save barplot."""
     # Save the raw counts
-    with open(os.path.join(save_dir, f"{experiment_name}-rxn-distribution.json"), "w") as f:
+    with open(os.path.join(save_dir, f"{experiment_name}-top-graphs-rxn-distribution.json"), "w") as f:
         json.dump(rxn_count, f, indent=4)
 
     # Extract categories and counts
@@ -403,4 +410,4 @@ def plot_rxn_classes(
     plt.xticks(rotation=45, ha="right")
     plt.tight_layout()
 
-    plt.savefig(os.path.join(save_dir, f"{experiment_name}-rxn-distribution.png"))
+    plt.savefig(os.path.join(save_dir, f"{experiment_name}-top-graphs-rxn-distribution.png"))

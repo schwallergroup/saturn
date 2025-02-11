@@ -26,7 +26,7 @@ from utils import (
     write_out_top_syntheseus_graphs,
     plot_rxn_evolution,
     count_rxn_graph,
-    plot_rxn_classes
+    plot_top_graphs_rxn_classes
 )
 
 # -----------------
@@ -152,6 +152,9 @@ def log_molecule_and_rxn_metrics(
 ) -> None:
     """Log molecule and reaction metrics."""
 
+    # Make save directory
+    os.makedirs(save_dir, exist_ok=True)
+
     # Store DataFrames with top molecules
     top_oracle_histories = []
 
@@ -248,7 +251,8 @@ def log_molecule_and_rxn_metrics(
         smiles_rxn_tracker=smiles_rxn_tracker,
         enforced_rxn=experiment_name,
         save_dir=save_dir,
-        experiment_name=experiment_name
+        experiment_name=experiment_name,
+        num_seeds=len(seeds)
     )
     
     # Iterate over top molecules and save routes for visualization
@@ -265,9 +269,6 @@ def log_molecule_and_rxn_metrics(
         )
     
         top_graphs.update(extracted_graph)
-    
-    # Save top graphs
-    os.makedirs(save_dir, exist_ok=True)
 
     with open(os.path.join(save_dir, f"{experiment_name}-top-graphs.json"), "w") as f:
         json.dump(top_graphs, f, indent=4)
@@ -285,7 +286,7 @@ def log_molecule_and_rxn_metrics(
     rxn_count, rxn_steps = count_rxn_graph(top_graphs)
     logging.info(f"Top Graphs Reaction Steps: {np.mean(rxn_steps):.2f} ± {np.std(rxn_steps):.2f}")
 
-    plot_rxn_classes(
+    plot_top_graphs_rxn_classes(
         rxn_count=rxn_count,
         save_dir=save_dir,
         experiment_name=experiment_name
@@ -309,17 +310,17 @@ if __name__ == "__main__":
         help="Names of the experiment folders to analyze."
     )
     parser.add_argument(
-        "--save_top_percentage_routes",
-        type=float,
-        default=0.005,
-        help="Percentage of top routes to save (e.g. 0.005 for top 0.5%%)."
-    )
-    parser.add_argument(
         "--docking_oracle",
         type=str,
         required=True,
         choices=["quickvina", "quickvina2", "gnina"],
         help="Docking oracle used in the reward function."
+    )
+    parser.add_argument(
+        "--save_top_percentage_routes",
+        type=float,
+        default=0.005,
+        help="Percentage of top routes to save (e.g. 0.005 for top 0.5%%)."
     )
     args = parser.parse_args()
 
