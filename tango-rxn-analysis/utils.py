@@ -1,6 +1,8 @@
 """Utils for analysis"""
 from typing import Dict, List, Tuple, Union
 import os
+import shutil
+import subprocess
 import logging
 import json
 import random
@@ -411,3 +413,65 @@ def plot_top_graphs_rxn_classes(
     plt.tight_layout()
 
     plt.savefig(os.path.join(save_dir, f"{experiment_name}-top-graphs-rxn-distribution.png"))
+
+def annotate_rxn_conditions(
+    top_graphs: Dict[str, Dict[str, Union[str, int]]],
+    reacon_dir: str
+) -> Dict[str, Dict[str, Union[str, int]]]:
+    """
+    Annotate the conditions for the top graphs using Reacon: https://pubs.rsc.org/en/content/articlehtml/2024/sc/d4sc05946h#cit27.
+    """
+    # Loop through top_graphs and extract all reaction nodes
+    reaction_smiles = []
+    for smiles, data in top_graphs.items():
+        synthesis_graph = {k:v for k,v in data["synthesis_data"].items() if "node" in k}
+        for node, attributes in synthesis_graph.items():
+            if attributes["is_rxn"]:
+                reaction_smiles.append(attributes["rxn_smiles"])
+
+    # Write a temporary DataFrame out following the required format
+    df = pd.DataFrame({
+        "_id": list(range(len(reaction_smiles))),  # Dummy attribute
+        "reaction_smiles": reaction_smiles
+    })
+    df.to_csv("temp_reaction_smiles.csv", index=False)
+
+    # Run Reacon
+    subprocess.run([
+        "bash", 
+        os.path.join(reacon_dir, "map_and_pred_conditions.sh"),
+        os.path.abspath(os.path.dirname(__file__)),
+        reacon_dir
+    ])
+
+    # Extract the cluster predictions
+    conditions = []
+    reacon_output = json.load(open("temp_predictions/cluster_condition_prediction.json"))
+    for rxn_id, preds in reacon_output.items():
+        top_1_condition = preds[1][0]["best condition"]
+        conditions.append(top_1_condition)
+
+    # Add conditions to top_graphs
+    condition_idx = 0
+    for smiles, data in top_graphs.items():
+        synthesis_graph = {k:v for k,v in data["synthesis_data"].items() if "node" in k}
+        for node, attributes in synthesis_graph.items():
+            if attributes["is_rxn"]:
+                condition_dict = {
+                    "catalyst": conditions[condition_idx][0],
+                    "solvent_1": conditions[condition_idx][1], 
+                    "solvent_2": conditions[condition_idx][2],
+                    "reagent_1": conditions[condition_idx][3],
+                    "reagent_2": conditions[condition_idx][4], 
+                    "reagent_3": conditions[condition_idx][5]
+                }
+                attributes["conditions"] = condition_dict
+                condition_idx += 1
+
+    # Remove temporary files
+    os.remove("temp_reaction_smiles.csv")
+    os.remove("temp_reaction_templates.csv")
+    shutil.rmtree("temp_predictions")
+    os.remove("sample_preds.csv")
+    
+    return top_graphs

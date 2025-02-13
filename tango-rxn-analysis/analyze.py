@@ -26,7 +26,8 @@ from utils import (
     write_out_top_syntheseus_graphs,
     plot_rxn_evolution,
     count_rxn_graph,
-    plot_top_graphs_rxn_classes
+    plot_top_graphs_rxn_classes,
+    annotate_rxn_conditions
 )
 
 # -----------------
@@ -270,9 +271,6 @@ def log_molecule_and_rxn_metrics(
     
         top_graphs.update(extracted_graph)
 
-    with open(os.path.join(save_dir, f"{experiment_name}-top-graphs.json"), "w") as f:
-        json.dump(top_graphs, f, indent=4)
-
     # Count number of unique enforced blocks amongst top graphs
     if enforce_building_blocks:
         unique_enforced_blocks = set()
@@ -291,6 +289,19 @@ def log_molecule_and_rxn_metrics(
         save_dir=save_dir,
         experiment_name=experiment_name
     )
+
+    # Annotate reaction conditions
+    logging.info(f"Annotating reaction conditions for the top graphs for experiment: {experiment_name}")
+    try:
+        top_graphs = annotate_rxn_conditions(
+            top_graphs=top_graphs,
+            reacon_dir="/home/jeff/saturn-dev/test/testing-reacon/reacon"
+        )
+    except Exception:
+        logging.info(f"Error in reaction condition annotation for experiment: {experiment_name}. Do not expect any reaction conditions to be annotated in the top graphs.")
+
+    with open(os.path.join(save_dir, f"{experiment_name}-top-graphs.json"), "w") as f:
+        json.dump(top_graphs, f, indent=4)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
