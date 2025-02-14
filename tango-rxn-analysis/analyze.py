@@ -24,8 +24,10 @@ from utils import (
     internal_diversity,
     NCircles,
     write_out_top_syntheseus_graphs,
+    plot_rxn_evolution,
     count_rxn_graph,
-    plot_rxn_classes
+    plot_top_graphs_rxn_classes,
+    annotate_rxn_conditions
 )
 
 # -----------------
@@ -42,18 +44,12 @@ QUICKVINA2_DOCKING_SCORE_ENUM = "quickvina2_gpu_raw_values"
 GNINA_DOCKING_SCORE_ENUM = "gnina_raw_values"
 
 def get_docking_score_enum(docking_oracle: str) -> str:
-    if docking_oracle == "quickvina2":
+    if docking_oracle in ["quickvina", "quickvina2"]:
         return QUICKVINA2_DOCKING_SCORE_ENUM
     elif docking_oracle == "gnina":
         return GNINA_DOCKING_SCORE_ENUM
     else:
         raise ValueError(f"Docking oracle {docking_oracle} not supported")
-
-# Fixed utility script paths
-SATURN_BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ROUTE_EXTRACTION_SCRIPT = os.path.join(SATURN_BASE_PATH, "oracles/synthesizability/utils/extract_syntheseus_route_data.py")
-RXN_INFO_EXTRACTION_SCRIPT = os.path.join(SATURN_BASE_PATH, "oracles/synthesizability/utils/extract_rxn_info.py")
-
 
 def log_synthesizable_metrics(seeds: List[str]) -> None:
     """Log number of synthesizable molecules."""
@@ -95,7 +91,6 @@ def log_synthesizable_metrics(seeds: List[str]) -> None:
     else:
         logging.info(f"No runs generated any synthesizable molecules (with all constraints).")
 
-
 def log_wall_time(seeds: List[str]) -> None:
     """Log run wall time."""
     times = []
@@ -117,7 +112,6 @@ def log_wall_time(seeds: List[str]) -> None:
         std_hours, std_minutes = divmod(std_time, 3600)
         std_minutes = std_minutes / 60
         logging.info(f"Wall Time (N={len(times)}): {int(mean_hours)}h {int(mean_minutes)}m ± {int(std_hours)}h {int(std_minutes)}m")
-
 
 def log_pooled_molecules_metrics(
     pooled_data: List[Tuple[str, float, float]],  # (SMILES, docking_score, qed)
@@ -144,30 +138,34 @@ def log_pooled_molecules_metrics(
         circles_high = NCircles(threshold=0.75).measure(fps)
         circles_low = NCircles(threshold=0.50).measure(fps)
 
-        logging.info(f"{threshold_label}: {np.mean(docking_scores):.2f} ± {np.std(docking_scores):.2f} QED: {np.mean(qed_values):.2f} ± {np.std(qed_values):.2f} (N={len(pooled_data)})")
+        logging.info(f"{threshold_label}: {np.mean(docking_scores):.2f} ± {np.std(docking_scores):.2f} QED: {np.mean(qed_values):.2f} ± {np.std(qed_values):.2f}")
         logging.info(f"Ligand Efficiency: {np.mean(ligand_efficiency_values):.2f} ± {np.std(ligand_efficiency_values):.2f}, # Unique Bemis-Murcko Scaffolds: {scaffolds}")
         logging.info(f"IntDiv1: {intdiv1:.3f}, #Circles (T=0.75): {circles_high}, #Circles (T=0.50): {circles_low}\n")
 
     else:
         logging.info(f"No molecules generated for {threshold_label} docking score interval")
 
-
 def log_molecule_and_rxn_metrics(
     seeds: List[str],    
     experiment_name: str,
-    save_top_graphs: bool = True,
-    save_top_percentage_routes: float = 0.005,
+    save_top_percentage_routes: float,
     save_dir: str = "./top_graphs/"
 ) -> None:
     """Log molecule and reaction metrics."""
-    # If top graphs should be saved 
-    if save_top_graphs:
-        top_oracle_histories = [] # Store DataFrames with top molecules
+
+    # Make save directory
+    os.makedirs(save_dir, exist_ok=True)
+
+    # Store DataFrames with top molecules
+    top_oracle_histories = []
 
     N_rxn = 0
     num_enforced_rxn = []
-    enforced_rxn_metrics = []  # List of (SMILES, docking_score, qed) tuples
+    enforced_rxn_metrics = []  # List of (SMILES, docking_score, QED) tuples
     top_enforced_rxn_metrics = []
+
+    # Store per-seed results
+    seed_results = []
 
     for seed in seeds:
         enforce_reactions, enforce_building_blocks, enforced_building_blocks_file = get_run_data(seed)
@@ -178,15 +176,11 @@ def log_molecule_and_rxn_metrics(
             continue
             
         # Load and canonicalize SMILES from JSON files
-        rxn_json = json.load(open(os.path.join( 
-                                seed, 
-                                "syntheseus_results", 
-                                "matched_generated_smiles_with_rxn.json"), 
-                                "r"
-                            )
-                        )
-        
+        rxn_json = json.load(open(os.path.join(seed, "syntheseus_results", "matched_generated_smiles_with_rxn.json"), "r"))
         enforced_rxn_smiles = set([canonicalize_smiles(s) for smiles_list in rxn_json.values() for s in smiles_list if s])
+
+        # Load smiles_rxn_tracker.json
+        smiles_rxn_tracker = json.load(open(os.path.join(seed, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
 
         if len(enforced_rxn_smiles) > 0:
             N_rxn += 1
@@ -203,15 +197,21 @@ def log_molecule_and_rxn_metrics(
         assert sum(df_enforced_rxn[SYNTHESEUS_REWARD_ENUM]) == len(df_enforced_rxn), "Error: Not all matched molecules from the JSON have syntheseus_raw_values == 1 in the oracle history."
 
         df_enforced_rxn = df_enforced_rxn.sort_values(by=REWARD_ENUM, ascending=False)
+        # Get the top molecules
         df_top_enforced_rxn = df_enforced_rxn.head(int(save_top_percentage_routes * len(df_enforced_rxn)))
 
         assert abs(len(df_enforced_rxn) - len(enforced_rxn_smiles)) <= 10, f"Large mismatch in number of SMILES matched in DataFrame: {len(df_enforced_rxn)} != {len(enforced_rxn_smiles)}"
 
-        enforced_rxn_metrics.extend(zip(
-            df_enforced_rxn["canonical_smiles"], 
-            df_enforced_rxn[DOCKING_SCORE_ENUM], 
+        # Store this seed's results
+        seed_metrics = list(zip(
+            df_enforced_rxn["canonical_smiles"],
+            df_enforced_rxn[DOCKING_SCORE_ENUM],
             df_enforced_rxn[QED_ENUM]
         ))
+        seed_results.append(seed_metrics)
+
+        # Add to pooled results
+        enforced_rxn_metrics.extend(seed_metrics)
 
         top_enforced_rxn_metrics.extend(zip(  # Top molecules (by reward, given syntheseus_raw_values == 1)
             df_top_enforced_rxn["canonical_smiles"], 
@@ -219,89 +219,94 @@ def log_molecule_and_rxn_metrics(
             df_top_enforced_rxn[QED_ENUM]
         ))
 
-        if save_top_graphs:
-            top_oracle_histories.append((df_top_enforced_rxn, seed))
-
+        # Store top molecules
+        top_oracle_histories.append((df_top_enforced_rxn, seed))
 
     logging.info(f"# Enforced Blocks (if applicable) and Reaction (N={N_rxn}): {int(np.mean(num_enforced_rxn))} ± {int(np.std(num_enforced_rxn))}\n")
 
-    # Log the mean and std of the docking scores across thresholds (-8 to -9, -9 to -10, < -10)
-    logging.info(f"Enforced Reactions Docking Score Stats:\n")
-
+    # Log pooled metrics with per-seed molecule counts in parentheses
     # -8 to -9
     metrics_8_9 = [(smiles, dock, qed) for smiles, dock, qed in enforced_rxn_metrics if -9 <= dock < -8]
-    log_pooled_molecules_metrics(metrics_8_9, "Docking Scores: -8 to -9")
+    seed_counts_8_9 = [len([(smiles, dock, qed) for smiles, dock, qed in seed_metrics if -9 <= dock < -8]) for seed_metrics in seed_results]
+    seed_counts_str_8_9 = [str(count) for count in seed_counts_8_9]
+    log_pooled_molecules_metrics(metrics_8_9, f"Docking Scores: -8 to -9 (N={len(metrics_8_9)}, per seed: {', '.join(seed_counts_str_8_9)}, Mean ± Std: {int(np.mean(seed_counts_8_9))} ± {int(np.std(seed_counts_8_9))})")
     
     # -9 to -10
     metrics_9_10 = [(smiles, dock, qed) for smiles, dock, qed in enforced_rxn_metrics if -10 <= dock < -9]
-    log_pooled_molecules_metrics(metrics_9_10, "Docking Scores: -9 to -10")
+    seed_counts_9_10 = [len([(smiles, dock, qed) for smiles, dock, qed in seed_metrics if -10 <= dock < -9]) for seed_metrics in seed_results]
+    seed_counts_str_9_10 = [str(count) for count in seed_counts_9_10]
+    log_pooled_molecules_metrics(metrics_9_10, f"Docking Scores: -9 to -10 (N={len(metrics_9_10)}, per seed: {', '.join(seed_counts_str_9_10)}, Mean ± Std: {int(np.mean(seed_counts_9_10))} ± {int(np.std(seed_counts_9_10))})")
     
     # < -10
     metrics_10 = [(smiles, dock, qed) for smiles, dock, qed in enforced_rxn_metrics if dock < -10]
-    log_pooled_molecules_metrics(metrics_10, "Docking Scores: < -10")
+    seed_counts_10 = [len([(smiles, dock, qed) for smiles, dock, qed in seed_metrics if dock < -10]) for seed_metrics in seed_results]
+    seed_counts_str_10 = [str(count) for count in seed_counts_10]
+    log_pooled_molecules_metrics(metrics_10, f"Docking Scores: < -10 (N={len(metrics_10)}, per seed: {', '.join(seed_counts_str_10)}, Mean ± Std: {int(np.mean(seed_counts_10))} ± {int(np.std(seed_counts_10))})")
 
     # Highest Reward
     metrics_highest_reward = [(smiles, dock, qed) for smiles, dock, qed in top_enforced_rxn_metrics]
     log_pooled_molecules_metrics(metrics_highest_reward, f"Top {save_top_percentage_routes * 100}% by Reward, Docking Scores:")
+
+    # Plot evolution of reaction classes
+    plot_rxn_evolution(
+        smiles_rxn_tracker=smiles_rxn_tracker,
+        enforced_rxn=experiment_name,
+        save_dir=save_dir,
+        experiment_name=experiment_name,
+        num_seeds=len(seeds)
+    )
     
-    # If save_top_graphs, iterate over graphs, save them and plot reaction distribution
-    if save_top_graphs:
-        logging.info(f"Saving top {save_top_percentage_routes * 100}% of routes for experiment: {experiment_name}")
+    # Iterate over top molecules and save routes for visualization
+    logging.info(f"Saving top {save_top_percentage_routes * 100}% of routes for experiment: {experiment_name}")
 
-        top_graphs = {}
+    top_graphs = {}
 
-        # For each DataFrame, slice the top % and save routes for visualization
-        for df, seed in top_oracle_histories:
+    # For each DataFrame, slice the top % and save routes for visualization
+    for df, seed in top_oracle_histories:
 
-            syntheseus_path = os.path.join(seed, "syntheseus_results")
-            # TODO: Check why the number of solved molecules does not match with the one if syntheseus_raw_values == 1
-            extracted_graph = write_out_top_syntheseus_graphs(
-                oracle_history=df,
-                syntheseus_folder=syntheseus_path,
-                enforce_building_blocks=enforce_building_blocks,
-                enforced_building_blocks_file=enforced_building_blocks_file,
-                syntheseus_path_script=ROUTE_EXTRACTION_SCRIPT,
-                rxn_info_path_script=RXN_INFO_EXTRACTION_SCRIPT
-            )
-        
-            top_graphs.update(extracted_graph)
-        
-        # Save top graphs
-        os.makedirs(save_dir, exist_ok=True)
-
-        with open(os.path.join(save_dir, f"{experiment_name}-top-graphs.json"), "w") as f:
-            json.dump(top_graphs, f, indent=4)
-
-        # Count number of unique enforced blocks amongst top graphs
-        if enforce_building_blocks:
-            unique_enforced_blocks = set()
-            for graph in top_graphs.values():
-                unique_enforced_blocks.add(graph["enforced_block"])
-
-            total_num_enforced_blocks = len(set([canonicalize_smiles(s) for s in open(enforced_building_blocks_file).readlines()]))
-            logging.info(f"Unique Enforced Blocks: {len(unique_enforced_blocks)}/{total_num_enforced_blocks}")
-
-        # Plot reactions
-        rxn_count, rxn_steps = count_rxn_graph(top_graphs)
-        logging.info(f"Top Graphs Reaction Steps: {np.mean(rxn_steps):.2f} ± {np.std(rxn_steps):.2f}")
-
-        plot_rxn_classes(
-            rxn_count=rxn_count,
-            save_dir=save_dir,
-            experiment_name=experiment_name
+        extracted_graph = write_out_top_syntheseus_graphs(
+            top_oracle_history=df,
+            smiles_rxn_tracker=smiles_rxn_tracker
         )
+    
+        top_graphs.update(extracted_graph)
 
+    # Count number of unique enforced blocks amongst top graphs
+    if enforce_building_blocks:
+        unique_enforced_blocks = set()
+        for graph in top_graphs.values():
+            unique_enforced_blocks.add(graph["enforced_block"])
+
+        total_num_enforced_blocks = len(set([canonicalize_smiles(s) for s in open(enforced_building_blocks_file).readlines()]))
+        logging.info(f"Unique Enforced Blocks: {len(unique_enforced_blocks)}/{total_num_enforced_blocks}")
+
+    # Plot reactions
+    rxn_count, rxn_steps = count_rxn_graph(top_graphs)
+    logging.info(f"Top Graphs Reaction Steps: {np.mean(rxn_steps):.2f} ± {np.std(rxn_steps):.2f}")
+
+    plot_top_graphs_rxn_classes(
+        rxn_count=rxn_count,
+        save_dir=save_dir,
+        experiment_name=experiment_name
+    )
+
+    # Annotate reaction conditions
+    logging.info(f"Annotating reaction conditions for the top graphs for experiment: {experiment_name}")
+    try:
+        top_graphs = annotate_rxn_conditions(
+            top_graphs=top_graphs,
+            reacon_dir="/home/jeff/saturn-dev/test/testing-reacon/reacon"
+        )
+    except Exception:
+        logging.info(f"Error in reaction condition annotation for experiment: {experiment_name}. Do not expect any reaction conditions to be annotated in the top graphs.")
+
+    with open(os.path.join(save_dir, f"{experiment_name}-top-graphs.json"), "w") as f:
+        json.dump(top_graphs, f, indent=4)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run analysis of TANGO-RXN runs and output a log file of metrics.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument(
-        "--experiments",
-        nargs="+",
-        required=True,
-        help="Names of the experiment folders to analyze."
     )
     parser.add_argument(
         "--experiment_path",
@@ -310,10 +315,17 @@ if __name__ == "__main__":
         help="Path to parent directory containing the experiment folders."
     )
     parser.add_argument(
-        "--save_top_graphs",
-        action="store_true",
-        default=True,
-        help="Extract and save synthesis graphs for top molecules."
+        "--experiments",
+        nargs="+",
+        required=True,
+        help="Names of the experiment folders to analyze."
+    )
+    parser.add_argument(
+        "--docking_oracle",
+        type=str,
+        required=True,
+        choices=["quickvina", "quickvina2", "gnina"],
+        help="Docking oracle used in the reward function."
     )
     parser.add_argument(
         "--save_top_percentage_routes",
@@ -321,20 +333,12 @@ if __name__ == "__main__":
         default=0.005,
         help="Percentage of top routes to save (e.g. 0.005 for top 0.5%%)."
     )
-    parser.add_argument(
-        "--docking_oracle",
-        type=str,
-        required=True,
-        choices=["quickvina2", "gnina"],
-        help="Docking oracle used for scoring"
-    )
-
     args = parser.parse_args()
 
     # Setup logging
     setup_logging("./metrics.log")
-    logging.info(f"Saving top graphs: {args.save_top_graphs} - If True, top {args.save_top_percentage_routes * 100}% of routes will be saved.")
-
+    logging.info(f"The script will save the top {args.save_top_percentage_routes * 100}% of routes for each experiment.")
+    
     start_time = time.perf_counter()
 
     for experiment_name in args.experiments:
@@ -342,8 +346,8 @@ if __name__ == "__main__":
         logging.info(f"Starting analysis for experiment: {experiment_name}\n")
 
         path = os.path.join(args.experiment_path, experiment_name)
-        seeds = [os.path.join(path, f"seed{seed}") for seed in range(5) if os.path.exists(os.path.join(path, f"seed{seed}"))]
-        assert len(seeds) == 5, f"Expected 5 seeds, found {len(seeds)} for experiment {experiment_name}."
+        seeds = [os.path.join(path, folder) for folder in os.listdir(path) if folder.startswith("seed") and os.path.isdir(os.path.join(path, folder))]
+        assert len(seeds) > 0, f"No seeds found for experiment {experiment_name}."
 
         logging.info(f"----- Results for: {experiment_name} -----")
 
@@ -359,7 +363,6 @@ if __name__ == "__main__":
         log_molecule_and_rxn_metrics(
             seeds=seeds,
             experiment_name=experiment_name,
-            save_top_graphs=args.save_top_graphs,
             save_top_percentage_routes=args.save_top_percentage_routes
         )
 

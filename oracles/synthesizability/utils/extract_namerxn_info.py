@@ -37,7 +37,7 @@ def run_namerxn(
         rxn_name = rxn.split("[")[0].strip()
         rxn_name = " ".join(rxn_name.split()[1:]).replace("\n", "")
 
-        rxn_info.append((rxn_name, rxn_class))
+        rxn_info.append((rxn_class, rxn_name))
 
     return rxn_info
 

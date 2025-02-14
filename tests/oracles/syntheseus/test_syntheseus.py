@@ -111,8 +111,8 @@ def base_oracle_params() -> dict:
                 "enforce_all_reactions": False,
                 "rxn_insight_env_name": "rxn-insight",
                 "use_namerxn": False,
-                 # Need to change below this to user's local path
-                 # FIXME: The tests assume NameRXN version 3.7.3
+                # NOTE: The tests assume NameRXN version 3.7.3
+                # NOTE: User's should modify the path below to their local path
                 "namerxn_binary_path": "/home/jeff/saturn-dev/test/testing-namerxn/HazELNut/namerxn",
                 "enforced_rxn_classes": [],
                 "avoid_rxn_classes": [],
@@ -122,9 +122,6 @@ def base_oracle_params() -> dict:
                 "seed_reactions_file_folder": os.path.join(CURRENT_DIR, "../../../test/mitsunobu-seeding-preprocessed")
             },
             "route_extraction_script_path": os.path.join(CURRENT_DIR, "../../../oracles/synthesizability/utils/extract_syntheseus_route_data.py"),
-            "save_top_routes": False,
-            "percentage_to_save": 0.005,
-            "include_rxn_info": False,
             "time_limit_s": 180,
             "optimize_path_length": False,
             "parallelize": False,
@@ -167,7 +164,7 @@ def test_normal_synthesizability(aripiprazole_mol, aripiprazole_hexane_chain_mol
         oracle_calls=1
     )
     assert len(solved) == 1, "Expected 1 molecule in the SMILES list"
-    assert (solved == np.array([2])).all(), "Expected the aripiprazole to be solved"
+    assert (solved == np.array([2])).all(), "Expected aripiprazole to be solved"
 
     # Test 2 molecules since Syntheseus results parsing is difference when > 1 input molecules
     solved = syntheseus_oracle(
@@ -175,7 +172,7 @@ def test_normal_synthesizability(aripiprazole_mol, aripiprazole_hexane_chain_mol
         oracle_calls=1
     )
     assert len(solved) == 2, "Expected 2 molecules in the SMILES list"
-    assert (solved == np.array([2, -99])).all(), "Expected the aripiprazole to be solved and the hexane chain to be unsolvable"
+    assert (solved == np.array([2, -99])).all(), "Expected aripiprazole to be solved and the hexane chain to be unsolvable"
 
 def test_rxn_class_synthesizability(aripiprazole_mol, amide_mol, base_oracle_params):
     """

@@ -1,10 +1,10 @@
 """Utils for analysis"""
 from typing import Dict, List, Tuple, Union
 import os
-import logging
+import shutil
 import subprocess
+import logging
 import json
-import ast
 import random
 import datetime
 import pandas as pd
@@ -20,6 +20,7 @@ from rdkit import DataStructs
 import matplotlib.pyplot as plt
 import more_itertools as mit
 from matplotlib import pyplot as plt
+from collections import defaultdict
 
 import warnings
 from rdkit import RDLogger
@@ -34,17 +35,16 @@ MORGAN_BITS = 1024
 # General Utility Functions
 # -------------------------
 def setup_logging(logging_path: str):
-    """Sets up logging to a file and console"""
+    """Sets up logging to a file and console."""
     logging.basicConfig(filename=logging_path, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
     console.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     logging.getLogger("").addHandler(console)
 
-
 def canonicalize_smiles(smiles: str) -> str:
     """
-    Canonicalize the given SMILES string
+    Canonicalize the given SMILES string.
     """
     try:
         mol = Chem.MolFromSmiles(smiles)
@@ -52,26 +52,23 @@ def canonicalize_smiles(smiles: str) -> str:
     except Exception:
         return smiles
 
-
 def df_remove_duplicate_smiles(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Remove duplicate SMILES from the given DataFrame
+    Remove duplicate SMILES from the given DataFrame.
     """
     df["canonical_smiles"] = df["smiles"].apply(lambda x: canonicalize_smiles(x) if x is not None and x != "" else None)
     df = df.drop_duplicates(subset=["canonical_smiles"])
     return df
 
-
 def get_morgan_fingerprints(mols: List[Mol], as_list: bool = False) -> Union[list, np.array]:
     """
-    Get the Morgan fingerprints for the given molecules
+    Get the Morgan fingerprints for the given molecules.
     """
     fps = [AllChem.GetMorganFingerprintAsBitVect(m, MORGAN_RADIUS, MORGAN_BITS) for m in mols]
     if as_list:
         return fps
     else:
         return np.array(fps)
-
 
 def get_wall_time(lines: List[str]) -> float:
     total_time = float(lines[-1].split()[-2])
@@ -96,7 +93,7 @@ def ligand_efficiency(
     docking_scores: List[float]
 ) -> List[float]:
     """
-    Calculate the ligand efficiencies for the molecules
+    Calculate the ligand efficiencies for the molecules.
     """
     ligand_efficiencies = []
     for idx, mol in enumerate(mols):
@@ -114,7 +111,7 @@ def ligand_efficiency(
 # ---------------------------
 def num_unique_murcko_scaffolds(mols: List[Mol]) -> int:
     """
-    Count the number of unique Murcko scaffolds in the input SMILES list
+    Count the number of unique Murcko scaffolds in the input SMILES list.
     """
     scaffolds = set()
     for mol in mols:
@@ -125,7 +122,6 @@ def num_unique_murcko_scaffolds(mols: List[Mol]) -> int:
             continue
 
     return len(scaffolds)
-
 
 # From https://github.com/molecularsets/moses/blob/master/moses/metrics/metrics.py
 def average_agg_tanimoto(
@@ -171,7 +167,6 @@ def average_agg_tanimoto(
         agg_tanimoto = (agg_tanimoto)**(1/p)
     return np.mean(agg_tanimoto)
 
-
 # From https://github.com/molecularsets/moses/blob/master/moses/metrics/metrics.py
 def internal_diversity(
     mols: List[Mol], 
@@ -187,18 +182,15 @@ def internal_diversity(
     """
     fps = get_morgan_fingerprints(mols)
     return 1 - (average_agg_tanimoto(fps, fps, agg="mean", device=device, p=p)).mean()
-
         
 def get_ncircle(df):
     if "FPS" not in df:
         df["FPS"] = [AllChem.GetMorganFingerprintAsBitVect((mol), 2, 1024) for mol in df["MOL"]]
     return NCircles().measure(df["FPS"])
 
-
 def similarity_matrix_tanimoto(fps1, fps2):
     similarities = [DataStructs.BulkTanimotoSimilarity(fp, fps2) for fp in fps1]
     return np.array(similarities)
-
 
 class NCircles():
     def __init__(self, threshold=0.75):
@@ -229,153 +221,46 @@ class NCircles():
         vecs = self.get_circles((vecs, self.sim_mat_func, self.t))
         return len(vecs)
 
-
 def write_out_top_syntheseus_graphs(
-    oracle_history: pd.DataFrame,
-    syntheseus_folder: str,
-    enforce_building_blocks: bool,
-    enforced_building_blocks_file: str,
-    syntheseus_path_script: str,
-    rxn_info_path_script: str
-) -> None:
+    top_oracle_history: pd.DataFrame,
+    smiles_rxn_tracker: dict
+) -> Dict[str, Dict[str, Union[str, int]]]:
     """
-    Extract the Syntheseus synthesis graph PDF files for the highest reward molecules (given they satisfy all reaction constraints).
+    Extract the Syntheseus synthesis graph information for the highest reward molecules (given they satisfy all reaction constraints).
     The purpose of this function is to automatically allow the user to visualize the synthesis routes for the top molecules.
     """
     # Output JSON with all relevant metrics and information
     output = {}
-    
-    # Loop through each top generated SMILES, extract the Syntheseus graph, and track which enforced smiles is visited (if applicable)
-    if enforce_building_blocks:
-        enforced_building_blocks_smiles = set([canonicalize_smiles(s) for s in open(enforced_building_blocks_file).readlines()])
 
-    syntheseus_outputs = os.listdir(syntheseus_folder)
-
-    for idx, (_, row) in enumerate(oracle_history.iterrows()):
-        oracle_calls = int(row["oracle_calls"])
-        generated_smiles = row["smiles"]
-        # Extract the Oracle raw values
+    for idx, (_, row) in enumerate(top_oracle_history.iterrows()):
+        generated_smiles = canonicalize_smiles(row["smiles"])
+        # Extract the Oracle raw reward values
         reward = {
             "reward": row["reward"],
             **{col: row[col] for col in row.index if "raw_values" in col}
         }
-        
-        # Find the Syntheseus output folder with the closest *smaller* number of oracle calls
-        # FIXME: This is because currently, oracle calls is incremented before the Oracle History is updated. Fix this in the future. This is inelegant
-        closest_smaller_oracle_calls_folder = max(
-            [
-                folder for folder in syntheseus_outputs 
-                if not folder.endswith(".json") and 
-                not folder.endswith(".pdf") and 
-                not "graphs" in folder and
-                int(folder.split("_")[-1]) < oracle_calls
-            ],
-            key=lambda x: int(x.split("_")[-1])
-        )
 
-        # All the Mols matching the oracle calls
-        mol_folder = os.listdir(os.path.join(syntheseus_folder, closest_smaller_oracle_calls_folder))
-        # Loop through each to find the correct molecule
-        for individual_mol_folder in mol_folder:
-            added = False
-            all_output_files = os.listdir(os.path.join(syntheseus_folder, closest_smaller_oracle_calls_folder, individual_mol_folder))
-            # Check if the Mol is solved
-            if "route_0.pkl" in all_output_files:
-                # Extract the route Mol data
-                route = extract_syntheseus_route_data(
-                    route_path=os.path.join(syntheseus_folder, closest_smaller_oracle_calls_folder, individual_mol_folder, "route_0.pkl"),
-                    data_type="mol",
-                    syntheseus_script_path=syntheseus_path_script,
-                )
-                # Track which enforced block is visited (if applicable)
-                specific_enforced_block = None
-
-                for node, node_data in route.items():
-                    # Check if the generated SMILES is in the route
-                    if node_data["depth"] == 0 and canonicalize_smiles(node_data["smiles"]) == canonicalize_smiles(generated_smiles):
-                        added = True  
-                        if enforce_building_blocks:
-                            # Extract which enforced block is present
-                            for intermediate_node, intermediate_node_data in route.items():
-                                canonical_intermediate_smiles = canonicalize_smiles(intermediate_node_data["smiles"])  # Canonicalize in case
-                                if canonical_intermediate_smiles in enforced_building_blocks_smiles:
-                                    specific_enforced_block = canonical_intermediate_smiles
-                                    break
-                        if added:
-                            break
-                if added:
-                    break
-
-        # Get Synthesis data
-        synthesis_data = extract_syntheseus_route_data(
-            route_path=os.path.join(syntheseus_folder, closest_smaller_oracle_calls_folder, individual_mol_folder, "route_0.pkl"),
-            data_type="all",
-            syntheseus_script_path=syntheseus_path_script
-        )     
-
-        # For each Reaction node (is_rxn = True), extract the reaction information if the user specified to include reaction information
-        for node, node_data in synthesis_data.items():
-            if node_data["is_rxn"]:
-                extraction_result = subprocess.run([
-                    "conda",
-                    "run", 
-                    "-n",
-                    "rxn-insight", 
-                    "python", 
-                    rxn_info_path_script, 
-                    # Pass the rxn SMILES extracted from the Syntheseus route
-                    node_data["rxn_smiles"]
-                ], capture_output=True, text=True)
-
-                # Check for errors
-                assert extraction_result.returncode == 0, f"Error during Rxn-INSIGHT reaction information extraction: {extraction_result.stderr}"
-                rxn_info = ast.literal_eval(extraction_result.stdout)
-                node_data["rxn_class"] = rxn_info["CLASS"]
-                node_data["rxn_name"] = rxn_info["NAME"]
+        # Extract the synthesis constraints information (enforced block and/or reaction)
+        synthesis_data = smiles_rxn_tracker[generated_smiles]
 
         # Construct the JSON for the current molecule
         output[generated_smiles] = {
             "reward": reward,
-            "synthesis_data": synthesis_data,
-            "enforced_block": specific_enforced_block
+            "enforced_block": synthesis_data["enforced_block"],
+            # FIXME: This is due to the current GUI expecting a certain data structure
+            "synthesis_data": {k:v for k,v in synthesis_data.items() if k != "enforced_block"},
         }
+
     return output
-
-
-def extract_syntheseus_route_data(
-    route_path: str,
-    data_type: str,
-    syntheseus_script_path: str
-) -> Dict[str, Union[str, int]]:
-    
-    # Read Syntheseus route data from the pickle file and extract the Mols or Reactions
-    # HACK: This (temporary) solution enables reading the pickled data *without* installing Syntheseus into the Saturn environment
-    extraction_result = subprocess.run([
-        "conda", 
-        "run", 
-        "-n",
-        "syntheseus-full", 
-        "python", 
-        syntheseus_script_path, 
-        # NOTE: We set Syntheseus to terminate after 1 route is found, so the index is always 0
-        route_path,
-        data_type,  # "mol", "rxn", or "all"
-    ], capture_output=True, text=True)
-
-    # Check for errors
-    assert extraction_result.returncode == 0, f"Error during Syntheseus route ({data_type}) data extraction: {extraction_result.stderr}"
-    route = json.loads(extraction_result.stdout)
-
-    return route
-
 
 def get_run_data(path: str) -> Tuple[bool, bool, str]:
     """
-    Take run .json file and get info related to reaction and building blocks
+    Take run .json file and get info related to reaction and building blocks.
     """
     files = os.listdir(path)
     
     # Get JSON with file
+    # TODO: Make the run configuration string matching more robust
     file = [file for file in files if file.endswith(".json") and "run" in file][0]
 
     with open(os.path.join(path, file), "r") as f:
@@ -390,22 +275,97 @@ def get_run_data(path: str) -> Tuple[bool, bool, str]:
     
     return enforce_reactions, enforce_building_blocks, enforced_building_blocks_file
 
+def plot_rxn_evolution(
+    smiles_rxn_tracker: Dict[str, Dict[str, str]],
+    enforced_rxn: str,
+    save_dir: str,
+    experiment_name: str,
+    num_seeds: int
+) -> None:
+    """Plot evolution of reaction classes."""
+    # Load data
+    for seed in range(num_seeds):
+        experiment_path = f"test_files/{enforced_rxn}/seed{seed}"
+        oracle_history = pd.read_csv(f"{experiment_path}/oracle_history.csv")
+        oracle_history["canonical_smiles"] = oracle_history["smiles"].apply(canonicalize_smiles)
+
+        # Track reactions by class over time
+        rxn_stats = defaultdict(list)
+        all_rxn_steps = []
+
+        for smiles, rxn_info in smiles_rxn_tracker.items():
+            for attribute, attribute_value in rxn_info.items():
+                if attribute == "oracle_calls":
+                    oracle_calls = attribute_value
+                elif attribute == "rxn_steps":
+                    rxn_steps = attribute_value
+                    all_rxn_steps.append(rxn_steps)
+                elif isinstance(attribute_value, dict):
+                    if attribute_value["is_rxn"]:
+                        rxn_class = attribute_value["rxn_class"]
+                        rxn_name = attribute_value["rxn_name"]
+                        if oracle_calls is not None and rxn_class != "Unrecognized":
+                            rxn_stats[(rxn_class, rxn_name)].append(oracle_calls)
+                    
+        logging.info(f"{experiment_name} seed {seed} all synthesizable molecules: # reaction steps (N={len(all_rxn_steps)}): {round(np.mean(all_rxn_steps), 2)} ± {round(np.std(all_rxn_steps), 2)}")
+        
+        # Sort each reaction class by oracle calls
+        for rxn_class_name in rxn_stats:
+            rxn_stats[rxn_class_name] = sorted(rxn_stats[rxn_class_name])
+
+        # Sort reaction classes by count in descending order
+        sorted_stats = sorted(rxn_stats.items(), key=lambda x: len(x[1]), reverse=True)
+
+        # Filter for reactions with count > 500 and take top 10
+        sorted_stats = [(k,v) for k,v in sorted_stats if len(v) > 500][:10]
+
+        colours = [
+            "#2ecc71", "#3498db", "#9b59b6", "#f1c40f", "#e67e22", 
+            "#1abc9c", "#34495e", "#95a5a6", "#d35400", "#c0392b"
+        ]
+        enforced_colour = "#e74c3c"  # Bright red for enforced reaction
+
+        # Plot cumulative reactions over time
+        plt.figure(figsize=(16,8))
+
+        # Add legend entry explaining format
+        plt.plot([], [], " ", label="<Reaction Class>\n<Reaction Name>")
+
+        # Plot filtered reaction classes
+        for idx, ((rxn_class, rxn_name), calls) in enumerate(sorted_stats):
+            if enforced_rxn.lower() in rxn_class.lower() or enforced_rxn.lower() in rxn_name.lower():
+                plt.plot(calls, range(1, len(calls)+1), 
+                        label=f"{rxn_class}\n{rxn_name} (n={len(calls)})", 
+                        color=enforced_colour, alpha=1.0, linewidth=3)
+            else:
+                plt.plot(calls, range(1, len(calls)+1), 
+                        label=f"{rxn_class}\n{rxn_name} (n={len(calls)})", 
+                        color=colours[idx], alpha=1.0, linewidth=1)
+
+        plt.xlabel("Number of Oracle Calls", fontsize=12, fontweight="bold")
+        plt.ylabel("Cumulative Number of Reactions", fontsize=12, fontweight="bold")
+        plt.title("Cumulative Growth of Different Reaction Types", fontsize=14, fontweight="bold")
+        plt.grid(True)
+        plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=12)
+        plt.tight_layout()
+        
+        plt.savefig(os.path.join(save_dir, f"{experiment_name}-seed{seed}-rxn-evolution.png"))
 
 def count_rxn_graph(top_graphs: Dict[str, Union[str, float]]) -> Union[Dict[str, int], List[int]]:
     """
-    Count number of reaction classes and number of reaction steps for each top graph
+    Count number of reaction classes and number of reaction steps for each top graph.
     """
     rxn_count = dict()
     rxn_steps = []
 
     for key, value in top_graphs.items():
 
-        synthesis_graph = top_graphs[key]["synthesis_data"]
+        synthesis_graph = {k:v for k,v in top_graphs[key]["synthesis_data"].items() if "node" in k}
         steps = 0
 
-        for node, value in synthesis_graph.items():
-            if value["is_rxn"]:
-                rxn_name = value["rxn_name"]
+        for node, attributes in synthesis_graph.items():
+            if attributes["is_rxn"]:
+                rxn_name = attributes["rxn_name"]
                 if rxn_name not in rxn_count:
                     rxn_count[rxn_name] = 1
                 else:
@@ -417,15 +377,14 @@ def count_rxn_graph(top_graphs: Dict[str, Union[str, float]]) -> Union[Dict[str,
     
     return rxn_count, rxn_steps
 
-
-def plot_rxn_classes(
+def plot_top_graphs_rxn_classes(
     rxn_count: Dict[str, int],
     save_dir: str,
     experiment_name: str
 ) -> None:
-    """Plot reaction class distribution and save barplot"""
+    """Plot reaction class distribution and save barplot."""
     # Save the raw counts
-    with open(os.path.join(save_dir, f"{experiment_name}-rxn-distribution.json"), "w") as f:
+    with open(os.path.join(save_dir, f"{experiment_name}-top-graphs-rxn-distribution.json"), "w") as f:
         json.dump(rxn_count, f, indent=4)
 
     # Extract categories and counts
@@ -453,4 +412,66 @@ def plot_rxn_classes(
     plt.xticks(rotation=45, ha="right")
     plt.tight_layout()
 
-    plt.savefig(os.path.join(save_dir, f"{experiment_name}-rxn-distribution.png"))
+    plt.savefig(os.path.join(save_dir, f"{experiment_name}-top-graphs-rxn-distribution.png"))
+
+def annotate_rxn_conditions(
+    top_graphs: Dict[str, Dict[str, Union[str, int]]],
+    reacon_dir: str
+) -> Dict[str, Dict[str, Union[str, int]]]:
+    """
+    Annotate the conditions for the top graphs using Reacon: https://pubs.rsc.org/en/content/articlehtml/2024/sc/d4sc05946h#cit27.
+    """
+    # Loop through top_graphs and extract all reaction nodes
+    reaction_smiles = []
+    for smiles, data in top_graphs.items():
+        synthesis_graph = {k:v for k,v in data["synthesis_data"].items() if "node" in k}
+        for node, attributes in synthesis_graph.items():
+            if attributes["is_rxn"]:
+                reaction_smiles.append(attributes["rxn_smiles"])
+
+    # Write a temporary DataFrame out following the required format
+    df = pd.DataFrame({
+        "_id": list(range(len(reaction_smiles))),  # Dummy attribute
+        "reaction_smiles": reaction_smiles
+    })
+    df.to_csv("temp_reaction_smiles.csv", index=False)
+
+    # Run Reacon
+    subprocess.run([
+        "bash", 
+        os.path.join(reacon_dir, "map_and_pred_conditions.sh"),
+        os.path.abspath(os.path.dirname(__file__)),
+        reacon_dir
+    ])
+
+    # Extract the cluster predictions
+    conditions = []
+    reacon_output = json.load(open("temp_predictions/cluster_condition_prediction.json"))
+    for rxn_id, preds in reacon_output.items():
+        top_1_condition = preds[1][0]["best condition"]
+        conditions.append(top_1_condition)
+
+    # Add conditions to top_graphs
+    condition_idx = 0
+    for smiles, data in top_graphs.items():
+        synthesis_graph = {k:v for k,v in data["synthesis_data"].items() if "node" in k}
+        for node, attributes in synthesis_graph.items():
+            if attributes["is_rxn"]:
+                condition_dict = {
+                    "catalyst": conditions[condition_idx][0],
+                    "solvent_1": conditions[condition_idx][1], 
+                    "solvent_2": conditions[condition_idx][2],
+                    "reagent_1": conditions[condition_idx][3],
+                    "reagent_2": conditions[condition_idx][4], 
+                    "reagent_3": conditions[condition_idx][5]
+                }
+                attributes["conditions"] = condition_dict
+                condition_idx += 1
+
+    # Remove temporary files
+    os.remove("temp_reaction_smiles.csv")
+    os.remove("temp_reaction_templates.csv")
+    shutil.rmtree("temp_predictions")
+    os.remove("sample_preds.csv")
+    
+    return top_graphs

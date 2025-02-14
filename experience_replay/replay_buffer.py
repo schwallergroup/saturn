@@ -48,7 +48,7 @@ class ReplayBuffer:
             "reward": rewards
             }
         )
-        self.memory = pd.concat([self.memory, df])
+        self.memory = pd.concat([self.memory, df]) if len(self.memory) > 0 else df
         # Keep only the top N (by reward)
         self.purge_memory()
 

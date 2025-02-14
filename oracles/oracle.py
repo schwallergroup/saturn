@@ -296,9 +296,9 @@ class Oracle:
                 "reward": rewards, 
                 "penalized_reward": penalized_rewards 
             })
-        df = pd.concat([df, oracle_components_df], axis=1)  
+        df = pd.concat([df, oracle_components_df], axis=1)
 
-        self.oracle_history = pd.concat([self.oracle_history, df])
+        self.oracle_history = pd.concat([self.oracle_history, df]) if len(self.oracle_history) > 0 else df
 
     @staticmethod
     def de_duplicate_smiles(smiles: np.ndarray[str]) -> np.ndarray[str]:
@@ -322,7 +322,11 @@ class Oracle:
 
     def write_out_repeat_history(self, path: str):
         """Write out the repeated SMILES histories as JSON."""
-        with open(os.path.join(path, "repeated_sampled_smiles_history.json"), "w") as f:
-            json.dump(self.repeated_sampled_smiles, f, indent=2)
-        with open(os.path.join(path, "repeated_hallucinated_smiles_history.json"), "w") as f:
-            json.dump(self.repeated_hallucinated_smiles, f, indent=2)
+        # FIXME: Reproduce json dump error
+        try:
+            with open(os.path.join(path, "repeated_sampled_smiles_history.json"), "w") as f:
+                json.dump(self.repeated_sampled_smiles, f, indent=2)
+            with open(os.path.join(path, "repeated_hallucinated_smiles_history.json"), "w") as f:
+                json.dump(self.repeated_hallucinated_smiles, f, indent=2)
+        except Exception:
+            print("Failed to write out repeat histories.")

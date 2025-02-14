@@ -2,8 +2,11 @@
 
 `analyze.py` is a script that outputs various metrics for TANGO-RXN experiments. 
 
+# Reaction Condition Annotation:
 
-General Metrics
+This is performed by [Reacon](https://pubs.rsc.org/en/content/articlehtml/2025/sc/d4sc05946h) and requires following the installation [here](https://github.com/schwallergroup/reacon).
+
+# General Metrics
 ---------------
 `# Non-synthesizable`: Number of generated molecules without a solved route by the retrosynthesis model
 

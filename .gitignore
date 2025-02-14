@@ -7,6 +7,7 @@ experiments
 test/
 test_files/
 synth/
+syntheseus_results/
 constrained-docking/
 boost_1_85_0
 Vina-GPU-2.1
@@ -19,6 +20,3 @@ output/
 *.png
 *.ipynb
 *.log
-*.smi
-debug_enumeration/*
-*.ckpt
