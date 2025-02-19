@@ -1,0 +1,102 @@
+{
+    "O=C(NC(=O)C1CCOCC1)c1cc(-c2ccc(Cl)cc2)ccn1": {
+        "reward": {
+            "reward": 0.8348099,
+            "syntheseus_raw_values": 1.0,
+            "qed_raw_values": 0.8687035383310041,
+            "num_hbd_raw_values": 1,
+            "quickvina2_gpu_raw_values": -9.1
+        },
+        "enforced_block": "OB(O)c1ccc(Cl)cc1",
+        "synthesis_data": {
+            "oracle_calls": 847,
+            "rxn_steps": 2,
+            "node_1": {
+                "depth": 0,
+                "is_mol": true,
+                "mol_smiles": "O=C(NC(=O)C1CCOCC1)c1cc(-c2ccc(Cl)cc2)ccn1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_2": {
+                "depth": 1,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "O=C(NC(=O)C1CCOCC1)c1cc(Br)ccn1.OB(O)c1ccc(Cl)cc1>>O=C(NC(=O)C1CCOCC1)c1cc(-c2ccc(Cl)cc2)ccn1",
+                "rxn_class": "Suzuki coupling",
+                "rxn_name": "Bromo Suzuki-type coupling",
+                "is_purchasable": null,
+                "conditions": {
+                    "catalyst": "None",
+                    "solvent_1": "None",
+                    "solvent_2": "None",
+                    "reagent_1": "None",
+                    "reagent_2": "None",
+                    "reagent_3": "None"
+                }
+            },
+            "node_3": {
+                "depth": 2,
+                "is_mol": true,
+                "mol_smiles": "O=C(NC(=O)C1CCOCC1)c1cc(Br)ccn1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": false
+            },
+            "node_4": {
+                "depth": 2,
+                "is_mol": true,
+                "mol_smiles": "OB(O)c1ccc(Cl)cc1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            },
+            "node_5": {
+                "depth": 3,
+                "is_mol": false,
+                "mol_smiles": null,
+                "is_rxn": true,
+                "rxn_smiles": "NC(=O)C1CCOCC1.O=C(O)c1cc(Br)ccn1>>O=C(NC(=O)C1CCOCC1)c1cc(Br)ccn1",
+                "rxn_class": "N-acylation to amide",
+                "rxn_name": "Carboxylic acid + amide condensation",
+                "is_purchasable": null,
+                "conditions": {
+                    "catalyst": "None",
+                    "solvent_1": "CCOC(C)=O",
+                    "solvent_2": "None",
+                    "reagent_1": "None",
+                    "reagent_2": "None",
+                    "reagent_3": "None"
+                }
+            },
+            "node_6": {
+                "depth": 4,
+                "is_mol": true,
+                "mol_smiles": "NC(=O)C1CCOCC1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            },
+            "node_7": {
+                "depth": 4,
+                "is_mol": true,
+                "mol_smiles": "O=C(O)c1cc(Br)ccn1",
+                "is_rxn": false,
+                "rxn_smiles": null,
+                "rxn_class": null,
+                "rxn_name": null,
+                "is_purchasable": true
+            }
+        }
+    }
+}
