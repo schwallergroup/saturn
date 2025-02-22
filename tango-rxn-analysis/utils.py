@@ -277,6 +277,7 @@ def get_run_data(path: str) -> Tuple[bool, bool, str]:
 
 def plot_rxn_evolution(
     smiles_rxn_tracker: Dict[str, Dict[str, str]],
+    experiment_path: str,
     enforced_rxn: str,
     save_dir: str,
     experiment_name: str,
@@ -285,7 +286,7 @@ def plot_rxn_evolution(
     """Plot evolution of reaction classes."""
     # Load data
     for seed in range(num_seeds):
-        experiment_path = f"test_files/{enforced_rxn}/seed{seed}"
+        experiment_path = f"{experiment_path}/{enforced_rxn}/seed{seed}"
         oracle_history = pd.read_csv(f"{experiment_path}/oracle_history.csv")
         oracle_history["canonical_smiles"] = oracle_history["smiles"].apply(canonicalize_smiles)
 

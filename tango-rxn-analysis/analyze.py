@@ -147,6 +147,7 @@ def log_pooled_molecules_metrics(
 
 def log_molecule_and_rxn_metrics(
     seeds: List[str],    
+    experiment_path: str,
     experiment_name: str,
     save_top_percentage_routes: float,
     save_dir: str = "./top_graphs/"
@@ -250,6 +251,7 @@ def log_molecule_and_rxn_metrics(
     # Plot evolution of reaction classes
     plot_rxn_evolution(
         smiles_rxn_tracker=smiles_rxn_tracker,
+        experiment_path=experiment_path,
         enforced_rxn=experiment_name,
         save_dir=save_dir,
         experiment_name=experiment_name,
@@ -362,6 +364,7 @@ if __name__ == "__main__":
         # Log enforced reaction and building blocks info
         log_molecule_and_rxn_metrics(
             seeds=seeds,
+            experiment_path=args.experiment_path,
             experiment_name=experiment_name,
             save_top_percentage_routes=args.save_top_percentage_routes
         )
