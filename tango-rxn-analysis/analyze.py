@@ -221,7 +221,7 @@ def log_molecule_and_rxn_metrics(
         ))
 
         # Store top molecules
-        top_oracle_histories.append((df_top_enforced_rxn, seed))
+        top_oracle_histories.append((df_top_enforced_rxn, seed_path))
 
     logging.info(f"# Enforced Blocks (if applicable) and Reaction (N={N_rxn}): {int(np.mean(num_enforced_rxn))} ± {int(np.std(num_enforced_rxn))}\n")
 
@@ -262,7 +262,9 @@ def log_molecule_and_rxn_metrics(
     top_graphs = {}
 
     # For each DataFrame, slice the top % and save routes for visualization
-    for df, seed in top_oracle_histories:
+    for df, seed_path in top_oracle_histories:
+
+        smiles_rxn_tracker = json.load(open(os.path.join(seed_path, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
 
         extracted_graph = write_out_top_syntheseus_graphs(
             top_oracle_history=df,
