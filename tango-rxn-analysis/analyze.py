@@ -350,6 +350,7 @@ if __name__ == "__main__":
         path = os.path.join(args.experiment_path, experiment_name)
         seeds_paths = [os.path.join(path, folder) for folder in os.listdir(path) if folder.startswith("seed") and os.path.isdir(os.path.join(path, folder))]
         assert len(seeds_paths) > 0, f"No seeds found for experiment {experiment_name}."
+        # FIXME: Some parts of the code assume that the format of seed_paths ends with */seed{idx}
         seeds_paths.sort()
 
         logging.info(f"----- Results for: {experiment_name} -----")

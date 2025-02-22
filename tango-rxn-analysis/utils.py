@@ -306,7 +306,7 @@ def plot_rxn_evolution(
                         if oracle_calls is not None and rxn_class != "Unrecognized":
                             rxn_stats[(rxn_class, rxn_name)].append(oracle_calls)
                     
-        logging.info(f"{experiment_name} seed {seed_path[-1]} all synthesizable molecules: # reaction steps (N={len(all_rxn_steps)}): {round(np.mean(all_rxn_steps), 2)} ± {round(np.std(all_rxn_steps), 2)}")
+        logging.info(f"{experiment_name} seed {seed_path[-1]} all synthesizable molecules (N={len(all_rxn_steps)}) - # reaction steps: {round(np.mean(all_rxn_steps), 2)} ± {round(np.std(all_rxn_steps), 2)}")
         
         # Sort each reaction class by oracle calls
         for rxn_class_name in rxn_stats:
@@ -316,7 +316,7 @@ def plot_rxn_evolution(
         sorted_stats = sorted(rxn_stats.items(), key=lambda x: len(x[1]), reverse=True)
 
         # Filter for reactions with count > 500 and take top 10
-        sorted_stats = [(k,v) for k,v in sorted_stats if len(v) > 500][:10]
+        sorted_stats = [(k, v) for k, v in sorted_stats if len(v) > 500][:10]
 
         colours = [
             "#2ecc71", "#3498db", "#9b59b6", "#f1c40f", "#e67e22", 
@@ -348,7 +348,7 @@ def plot_rxn_evolution(
         plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=12)
         plt.tight_layout()
         
-        plt.savefig(os.path.join(save_dir, f"{experiment_name}-seed{seed}-rxn-evolution.png"))
+        plt.savefig(os.path.join(save_dir, f"{experiment_name}-seed{seed_path[-1]}-rxn-evolution.png"))
 
 def count_rxn_graph(top_graphs: Dict[str, Union[str, float]]) -> Union[Dict[str, int], List[int]]:
     """
