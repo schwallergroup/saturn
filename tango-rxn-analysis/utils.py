@@ -349,6 +349,7 @@ def plot_rxn_evolution(
         plt.tight_layout()
         
         plt.savefig(os.path.join(save_dir, f"{experiment_name}-seed{seed_path[-1]}-rxn-evolution.png"))
+        plt.close()
 
 def count_rxn_graph(top_graphs: Dict[str, Union[str, float]]) -> Union[Dict[str, int], List[int]]:
     """
@@ -412,6 +413,7 @@ def plot_top_graphs_rxn_classes(
     plt.tight_layout()
 
     plt.savefig(os.path.join(save_dir, f"{experiment_name}-top-graphs-rxn-distribution.png"))
+    plt.close()
 
 def annotate_rxn_conditions(
     top_graphs: Dict[str, Dict[str, Union[str, int]]],
