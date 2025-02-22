@@ -286,8 +286,8 @@ def plot_rxn_evolution(
     """Plot evolution of reaction classes."""
     # Load data
     for seed in range(num_seeds):
-        experiment_path = f"{experiment_path}/{enforced_rxn}/seed{seed}"
-        oracle_history = pd.read_csv(f"{experiment_path}/oracle_history.csv")
+        oracle_history_base_path = f"{experiment_path}/{enforced_rxn}/seed{seed}"
+        oracle_history = pd.read_csv(f"{oracle_history_base_path}/oracle_history.csv")
         oracle_history["canonical_smiles"] = oracle_history["smiles"].apply(canonicalize_smiles)
 
         # Track reactions by class over time
