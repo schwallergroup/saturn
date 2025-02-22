@@ -276,21 +276,19 @@ def get_run_data(path: str) -> Tuple[bool, bool, str]:
     return enforce_reactions, enforce_building_blocks, enforced_building_blocks_file
 
 def plot_rxn_evolution(
-    smiles_rxn_tracker: Dict[str, Dict[str, str]],
-    experiment_path: str,
+    seeds_paths: List[str],
     enforced_rxn: str,
     save_dir: str,
-    experiment_name: str,
-    num_seeds: int
+    experiment_name: str
 ) -> None:
     """Plot evolution of reaction classes."""
     # Load data
-    for seed in range(num_seeds):
-        oracle_history_base_path = f"{experiment_path}/{enforced_rxn}/seed{seed}"
-        oracle_history = pd.read_csv(f"{oracle_history_base_path}/oracle_history.csv")
+    for seed_path in seeds_paths:
+        oracle_history = pd.read_csv(f"{seed_path}/oracle_history.csv")
         oracle_history["canonical_smiles"] = oracle_history["smiles"].apply(canonicalize_smiles)
 
         # Track reactions by class over time
+        smiles_rxn_tracker = json.load(open(os.path.join(seed_path, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
         rxn_stats = defaultdict(list)
         all_rxn_steps = []
 
@@ -308,7 +306,7 @@ def plot_rxn_evolution(
                         if oracle_calls is not None and rxn_class != "Unrecognized":
                             rxn_stats[(rxn_class, rxn_name)].append(oracle_calls)
                     
-        logging.info(f"{experiment_name} seed {seed} all synthesizable molecules: # reaction steps (N={len(all_rxn_steps)}): {round(np.mean(all_rxn_steps), 2)} ± {round(np.std(all_rxn_steps), 2)}")
+        logging.info(f"{experiment_name} seed {seed_path[-1]} all synthesizable molecules: # reaction steps (N={len(all_rxn_steps)}): {round(np.mean(all_rxn_steps), 2)} ± {round(np.std(all_rxn_steps), 2)}")
         
         # Sort each reaction class by oracle calls
         for rxn_class_name in rxn_stats:

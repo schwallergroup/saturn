@@ -146,7 +146,7 @@ def log_pooled_molecules_metrics(
         logging.info(f"No molecules generated for {threshold_label} docking score interval")
 
 def log_molecule_and_rxn_metrics(
-    seeds: List[str],    
+    seeds_paths: List[str],    
     experiment_path: str,
     experiment_name: str,
     save_top_percentage_routes: float,
@@ -168,26 +168,26 @@ def log_molecule_and_rxn_metrics(
     # Store per-seed results
     seed_results = []
 
-    for seed in seeds:
-        enforce_reactions, enforce_building_blocks, enforced_building_blocks_file = get_run_data(seed)
+    for seed_path in seeds_paths:
+        enforce_reactions, enforce_building_blocks, enforced_building_blocks_file = get_run_data(seed_path)
         assert enforce_reactions, "Reaction presence was not enforced"
 
         # Skip if oracle_history.csv doesn't exist (failed run)
-        if not os.path.exists(os.path.join(seed, "oracle_history.csv")):
+        if not os.path.exists(os.path.join(seed_path, "oracle_history.csv")):
             continue
             
         # Load and canonicalize SMILES from JSON files
-        rxn_json = json.load(open(os.path.join(seed, "syntheseus_results", "matched_generated_smiles_with_rxn.json"), "r"))
+        rxn_json = json.load(open(os.path.join(seed_path, "syntheseus_results", "matched_generated_smiles_with_rxn.json"), "r"))
         enforced_rxn_smiles = set([canonicalize_smiles(s) for smiles_list in rxn_json.values() for s in smiles_list if s])
 
         # Load smiles_rxn_tracker.json
-        smiles_rxn_tracker = json.load(open(os.path.join(seed, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
+        smiles_rxn_tracker = json.load(open(os.path.join(seed_path, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
 
         if len(enforced_rxn_smiles) > 0:
             N_rxn += 1
 
         # Load and filter DataFrame
-        df = df_remove_duplicate_smiles(pd.read_csv(os.path.join(seed, "oracle_history.csv")))
+        df = df_remove_duplicate_smiles(pd.read_csv(os.path.join(seed_path, "oracle_history.csv")))
         df["canonical_smiles"] = df["smiles"].apply(canonicalize_smiles)
         
         # Track metrics
@@ -250,12 +250,10 @@ def log_molecule_and_rxn_metrics(
 
     # Plot evolution of reaction classes
     plot_rxn_evolution(
-        smiles_rxn_tracker=smiles_rxn_tracker,
-        experiment_path=experiment_path,
+        seeds_paths=seeds_paths,
         enforced_rxn=experiment_name,
         save_dir=save_dir,
-        experiment_name=experiment_name,
-        num_seeds=len(seeds)
+        experiment_name=experiment_name
     )
     
     # Iterate over top molecules and save routes for visualization
@@ -348,22 +346,23 @@ if __name__ == "__main__":
         logging.info(f"Starting analysis for experiment: {experiment_name}\n")
 
         path = os.path.join(args.experiment_path, experiment_name)
-        seeds = [os.path.join(path, folder) for folder in os.listdir(path) if folder.startswith("seed") and os.path.isdir(os.path.join(path, folder))]
-        assert len(seeds) > 0, f"No seeds found for experiment {experiment_name}."
+        seeds_paths = [os.path.join(path, folder) for folder in os.listdir(path) if folder.startswith("seed") and os.path.isdir(os.path.join(path, folder))]
+        assert len(seeds_paths) > 0, f"No seeds found for experiment {experiment_name}."
+        seeds_paths.sort()
 
         logging.info(f"----- Results for: {experiment_name} -----")
 
         # Log number of solved molecules
-        log_synthesizable_metrics(seeds)
+        log_synthesizable_metrics(seeds_paths)
 
         # Log wall time
-        log_wall_time(seeds)
+        log_wall_time(seeds_paths)
 
         DOCKING_SCORE_ENUM = get_docking_score_enum(args.docking_oracle)
 
         # Log enforced reaction and building blocks info
         log_molecule_and_rxn_metrics(
-            seeds=seeds,
+            seeds_paths=seeds_paths,
             experiment_path=args.experiment_path,
             experiment_name=experiment_name,
             save_top_percentage_routes=args.save_top_percentage_routes

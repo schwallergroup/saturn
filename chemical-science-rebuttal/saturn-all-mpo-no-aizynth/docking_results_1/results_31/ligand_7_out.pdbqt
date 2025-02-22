@@ -1,0 +1,35 @@
+MODEL 1
+REMARK VINA RESULT:      -5.8      0.000      0.000
+REMARK  Name = 
+REMARK  4 active torsions:
+REMARK  status: ('A' for Active; 'I' for Inactive)
+REMARK    1  A    between atoms: C_1  and  C_2
+REMARK    2  A    between atoms: N_6  and  O_7
+REMARK    3  A    between atoms: C_8  and  C_9
+REMARK    4  A    between atoms: C_16  and  C_17
+REMARK                            x       y       z     vdW  Elec       q    Type
+REMARK                         _______ _______ _______ _____ _____    ______ ____
+ROOT
+ATOM      1  C   UNL     1     -30.764  72.393  15.488  0.00  0.00    +0.000 C 
+ATOM      2  C   UNL     1     -31.772  73.616  15.649  0.00  0.00    +0.000 C 
+ATOM      3  C   UNL     1     -32.601  73.574  14.336  0.00  0.00    +0.000 C 
+ATOM      4  C   UNL     1     -31.649  74.184  13.273  0.00  0.00    +0.000 C 
+ATOM      5  C   UNL     1     -30.604  74.915  14.084  0.00  0.00    +0.000 C 
+ATOM      6  N   UNL     1     -29.551  75.504  13.602  0.00  0.00    +0.000 NA
+ATOM      7  C   UNL     1     -31.021  75.000  15.516  0.00  0.00    +0.000 C 
+ATOM      8  C   UNL     1     -31.871  76.315  15.540  0.00  0.00    +0.000 C 
+ATOM      9  C   UNL     1     -29.932  75.123  16.622  0.00  0.00    +0.000 C 
+ATOM     10  C   UNL     1     -30.558  74.978  18.050  0.00  0.00    +0.000 C 
+ATOM     11  C   UNL     1     -31.422  73.700  18.159  0.00  0.00    +0.000 C 
+ATOM     12  C   UNL     1     -32.135  73.377  19.460  0.00  0.00    +0.000 C 
+ATOM     13  C   UNL     1     -33.088  72.232  19.054  0.00  0.00    +0.000 C 
+ATOM     14  C   UNL     1     -33.100  72.178  17.503  0.00  0.00    +0.000 C 
+ATOM     15  C   UNL     1     -32.510  73.538  17.062  0.00  0.00    +0.000 C 
+ATOM     16  C   UNL     1     -33.669  74.591  17.235  0.00  0.00    +0.000 C 
+ENDROOT
+BRANCH   6  17
+ATOM     17  O   UNL     1     -29.213  75.482  12.265  0.00  0.00    +0.000 OA
+ATOM     18  H   UNL     1     -29.908  75.559  11.531  0.00  0.00    +0.000 HD
+ENDBRANCH   6  17
+TORSDOF 1
+ENDMDL
