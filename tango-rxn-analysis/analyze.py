@@ -246,7 +246,7 @@ def log_molecule_and_rxn_metrics(
 
     # Highest Reward
     metrics_highest_reward = [(smiles, dock, qed) for smiles, dock, qed in top_enforced_rxn_metrics]
-    log_pooled_molecules_metrics(metrics_highest_reward, f"Top {save_top_percentage_routes * 100}% by Reward, Docking Scores:")
+    log_pooled_molecules_metrics(metrics_highest_reward, f"Top {save_top_percentage_routes * 100}% by Reward (N={len(metrics_highest_reward)}), Docking Scores:")
 
     # Plot evolution of reaction classes
     plot_rxn_evolution(
@@ -300,7 +300,7 @@ def log_molecule_and_rxn_metrics(
             reacon_dir="/home/jeff/saturn-dev/test/testing-reacon/reacon"
         )
     except Exception:
-        logging.info(f"Error in reaction condition annotation for experiment: {experiment_name}. Do not expect any reaction conditions to be annotated in the top graphs.")
+        logging.info(f"Error in reaction condition annotation for experiment: {experiment_name}. Do not expect any reaction conditions to be annotated for the top graphs.")
 
     with open(os.path.join(save_dir, f"{experiment_name}-top-graphs.json"), "w") as f:
         json.dump(top_graphs, f, indent=4)
