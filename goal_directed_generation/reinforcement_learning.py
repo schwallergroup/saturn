@@ -246,10 +246,11 @@ class ReinforcementLearningAgent:
         Based on REINVENT's original loss function: https://jcheminf.biomedcentral.com/articles/10.1186/s13321-017-0235-x
         """
         if len(smiles) != 0:
-            prior_likelihoods = -self.prior.likelihood_smiles(smiles)
-            agent_likelihoods = -self.agent.likelihood_smiles(smiles)
-            augmented_likelihoods = prior_likelihoods + self.sigma * to_tensor(rewards, self.device)
-            loss = torch.pow((augmented_likelihoods - agent_likelihoods), 2)
+            # NOTE: likelihood_smiles returns the NLL so negation recovers the log-likelihood
+            prior_log_likelihoods = -self.prior.likelihood_smiles(smiles)
+            agent_log_likelihoods = -self.agent.likelihood_smiles(smiles)
+            augmented_log_likelihoods = prior_log_likelihoods + self.sigma * to_tensor(rewards, self.device)
+            loss = torch.pow((augmented_log_likelihoods - agent_log_likelihoods), 2)
             return loss
         else:
             return torch.tensor([], dtype=torch.float64, device=self.device)
@@ -294,7 +295,10 @@ class ReinforcementLearningAgent:
 
     def _reset_agent(self):
         """Reset the Agent to the best checkpoint."""
-        self.agent = Generator.load_from_file(os.path.join(self.model_checkpoints_dir, "best_agent.ckpt"), self.device)
+        self.agent = Generator.load_from_file(os.path.join(
+            self.model_checkpoints_dir, 
+            "best_agent.ckpt"
+        ), self.device)
 
     def _write_out_results(self):
         """
