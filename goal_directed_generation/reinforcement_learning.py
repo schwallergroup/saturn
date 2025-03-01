@@ -116,22 +116,23 @@ class ReinforcementLearningAgent:
         logging.info(f"Starting RL generative experiment with oracle budget: {self.oracle.budget}")
         # FIXME: could be dangerous in case of infinite loop
         while not self.oracle.budget_exceeded():
-            logging.info(f"Oracle calls: {self.oracle.calls}/{self.oracle.budget}")
-
             # 1. Sample unique SMILES from the Agent
             seqs, smiles, _ = sample_unique_sequences(self.agent, self.batch_size)
 
-            # 2. Remove molecules with radicals
-            smiles = chemistry_utils.remove_molecules_with_radicals(smiles)
-            if len(smiles) == 0:
-                logging.info("No valid SMILES in this batch. Generating a new batch.")
-                continue
-
-            # 3. Compute Validity and guard against Agent drift leading to invalid SMILES
+            # 2. Compute Validity and guard against Agent drift leading to invalid SMILES
             # NOTE: This is a rare occurrence and has been observed with repeated 0 reward batches
             # This has also been reported in https://link.springer.com/article/10.1007/s10994-024-06519-w
             reset, validity = self._validity_drift_guard(smiles)
             if reset:
+                continue
+
+            logging.info(f"Oracle calls: {self.oracle.calls}/{self.oracle.budget} (Batch Validity: {round(validity * 100, 2)}%, {int(validity * len(smiles))} / {len(smiles)})")
+
+            # 3. Remove molecules with radicals
+            # NOTE: This occurs due to SMILES syntax
+            smiles = chemistry_utils.remove_molecules_with_radicals(smiles)
+            if len(smiles) == 0:
+                logging.info("No valid SMILES in this batch. Generating a new batch.")
                 continue
 
             # 4. Beam Enumeration: Filter SMILES using the Beam Enumeration pool
