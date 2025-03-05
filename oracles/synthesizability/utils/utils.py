@@ -282,11 +282,13 @@ def get_percentage_of_carbon(
     target = Chem.MolFromSmiles(smiles_target)
 
     # Find MCS. We use CompareAny
-    mcs = rdFMCS.FindMCS(mols = [bb, target],
-                  matchChiralTag=True,
-                  bondCompare=rdFMCS.BondCompare.CompareAny,
-                  ringCompare=rdFMCS.RingCompare.StrictRingFusion,
-                  completeRingsOnly=True)
+    mcs = rdFMCS.FindMCS(
+        mols = [bb, target],
+        matchChiralTag=True,
+        bondCompare=rdFMCS.BondCompare.CompareAny,
+        ringCompare=rdFMCS.RingCompare.StrictRingFusion,
+        completeRingsOnly=True
+    )
 
     # Get match
     matched_atoms = Chem.MolFromSmarts(mcs.smartsString).GetAtoms()
@@ -302,7 +304,7 @@ def get_percentage_of_carbon(
 
 def shape_path_length_reward(
     length: int,
-    low: float = -1.0,
+    low: float = 1.0,
     high: float = 8.0,
     k: float = 0.25
 ) -> float:

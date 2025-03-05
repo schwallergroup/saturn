@@ -564,7 +564,8 @@ class Syntheseus(OracleComponent):
             # Enforcing blocks and/or reaction classes while also minimizing the path length
             if self.minimize_path_length:
                 for idx in range(len(node_rewards)):
-                    node_rewards[idx] *= shape_path_length_reward(steps[idx])
+                    if is_solved[idx] == 1:
+                        node_rewards[idx] *= shape_path_length_reward(steps[idx])
 
             return node_rewards
 
