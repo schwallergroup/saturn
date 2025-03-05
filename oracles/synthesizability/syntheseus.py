@@ -37,11 +37,11 @@ class Syntheseus(OracleComponent):
         self.syntheseus_env_name = self.parameters.specific_parameters.get("syntheseus_env_name", None)
         assert self.syntheseus_env_name is not None, "Please provide the Conda environment name with Syntheseus installed."
 
-        # Whether to optimize for path length
-        self.optimize_path_length = self.parameters.specific_parameters.get("optimize_path_length", False)
+        # Whether to incentivize minimizing the path length of synthetic routes
+        self.minimize_path_length = self.parameters.specific_parameters.get("minimize_path_length", False)
 
         # Whether to parallelize Syntheseus execution
-        self.parallelize = self.parameters.specific_parameters.get("parallelize", True) # Defaults to True
+        self.parallelize = self.parameters.specific_parameters.get("parallelize", True)  # Defaults to True
         self.max_workers = self.parameters.specific_parameters.get("max_workers", 4)  # Default to 4 workers
 
         # Reaction model
@@ -140,7 +140,7 @@ class Syntheseus(OracleComponent):
         self, 
         mols: np.ndarray[Mol],
         oracle_calls: int
-    ) -> np.ndarray[int]:
+    ) -> np.ndarray[Union[int, float]]:
         smiles = np.vectorize(Chem.MolToSmiles)(mols)
         # Save SMILES order - overwrites the previous batch's SMILES
         self.smiles = smiles
@@ -150,7 +150,7 @@ class Syntheseus(OracleComponent):
         self, 
         smiles: np.ndarray[str],
         oracle_calls: int
-    ) -> np.ndarray[int]:
+    ) -> np.ndarray[Union[int, float]]:
         """
         Thread Parallelized execution of Syntheseus on the SMILES batch.
         """
