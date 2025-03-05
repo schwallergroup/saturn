@@ -299,4 +299,16 @@ def get_percentage_of_carbon(
     assert total_C > 0, "Total number of carbons must be greater than 0."
     
     return matched_C/total_C
-    
+
+def shape_path_length_reward(
+    length: int,
+    low: float = -1.0,
+    high: float = 8.0,
+    k: float = 0.25
+) -> float:
+    """
+    Hard-coded reverse sigmoid reward tranformation for the path length of a synthetic route.
+
+    Output is in the range [0, 1].
+    """
+    return 1 / (1 + 10 ** (k * (length - (high + low) / 2) * 10 / (high - low)))

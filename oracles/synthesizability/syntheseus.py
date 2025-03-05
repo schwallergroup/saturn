@@ -14,7 +14,7 @@ from oracles.dataclass import OracleComponentParameters
 from rdkit import Chem
 from rdkit.Chem import Mol
 from utils.chemistry_utils import canonicalize_smiles, construct_morgan_fingerprints_batch_from_file
-from oracles.synthesizability.utils.utils import match_stock, extract_functional_groups, get_node_reward
+from oracles.synthesizability.utils.utils import match_stock, extract_functional_groups, get_node_reward, shape_path_length_reward
 from concurrent.futures import ThreadPoolExecutor
 from oracles.synthesizability.utils.CONSTANTS import DEFAULT_TANGO_WEIGHTS
 
@@ -560,10 +560,15 @@ class Syntheseus(OracleComponent):
 
             if not self.parallelize:
                 assert len(node_rewards) == len(smiles), "Syntheseus output length mismatch."
+            
+            # Enforcing blocks and/or reaction classes while also minimizing the path length
+            if self.minimize_path_length:
+                for idx in range(len(node_rewards)):
+                    node_rewards[idx] *= shape_path_length_reward(steps[idx])
 
             return node_rewards
 
-        elif self.optimize_path_length:
+        elif self.minimize_path_length:
             if not self.parallelize:
                 assert len(steps) == len(smiles), "Syntheseus output length mismatch."
             return steps
