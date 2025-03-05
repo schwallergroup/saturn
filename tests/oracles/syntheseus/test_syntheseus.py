@@ -123,7 +123,7 @@ def base_oracle_params() -> dict:
             },
             "route_extraction_script_path": os.path.join(CURRENT_DIR, "../../../oracles/synthesizability/utils/extract_syntheseus_route_data.py"),
             "time_limit_s": 180,
-            "optimize_path_length": False,
+            "minimize_path_length": False,
             "parallelize": False,
             "max_workers": 4,
             "results_dir": os.path.join(CURRENT_DIR, "syntheseus_results")
