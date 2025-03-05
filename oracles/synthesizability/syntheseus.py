@@ -176,7 +176,7 @@ class Syntheseus(OracleComponent):
         self, 
         smiles: np.ndarray[str],
         oracle_calls: int
-    ) -> np.ndarray[int]:
+    ) -> np.ndarray[Union[int, float]]:
         """
         Execute Syntheseus on the SMILES batch.
         """
