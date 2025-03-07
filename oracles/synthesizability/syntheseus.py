@@ -153,6 +153,7 @@ class Syntheseus(OracleComponent):
     ) -> np.ndarray[Union[int, float]]:
         """
         Thread Parallelized execution of Syntheseus on the SMILES batch.
+        # FIXME: Fix for proper function and allow multi-GPU execution
         """
         # 1. Chunk the SMILES into max_worker batches
         smiles_chunks = np.array_split(smiles, self.max_workers)
@@ -261,7 +262,7 @@ class Syntheseus(OracleComponent):
                             self.matched_generated_smiles[oracle_calls] = []
 
                         max_depth = self._get_max_depth(route)
-                        # Track the synthesis pathway contains an enforced building block
+                        # Track whether the synthesis pathway contains an enforced building block
                         is_matched = False
                         
                         # Check whether to use dense reward
