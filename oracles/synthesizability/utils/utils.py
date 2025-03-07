@@ -310,7 +310,7 @@ def shape_path_length_reward(
 ) -> float:
     """
     Hard-coded reverse sigmoid reward tranformation for the path length of a synthetic route.
-
     Output is in the range [0, 1].
+    Used if minimizing path length while also enforcing block and/or reaction constraints.
     """
     return 1 / (1 + 10 ** (k * (length - (high + low) / 2) * 10 / (high - low)))
