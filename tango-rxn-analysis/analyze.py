@@ -51,36 +51,69 @@ def get_docking_score_enum(docking_oracle: str) -> str:
     else:
         raise ValueError(f"Docking oracle {docking_oracle} not supported")
 
-def log_synthesizable_metrics(seeds: List[str]) -> None:
+def log_synthesizable_metrics(
+    seeds_paths: List[str],
+    minimize_path_length: bool
+) -> None:
     """Log number of synthesizable molecules."""
     N = 0
     non_synthesizable = []
     synthesizable = []
     synthesizable_with_constraints = []
     
-    for seed in seeds:
-        df = pd.read_csv(os.path.join(seed, "oracle_history.csv"))
+    for seed_path in seeds_paths:
+        # Skip if oracle_history.csv doesn't exist (failed run)
+        if not os.path.exists(os.path.join(seed_path, "oracle_history.csv")):
+            continue
+
+        df = pd.read_csv(os.path.join(seed_path, "oracle_history.csv"))
         # Number of generated molecules
         num_generated_molecules = len(df)
 
         # Synthesizable molecules
-        syntheseus_results_dir = os.path.join(seed, "syntheseus_results")
+        syntheseus_results_dir = os.path.join(seed_path, "syntheseus_results")
         num_pkl = int(subprocess.check_output(f"find {syntheseus_results_dir} -type f -name '*.pkl' | wc -l", shell=True))
         synthesizable.append(num_pkl)
 
         # Non-synthesizable molecules
         non_synthesizable.append(num_generated_molecules - num_pkl)
 
-        # Solved molecules
-        df_synthesizable_with_constraints = df.loc[df[SYNTHESEUS_REWARD_ENUM] == 1]
-        try:
-            df_synthesizable_with_constraints = df_remove_duplicate_smiles(df_synthesizable_with_constraints)
-        except Exception:
-            logging.info("Error in *synthesizable with constraints* de-duplication")
-        synthesizable_with_constraints.append(len(df_synthesizable_with_constraints))
+        # Synthesizable molecules with all constraints
+        if not minimize_path_length:
+            df_synthesizable_with_constraints = df.loc[df[SYNTHESEUS_REWARD_ENUM] == 1]
+            try:
+                df_synthesizable_with_constraints = df_remove_duplicate_smiles(df_synthesizable_with_constraints)
+            except Exception:
+                logging.info("Error in *synthesizable with constraints* de-duplication")
+            synthesizable_with_constraints.append(len(df_synthesizable_with_constraints))
+        else:
+            enforce_reactions, enforced_reaction_classes, enforce_building_blocks, enforced_building_blocks_file = get_run_data(seed_path)
+            assert enforce_reactions, "Reaction presence was not enforced"
+            # Load and canonicalize SMILES from JSON files
+            smiles_rxn_tracker = json.load(open(os.path.join(seed_path, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
 
+            # If also enforcing building blocks
+            if enforce_building_blocks:
+                count_with_enforced_block = sum(1 for rxn_info in smiles_rxn_tracker.values() if rxn_info["enforced_block"] is not None)
+                synthesizable_with_constraints.append(count_with_enforced_block)
+            else:
+                # In case of duplicates
+                matched_smiles = set()
+                matched_rxn_count = 0
+                for smiles, rxn_info in smiles_rxn_tracker.items():
+                    canonical_smiles = canonicalize_smiles(smiles)
+                    if canonical_smiles in matched_smiles:
+                        continue
+                    for v in rxn_info.values():
+                        if isinstance(v, dict) and v.get("rxn_class") is not None:
+                            if any(rxn in v["rxn_class"].lower() or rxn in v["rxn_name"].lower() for rxn in enforced_reaction_classes):
+                                matched_rxn_count += 1
+                                matched_smiles.add(canonical_smiles)
+                                break
+                synthesizable_with_constraints.append(matched_rxn_count)
+            
         # Number of successes
-        if len(df_synthesizable_with_constraints) > 0:
+        if synthesizable_with_constraints[-1] > 0:
             N += 1
 
     if len(synthesizable_with_constraints) > 0:
@@ -147,6 +180,7 @@ def log_pooled_molecules_metrics(
 
 def log_molecule_and_rxn_metrics(
     seeds_paths: List[str],    
+    minimize_path_length: bool,
     experiment_path: str,
     experiment_name: str,
     save_top_percentage_routes: float,
@@ -169,7 +203,7 @@ def log_molecule_and_rxn_metrics(
     seed_results = []
 
     for seed_path in seeds_paths:
-        enforce_reactions, enforce_building_blocks, enforced_building_blocks_file = get_run_data(seed_path)
+        enforce_reactions, enforced_reaction_classes, enforce_building_blocks, enforced_building_blocks_file = get_run_data(seed_path)
         assert enforce_reactions, "Reaction presence was not enforced"
 
         # Skip if oracle_history.csv doesn't exist (failed run)
@@ -180,9 +214,6 @@ def log_molecule_and_rxn_metrics(
         rxn_json = json.load(open(os.path.join(seed_path, "syntheseus_results", "matched_generated_smiles_with_rxn.json"), "r"))
         enforced_rxn_smiles = set([canonicalize_smiles(s) for smiles_list in rxn_json.values() for s in smiles_list if s])
 
-        # Load smiles_rxn_tracker.json
-        smiles_rxn_tracker = json.load(open(os.path.join(seed_path, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
-
         if len(enforced_rxn_smiles) > 0:
             N_rxn += 1
 
@@ -192,10 +223,11 @@ def log_molecule_and_rxn_metrics(
         
         # Track metrics
         num_enforced_rxn.append(len(enforced_rxn_smiles))
-        df_enforced_rxn = df[df["canonical_smiles"].isin(enforced_rxn_smiles)]  
 
-        # Double check that all matched molecules have syntheseus_raw_values == 1
-        assert sum(df_enforced_rxn[SYNTHESEUS_REWARD_ENUM]) == len(df_enforced_rxn), "Error: Not all matched molecules from the JSON have syntheseus_raw_values == 1 in the oracle history."
+        df_enforced_rxn = df[df["canonical_smiles"].isin(enforced_rxn_smiles)]  
+        if not minimize_path_length:
+            # Double check that all matched molecules have syntheseus_raw_values == 1
+            assert sum(df_enforced_rxn[SYNTHESEUS_REWARD_ENUM]) == len(df_enforced_rxn), "Error: Not all matched molecules from the JSON have syntheseus_raw_values == 1 in the oracle history."
 
         df_enforced_rxn = df_enforced_rxn.sort_values(by=REWARD_ENUM, ascending=False)
         # Get the top molecules
@@ -335,6 +367,11 @@ if __name__ == "__main__":
         default=0.005,
         help="Percentage of top routes to save (e.g. 0.005 for top 0.5%%)."
     )
+    parser.add_argument(
+        "--minimize_path_length",
+        action="store_true",
+        help="Whether the experiment minimizes the path length of the synthetic routes."
+    )
     args = parser.parse_args()
 
     # Setup logging
@@ -356,7 +393,10 @@ if __name__ == "__main__":
         logging.info(f"----- Results for: {experiment_name} -----")
 
         # Log number of solved molecules
-        log_synthesizable_metrics(seeds_paths)
+        log_synthesizable_metrics(
+            seeds_paths=seeds_paths,
+            minimize_path_length=args.minimize_path_length
+        )
 
         # Log wall time
         log_wall_time(seeds_paths)
@@ -366,6 +406,7 @@ if __name__ == "__main__":
         # Log enforced reaction and building blocks info
         log_molecule_and_rxn_metrics(
             seeds_paths=seeds_paths,
+            minimize_path_length=args.minimize_path_length,
             experiment_path=args.experiment_path,
             experiment_name=experiment_name,
             save_top_percentage_routes=args.save_top_percentage_routes

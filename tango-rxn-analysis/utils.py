@@ -253,7 +253,7 @@ def write_out_top_syntheseus_graphs(
 
     return output
 
-def get_run_data(path: str) -> Tuple[bool, bool, str]:
+def get_run_data(path: str) -> Tuple[bool, List[str], bool, str]:
     """
     Take run .json file and get info related to reaction and building blocks.
     """
@@ -270,10 +270,11 @@ def get_run_data(path: str) -> Tuple[bool, bool, str]:
     syntheseus_info = [component for component in data["oracle"]["components"] if component["name"] == "syntheseus"][0]["specific_parameters"]
     
     enforce_reactions = syntheseus_info["enforced_reactions"]["enforce_rxn_class_presence"]
+    enforced_reaction_classes = syntheseus_info["enforced_reactions"]["enforced_rxn_classes"]
     enforce_building_blocks = syntheseus_info["enforced_building_blocks"]["enforce_blocks"]
     enforced_building_blocks_file = syntheseus_info["enforced_building_blocks"]["enforced_building_blocks_file"]
     
-    return enforce_reactions, enforce_building_blocks, enforced_building_blocks_file
+    return enforce_reactions, enforced_reaction_classes, enforce_building_blocks, enforced_building_blocks_file
 
 def plot_rxn_evolution(
     seeds_paths: List[str],
@@ -284,6 +285,9 @@ def plot_rxn_evolution(
     """Plot evolution of reaction classes."""
     # Load data
     for seed_path in seeds_paths:
+        if not os.path.exists(os.path.join(seed_path, "oracle_history.csv")):
+            continue
+        
         oracle_history = pd.read_csv(f"{seed_path}/oracle_history.csv")
         oracle_history["canonical_smiles"] = oracle_history["smiles"].apply(canonicalize_smiles)
 
