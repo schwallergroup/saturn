@@ -105,7 +105,7 @@ def log_synthesizable_metrics(
                     if canonical_smiles in matched_smiles:
                         continue
                     for v in rxn_info.values():
-                        if isinstance(v, dict) and v.get("rxn_class") is not None:
+                        if (isinstance(v, dict)) and (v.get("rxn_class") is not None):
                             if any(rxn in v["rxn_class"].lower() or rxn in v["rxn_name"].lower() for rxn in enforced_reaction_classes):
                                 matched_rxn_count += 1
                                 matched_smiles.add(canonical_smiles)

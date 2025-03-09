@@ -15,6 +15,7 @@ from rdkit import Chem
 from rdkit.Chem import Mol
 from rdkit.Chem import AllChem
 from rdkit.Chem.Scaffolds.MurckoScaffold import GetScaffoldForMol
+from rdkit.Chem.Descriptors import MolWt
 from rdkit import DataStructs
 
 import matplotlib.pyplot as plt
@@ -282,12 +283,18 @@ def plot_rxn_evolution(
     save_dir: str,
     experiment_name: str
 ) -> None:
-    """Plot evolution of reaction classes."""
+    """
+    Plot evolution of reaction classes.
+    Logs for each seed:
+        1. Number of synthesizable molecules
+        2. Number of reaction steps
+        3. Building block number of heavy atoms and molecular weight
+    """
     # Load data
     for seed_path in seeds_paths:
         if not os.path.exists(os.path.join(seed_path, "oracle_history.csv")):
             continue
-        
+
         oracle_history = pd.read_csv(f"{seed_path}/oracle_history.csv")
         oracle_history["canonical_smiles"] = oracle_history["smiles"].apply(canonicalize_smiles)
 
@@ -296,22 +303,43 @@ def plot_rxn_evolution(
         rxn_stats = defaultdict(list)
         all_rxn_steps = []
 
+        # For the generated molecules satisfying the reaction constraints, log the building blocks' heavy atoms and molecular weight
+        rxn_json = json.load(open(os.path.join(seed_path, "syntheseus_results", "matched_generated_smiles_with_rxn.json"), "r"))
+        enforced_rxn_smiles = set([canonicalize_smiles(s) for smiles_list in rxn_json.values() for s in smiles_list if s])
+        generated_mols = []
+        building_blocks = []
+
         for smiles, rxn_info in smiles_rxn_tracker.items():
             for attribute, attribute_value in rxn_info.items():
                 if attribute == "oracle_calls":
                     oracle_calls = attribute_value
+
                 elif attribute == "rxn_steps":
                     rxn_steps = attribute_value
                     all_rxn_steps.append(rxn_steps)
+
                 elif isinstance(attribute_value, dict):
                     if attribute_value["is_rxn"]:
                         rxn_class = attribute_value["rxn_class"]
                         rxn_name = attribute_value["rxn_name"]
                         if oracle_calls is not None and rxn_class != "Unrecognized":
                             rxn_stats[(rxn_class, rxn_name)].append(oracle_calls)
+
+        for smiles in enforced_rxn_smiles:
+            rxn_info = smiles_rxn_tracker[smiles]
+            for attribute, attribute_value in rxn_info.items():
+                if isinstance(attribute_value, dict):
+                    if attribute_value["is_mol"]:
+                        if attribute_value.get("depth") == 0:
+                            generated_mols.append(Chem.MolFromSmiles(attribute_value["mol_smiles"]))
+                        else:
+                            building_blocks.append(Chem.MolFromSmiles(attribute_value["mol_smiles"]))
                     
         logging.info(f"{experiment_name} seed {seed_path[-1]} all synthesizable molecules (N={len(all_rxn_steps)}) - # reaction steps: {round(np.mean(all_rxn_steps), 2)} ± {round(np.std(all_rxn_steps), 2)}")
-        
+        logging.info(f"All reaction constraints satisfied:")
+        logging.info(f"Generated molecules (N={len(generated_mols)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in generated_mols]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in generated_mols]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in generated_mols]), 2)} ± {round(np.std([MolWt(mol) for mol in generated_mols]), 2)}")
+        logging.info(f"Building blocks (N={len(building_blocks)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in building_blocks]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in building_blocks]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in building_blocks]), 2)} ± {round(np.std([MolWt(mol) for mol in building_blocks]), 2)}")
+
         # Sort each reaction class by oracle calls
         for rxn_class_name in rxn_stats:
             rxn_stats[rxn_class_name] = sorted(rxn_stats[rxn_class_name])
