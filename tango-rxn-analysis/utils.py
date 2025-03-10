@@ -307,7 +307,7 @@ def plot_rxn_evolution(
         #       1. Number of reaction steps
         #       2. Generated molecules' number of heavy atoms and molecular weight
         #       3. Building blocks' number of heavy atoms and molecular weight
-        rxn_json = json.load(open(os.path.join(seed_path, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
+        rxn_json = json.load(open(os.path.join(seed_path, "syntheseus_results", "matched_generated_smiles_with_rxn.json"), "r"))
         enforced_rxn_smiles = set([canonicalize_smiles(s) for smiles_list in rxn_json.values() for s in smiles_list if s])
         generated_mols = []
         building_blocks = []
