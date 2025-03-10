@@ -303,8 +303,11 @@ def plot_rxn_evolution(
         rxn_stats = defaultdict(list)
         all_rxn_steps = []
 
-        # For the generated molecules satisfying the reaction constraints, log the building blocks' heavy atoms and molecular weight
-        rxn_json = json.load(open(os.path.join(seed_path, "syntheseus_results", "matched_generated_smiles_with_rxn.json"), "r"))
+        # For the generated molecules satisfying the reaction constraints, log:
+        #       1. Number of reaction steps
+        #       2. Generated molecules' number of heavy atoms and molecular weight
+        #       3. Building blocks' number of heavy atoms and molecular weight
+        rxn_json = json.load(open(os.path.join(seed_path, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
         enforced_rxn_smiles = set([canonicalize_smiles(s) for smiles_list in rxn_json.values() for s in smiles_list if s])
         generated_mols = []
         building_blocks = []
@@ -335,8 +338,9 @@ def plot_rxn_evolution(
                         else:
                             building_blocks.append(Chem.MolFromSmiles(attribute_value["mol_smiles"]))
                     
-        logging.info(f"{experiment_name} seed {seed_path[-1]} all synthesizable molecules (N={len(all_rxn_steps)}) - # reaction steps: {round(np.mean(all_rxn_steps), 2)} ± {round(np.std(all_rxn_steps), 2)}")
-        logging.info(f"All reaction constraints satisfied:")
+        logging.info("Reaction-level metrics:")
+        logging.info(f"seed {seed_path[-1]} all synthesizable molecules (N={len(all_rxn_steps)}) - # reaction steps: {round(np.mean(all_rxn_steps), 2)} ± {round(np.std(all_rxn_steps), 2)}")
+        logging.info(f"The following stats are for molecules satisfying all reaction constraints:")
         logging.info(f"Generated molecules (N={len(generated_mols)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in generated_mols]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in generated_mols]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in generated_mols]), 2)} ± {round(np.std([MolWt(mol) for mol in generated_mols]), 2)}")
         logging.info(f"Building blocks (N={len(building_blocks)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in building_blocks]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in building_blocks]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in building_blocks]), 2)} ± {round(np.std([MolWt(mol) for mol in building_blocks]), 2)}")
 
