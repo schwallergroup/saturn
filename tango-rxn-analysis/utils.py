@@ -15,7 +15,6 @@ from rdkit import Chem
 from rdkit.Chem import Mol
 from rdkit.Chem import AllChem
 from rdkit.Chem.Scaffolds.MurckoScaffold import GetScaffoldForMol
-from rdkit.Chem.Descriptors import MolWt
 from rdkit import DataStructs
 
 import matplotlib.pyplot as plt
@@ -274,26 +273,26 @@ def get_run_data(path: str) -> Tuple[bool, List[str], bool, str]:
     enforced_reaction_classes = syntheseus_info["enforced_reactions"]["enforced_rxn_classes"]
     enforce_building_blocks = syntheseus_info["enforced_building_blocks"]["enforce_blocks"]
     enforced_building_blocks_file = syntheseus_info["enforced_building_blocks"]["enforced_building_blocks_file"]
+
     
     return enforce_reactions, enforced_reaction_classes, enforce_building_blocks, enforced_building_blocks_file
 
 def plot_rxn_evolution(
-    top_oracle_histories: List[Tuple[pd.DataFrame, str]],  # (df, seed_path)
+    seeds_paths: List[str],
     enforced_rxn: str,
     save_dir: str,
     experiment_name: str,
 ) -> None:
     """
-    Plot evolution of reaction classes.
-    Logs for each seed:
-        1. Number of synthesizable molecules
-        2. Number of reaction steps
-        3. Building block number of heavy atoms and molecular weight
+    Plot evolution of reaction classes and log the number of reaction steps.
     """
+    all_rxn_steps = []
     # Load data
-    for top_df, seed_path in top_oracle_histories:
+    for seed_path in seeds_paths:
         if not os.path.exists(os.path.join(seed_path, "oracle_history.csv")):
             continue
+
+        seed_rxn_steps = []
 
         oracle_history = pd.read_csv(f"{seed_path}/oracle_history.csv")
         oracle_history["canonical_smiles"] = oracle_history["smiles"].apply(canonicalize_smiles)
@@ -301,16 +300,6 @@ def plot_rxn_evolution(
         # Track reactions by class over time
         smiles_rxn_tracker = json.load(open(os.path.join(seed_path, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
         rxn_stats = defaultdict(list)
-        all_rxn_steps = []
-
-        # For the generated molecules satisfying the reaction constraints, log:
-        #       1. Number of reaction steps
-        #       2. Generated molecules' number of heavy atoms and molecular weight
-        #       3. Building blocks' number of heavy atoms and molecular weight
-        rxn_json = json.load(open(os.path.join(seed_path, "syntheseus_results", "matched_generated_smiles_with_rxn.json"), "r"))
-        enforced_rxn_smiles = set([canonicalize_smiles(s) for smiles_list in rxn_json.values() for s in smiles_list if s])
-        generated_mols = []
-        building_blocks = []
 
         for smiles, rxn_info in smiles_rxn_tracker.items():
             for attribute, attribute_value in rxn_info.items():
@@ -319,7 +308,7 @@ def plot_rxn_evolution(
 
                 elif attribute == "rxn_steps":
                     rxn_steps = attribute_value
-                    all_rxn_steps.append(rxn_steps)
+                    seed_rxn_steps.append(rxn_steps)
 
                 elif isinstance(attribute_value, dict):
                     if attribute_value["is_rxn"]:
@@ -327,47 +316,6 @@ def plot_rxn_evolution(
                         rxn_name = attribute_value["rxn_name"]
                         if oracle_calls is not None and rxn_class != "Unrecognized":
                             rxn_stats[(rxn_class, rxn_name)].append(oracle_calls)
-
-        for smiles in enforced_rxn_smiles:
-            rxn_info = smiles_rxn_tracker[smiles]
-            for attribute, attribute_value in rxn_info.items():
-                if isinstance(attribute_value, dict):
-                    if attribute_value["is_mol"]:
-                        if attribute_value.get("depth") == 0:
-                            generated_mols.append(Chem.MolFromSmiles(attribute_value["mol_smiles"]))
-                        elif attribute_value.get("is_purchasable") == 1:
-                            building_blocks.append(Chem.MolFromSmiles(attribute_value["mol_smiles"]))
-        
-        # Also log metrics for the top molecules
-        top_generated_mols = []
-        top_building_blocks = []
-        with open("suzuki-blocks.smi", "r") as f:
-            suzuki_blocks = [line.strip() for line in f.readlines()]
-        
-        for _, row in top_df.iterrows():
-            smiles = canonicalize_smiles(row["canonical_smiles"])
-            if smiles in smiles_rxn_tracker:
-                rxn_info = smiles_rxn_tracker[smiles]
-                for attribute, attribute_value in rxn_info.items():
-                    if isinstance(attribute_value, dict):
-                        if attribute_value["is_mol"]:
-                            if attribute_value.get("depth") == 0:
-                                top_generated_mols.append(Chem.MolFromSmiles(attribute_value["mol_smiles"]))
-                            elif attribute_value.get("is_purchasable") == 1:
-                                if "B" in attribute_value["mol_smiles"]:
-                                    if attribute_value["mol_smiles"] in suzuki_blocks:
-                                        top_building_blocks.append(Chem.MolFromSmiles(attribute_value["mol_smiles"]))
-                    
-        logging.info(f"Reaction-level metrics for seed {seed_path[-1]}:")
-        logging.info(f"All synthesizable molecules (N={len(all_rxn_steps)}) - # reaction steps: {round(np.mean(all_rxn_steps), 2)} ± {round(np.std(all_rxn_steps), 2)}")
-        logging.info(f"The following stats are for molecules satisfying all reaction constraints:")
-        logging.info(f"Generated molecules (N={len(generated_mols)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in generated_mols]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in generated_mols]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in generated_mols]), 2)} ± {round(np.std([MolWt(mol) for mol in generated_mols]), 2)}")
-        logging.info(f"Building blocks (N={len(building_blocks)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in building_blocks]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in building_blocks]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in building_blocks]), 2)} ± {round(np.std([MolWt(mol) for mol in building_blocks]), 2)}")
-        
-        if top_generated_mols:
-            logging.info(f"Top generated molecules (N={len(top_generated_mols)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in top_generated_mols]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in top_generated_mols]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in top_generated_mols]), 2)} ± {round(np.std([MolWt(mol) for mol in top_generated_mols]), 2)}")
-        if top_building_blocks:
-            logging.info(f"Top building blocks (N={len(top_building_blocks)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in top_building_blocks]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in top_building_blocks]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in top_building_blocks]), 2)} ± {round(np.std([MolWt(mol) for mol in top_building_blocks]), 2)}")
 
         # Sort each reaction class by oracle calls
         for rxn_class_name in rxn_stats:
@@ -411,6 +359,20 @@ def plot_rxn_evolution(
         
         plt.savefig(os.path.join(save_dir, f"{experiment_name}-seed{seed_path[-1]}-rxn-evolution.png"))
         plt.close()
+
+        all_rxn_steps.append(seed_rxn_steps)  # List[List[int]]
+
+    # Flatten the list for overall statistics
+    flattened_rxn_steps = [step for seed_steps in all_rxn_steps for step in seed_steps]
+    
+    # Calculate per-seed statistics
+    per_seed_means_stds = [(round(np.mean(seed_steps), 2), round(np.std(seed_steps), 2), len(seed_steps)) for seed_steps in all_rxn_steps if len(seed_steps) > 0]
+    
+    # Log the overall number of reaction steps
+    logging.info(f"All synthesizable molecules across {len(seeds_paths)} seeds (N={len(flattened_rxn_steps)}) - # reaction steps: {round(np.mean(flattened_rxn_steps), 2)} ± {round(np.std(flattened_rxn_steps), 2)}")
+    
+    # Log the per-seed statistics
+    logging.info(f"Per-seed reaction steps - Means: {', '.join([f'{mean} ± {std} (N={N})' for mean, std, N in per_seed_means_stds])}\n")
 
 def count_rxn_graph(top_graphs: Dict[str, Union[str, float]]) -> Union[Dict[str, int], List[int]]:
     """
