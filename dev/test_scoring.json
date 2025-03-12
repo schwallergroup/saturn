@@ -1,34 +1,13 @@
 {
   "logging": {
-    "logging_path": "/home/jeff/synth/saturn-dev/temp/log.log",
-    "model_checkpoints_dir": "/home/jeff/synth/saturn-dev/temp"
+    "logging_path": "/home/jeff/saturn-dev/dev/score.log",
+    "model_checkpoints_dir": "/home/jeff/saturn-dev/dev"
   },
   "oracle": {
     "budget": 500,
     "allow_oracle_repeats": false,
     "aggregator": "product",
     "components": [
-      {
-        "name": "quickvina2_gpu",
-        "weight": 1,
-        "preliminary_check": false,
-        "specific_parameters": {
-          "binary": "/home/jeff/synth/saturn-dev/synth/Vina-GPU-2.1/QuickVina2-GPU-2.1/QuickVina2-GPU-2-1",
-          "force_field": "uff",
-          "receptor": "/home/jeff/synth/saturn-dev/synth/7uvu-2-monomers-pdbfixer.pdbqt",
-          "reference_ligand": "/home/jeff/synth/saturn-dev/synth/7uvu-reference.pdb",
-          "thread": 8000,
-          "results_dir": "/home/jeff/synth/saturn-dev/temp/docking_results"
-        },
-        "reward_shaping_function_parameters": {
-          "transformation_function": "reverse_sigmoid",
-          "parameters": {
-            "low": -16,
-            "high": 0,
-            "k": 0.15
-          }
-        }
-      },
       {
         "name": "qed",
         "weight": 1,
@@ -56,8 +35,8 @@
   },
   "goal_directed_generation": {
     "reinforcement_learning": {
-      "prior": "/home/jeff/synth/saturn-dev/synth/experiment_3/zinc-250k-aizynth-purged-epoch-100.prior",
-      "agent": "/home/jeff/synth/saturn-dev/synth/experiment_3/zinc-250k-aizynth-purged-epoch-100.prior",
+      "prior": "/home/jeff/saturn-dev/test/pubchem-mamba-epoch-5.prior",
+      "agent": "/home/jeff/saturn-dev/test/pubchem-mamba-epoch-5.prior",
       "batch_size": 16,
       "learning_rate": 0.0001,
       "sigma": 128.0,
@@ -107,7 +86,10 @@
   },
   "scoring": {
     "smiles_path": "/home/jeff/synth/saturn-dev/test_scoring_smiles.smi",
-    "output_csv_path": "/home/jeff/synth/saturn-dev/temp/output.csv"
+    "sample": true,
+    "agent": "/home/jeff/saturn-dev/test/pubchem-mamba-epoch-5.prior",
+    "sample_num": 500,
+    "output_csv_path": "/home/jeff/saturn-dev/dev/output.csv"
   },
   "running_mode": "scoring",
   "model_architecture": "mamba",
