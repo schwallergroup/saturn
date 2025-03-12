@@ -282,7 +282,7 @@ def log_molecule_and_rxn_metrics(
 
     # Plot evolution of reaction classes
     plot_rxn_evolution(
-        seeds_paths=seeds_paths,
+        top_oracle_histories=top_oracle_histories,
         enforced_rxn=experiment_name,
         save_dir=save_dir,
         experiment_name=experiment_name
@@ -324,6 +324,7 @@ def log_molecule_and_rxn_metrics(
         experiment_name=experiment_name
     )
 
+    '''
     # Annotate reaction conditions
     logging.info(f"Annotating reaction conditions for the top graphs for experiment: {experiment_name}")
     try:
@@ -336,6 +337,7 @@ def log_molecule_and_rxn_metrics(
 
     with open(os.path.join(save_dir, f"{experiment_name}-top-graphs.json"), "w") as f:
         json.dump(top_graphs, f, indent=4)
+    '''
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

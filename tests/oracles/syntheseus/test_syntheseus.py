@@ -111,7 +111,7 @@ def base_oracle_params() -> dict:
                 "enforce_all_reactions": False,
                 "rxn_insight_env_name": "rxn-insight",
                 "use_namerxn": False,
-                # NOTE: The tests assume NameRXN version 3.7.3 (reaction classification may differ between different ersions)
+                # NOTE: The tests assume NameRXN version 3.7.3 (reaction classification may differ between different versions)
                 # NOTE: Users should modify the path below to their local path
                 "namerxn_binary_path": "/home/jeff/saturn-dev/test/testing-namerxn/HazELNut/namerxn",
                 "enforced_rxn_classes": [],

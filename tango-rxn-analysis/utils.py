@@ -278,10 +278,10 @@ def get_run_data(path: str) -> Tuple[bool, List[str], bool, str]:
     return enforce_reactions, enforced_reaction_classes, enforce_building_blocks, enforced_building_blocks_file
 
 def plot_rxn_evolution(
-    seeds_paths: List[str],
+    top_oracle_histories: List[Tuple[pd.DataFrame, str]],  # (df, seed_path)
     enforced_rxn: str,
     save_dir: str,
-    experiment_name: str
+    experiment_name: str,
 ) -> None:
     """
     Plot evolution of reaction classes.
@@ -291,7 +291,7 @@ def plot_rxn_evolution(
         3. Building block number of heavy atoms and molecular weight
     """
     # Load data
-    for seed_path in seeds_paths:
+    for top_df, seed_path in top_oracle_histories:
         if not os.path.exists(os.path.join(seed_path, "oracle_history.csv")):
             continue
 
@@ -335,14 +335,39 @@ def plot_rxn_evolution(
                     if attribute_value["is_mol"]:
                         if attribute_value.get("depth") == 0:
                             generated_mols.append(Chem.MolFromSmiles(attribute_value["mol_smiles"]))
-                        else:
+                        elif attribute_value.get("is_purchasable") == 1:
                             building_blocks.append(Chem.MolFromSmiles(attribute_value["mol_smiles"]))
+        
+        # Also log metrics for the top molecules
+        top_generated_mols = []
+        top_building_blocks = []
+        with open("suzuki-blocks.smi", "r") as f:
+            suzuki_blocks = [line.strip() for line in f.readlines()]
+        
+        for _, row in top_df.iterrows():
+            smiles = canonicalize_smiles(row["canonical_smiles"])
+            if smiles in smiles_rxn_tracker:
+                rxn_info = smiles_rxn_tracker[smiles]
+                for attribute, attribute_value in rxn_info.items():
+                    if isinstance(attribute_value, dict):
+                        if attribute_value["is_mol"]:
+                            if attribute_value.get("depth") == 0:
+                                top_generated_mols.append(Chem.MolFromSmiles(attribute_value["mol_smiles"]))
+                            elif attribute_value.get("is_purchasable") == 1:
+                                if "B" in attribute_value["mol_smiles"]:
+                                    if attribute_value["mol_smiles"] in suzuki_blocks:
+                                        top_building_blocks.append(Chem.MolFromSmiles(attribute_value["mol_smiles"]))
                     
-        logging.info("Reaction-level metrics:")
-        logging.info(f"seed {seed_path[-1]} all synthesizable molecules (N={len(all_rxn_steps)}) - # reaction steps: {round(np.mean(all_rxn_steps), 2)} ± {round(np.std(all_rxn_steps), 2)}")
+        logging.info(f"Reaction-level metrics for seed {seed_path[-1]}:")
+        logging.info(f"All synthesizable molecules (N={len(all_rxn_steps)}) - # reaction steps: {round(np.mean(all_rxn_steps), 2)} ± {round(np.std(all_rxn_steps), 2)}")
         logging.info(f"The following stats are for molecules satisfying all reaction constraints:")
         logging.info(f"Generated molecules (N={len(generated_mols)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in generated_mols]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in generated_mols]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in generated_mols]), 2)} ± {round(np.std([MolWt(mol) for mol in generated_mols]), 2)}")
         logging.info(f"Building blocks (N={len(building_blocks)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in building_blocks]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in building_blocks]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in building_blocks]), 2)} ± {round(np.std([MolWt(mol) for mol in building_blocks]), 2)}")
+        
+        if top_generated_mols:
+            logging.info(f"Top generated molecules (N={len(top_generated_mols)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in top_generated_mols]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in top_generated_mols]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in top_generated_mols]), 2)} ± {round(np.std([MolWt(mol) for mol in top_generated_mols]), 2)}")
+        if top_building_blocks:
+            logging.info(f"Top building blocks (N={len(top_building_blocks)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in top_building_blocks]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in top_building_blocks]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in top_building_blocks]), 2)} ± {round(np.std([MolWt(mol) for mol in top_building_blocks]), 2)}")
 
         # Sort each reaction class by oracle calls
         for rxn_class_name in rxn_stats:
