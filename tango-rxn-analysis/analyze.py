@@ -502,8 +502,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_top_percentage_routes",
         type=float,
-        default=0.005,
-        help="Percentage of top routes to save (e.g. 0.005 for top 0.5%%)."
+        default=0.01,
+        help="Percentage of top routes to save (e.g. 0.01 for top 1%%)."
     )
     parser.add_argument(
         "--minimize_path_length",
