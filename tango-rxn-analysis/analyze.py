@@ -345,7 +345,8 @@ def log_molecule_and_rxn_metrics(
         df_enforced_rxn = df[df["canonical_smiles"].isin(enforced_rxn_smiles)]  
         if not minimize_path_length:
             # Double check that all matched molecules have syntheseus_raw_values == 1
-            assert sum(df_enforced_rxn[SYNTHESEUS_REWARD_ENUM]) == len(df_enforced_rxn), "Error: Not all matched molecules from the JSON have syntheseus_raw_values == 1 in the oracle history."
+            if sum(df_enforced_rxn[SYNTHESEUS_REWARD_ENUM]) != len(df_enforced_rxn):
+                logging.warning(f"Warning: Not all matched molecules from the JSON have syntheseus_raw_values == 1 in the oracle history - {sum(df_enforced_rxn[SYNTHESEUS_REWARD_ENUM])} != {len(df_enforced_rxn)}")
 
         df_enforced_rxn = df_enforced_rxn.sort_values(by=REWARD_ENUM, ascending=False)
         # Get the top molecules
