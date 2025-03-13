@@ -460,7 +460,6 @@ def log_molecule_and_rxn_metrics(
         save_top_percentage_routes=save_top_percentage_routes
     )
 
-    '''
     # Annotate reaction conditions
     logging.info(f"Annotating reaction conditions for the top graphs for experiment: {experiment_name}")
     try:
@@ -473,7 +472,6 @@ def log_molecule_and_rxn_metrics(
 
     with open(os.path.join(save_dir, f"{experiment_name}-top-graphs.json"), "w") as f:
         json.dump(top_graphs, f, indent=4)
-    '''
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -502,8 +500,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_top_percentage_routes",
         type=float,
-        default=0.01,
-        help="Percentage of top routes to save (e.g. 0.01 for top 1%%)."
+        default=0.05,
+        help="Percentage of top routes to save (e.g. 0.05 for top 5%%)."
     )
     parser.add_argument(
         "--minimize_path_length",
