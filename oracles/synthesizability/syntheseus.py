@@ -14,7 +14,7 @@ from oracles.dataclass import OracleComponentParameters
 from rdkit import Chem
 from rdkit.Chem import Mol
 from utils.chemistry_utils import canonicalize_smiles, construct_morgan_fingerprints_batch_from_file
-from oracles.synthesizability.utils.utils import match_stock, extract_functional_groups, get_node_reward
+from oracles.synthesizability.utils.utils import match_stock, extract_functional_groups, get_node_reward, shape_path_length_reward
 from concurrent.futures import ThreadPoolExecutor
 from oracles.synthesizability.utils.CONSTANTS import DEFAULT_TANGO_WEIGHTS
 
@@ -37,11 +37,11 @@ class Syntheseus(OracleComponent):
         self.syntheseus_env_name = self.parameters.specific_parameters.get("syntheseus_env_name", None)
         assert self.syntheseus_env_name is not None, "Please provide the Conda environment name with Syntheseus installed."
 
-        # Whether to optimize for path length
-        self.optimize_path_length = self.parameters.specific_parameters.get("optimize_path_length", False)
+        # Whether to incentivize minimizing the path length of synthetic routes
+        self.minimize_path_length = self.parameters.specific_parameters.get("minimize_path_length", False)
 
         # Whether to parallelize Syntheseus execution
-        self.parallelize = self.parameters.specific_parameters.get("parallelize", True) # Defaults to True
+        self.parallelize = self.parameters.specific_parameters.get("parallelize", True)  # Defaults to True
         self.max_workers = self.parameters.specific_parameters.get("max_workers", 4)  # Default to 4 workers
 
         # Reaction model
@@ -140,7 +140,7 @@ class Syntheseus(OracleComponent):
         self, 
         mols: np.ndarray[Mol],
         oracle_calls: int
-    ) -> np.ndarray[int]:
+    ) -> np.ndarray[Union[int, float]]:
         smiles = np.vectorize(Chem.MolToSmiles)(mols)
         # Save SMILES order - overwrites the previous batch's SMILES
         self.smiles = smiles
@@ -150,9 +150,10 @@ class Syntheseus(OracleComponent):
         self, 
         smiles: np.ndarray[str],
         oracle_calls: int
-    ) -> np.ndarray[int]:
+    ) -> np.ndarray[Union[int, float]]:
         """
         Thread Parallelized execution of Syntheseus on the SMILES batch.
+        # FIXME: Fix for proper function and allow multi-GPU execution
         """
         # 1. Chunk the SMILES into max_worker batches
         smiles_chunks = np.array_split(smiles, self.max_workers)
@@ -176,7 +177,7 @@ class Syntheseus(OracleComponent):
         self, 
         smiles: np.ndarray[str],
         oracle_calls: int
-    ) -> np.ndarray[int]:
+    ) -> np.ndarray[Union[int, float]]:
         """
         Execute Syntheseus on the SMILES batch.
         """
@@ -261,7 +262,7 @@ class Syntheseus(OracleComponent):
                             self.matched_generated_smiles[oracle_calls] = []
 
                         max_depth = self._get_max_depth(route)
-                        # Track the synthesis pathway contains an enforced building block
+                        # Track whether the synthesis pathway contains an enforced building block
                         is_matched = False
                         
                         # Check whether to use dense reward
@@ -560,10 +561,16 @@ class Syntheseus(OracleComponent):
 
             if not self.parallelize:
                 assert len(node_rewards) == len(smiles), "Syntheseus output length mismatch."
+            
+            # Enforcing blocks and/or reaction classes while also minimizing the path length
+            if self.minimize_path_length:
+                for idx in range(len(node_rewards)):
+                    if is_solved[idx] == 1:
+                        node_rewards[idx] *= shape_path_length_reward(steps[idx])
 
             return node_rewards
 
-        elif self.optimize_path_length:
+        elif self.minimize_path_length:
             if not self.parallelize:
                 assert len(steps) == len(smiles), "Syntheseus output length mismatch."
             return steps

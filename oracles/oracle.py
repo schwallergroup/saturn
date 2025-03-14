@@ -88,7 +88,7 @@ class Oracle:
         # 1. Only keep the valid SMILES (RDKit parsable into Mols)
         smiles = np.array([s for s in smiles if Chem.MolFromSmiles(s) is not None])
 
-        # 2. De-duplicate SMILES batch)
+        # 2. De-duplicate SMILES batch
         smiles = self.de_duplicate_smiles(smiles)
         
         # 3. Rewards can be obtained directly for SMILES in the Oracle Cache 
@@ -316,11 +316,17 @@ class Oracle:
         """Check if the oracle budget has been exceeded."""
         return self.calls >= self.budget
 
-    def write_out_oracle_history(self, path: str):
+    def write_out_oracle_history(
+        self, 
+        path: str
+    ) -> None:
         """Write out the oracle history as a CSV."""
         self.oracle_history.to_csv(os.path.join(path, "oracle_history.csv"), index=False)
 
-    def write_out_repeat_history(self, path: str):
+    def write_out_repeat_history(
+        self, 
+        path: str
+    ) -> None:
         """Write out the repeated SMILES histories as JSON."""
         # FIXME: Reproduce json dump error
         try:

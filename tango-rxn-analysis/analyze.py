@@ -11,6 +11,7 @@ import json
 import pandas as pd
 import numpy as np
 from rdkit import Chem
+from rdkit.Chem.Descriptors import MolWt
 
 from utils import (
     setup_logging,
@@ -51,36 +52,69 @@ def get_docking_score_enum(docking_oracle: str) -> str:
     else:
         raise ValueError(f"Docking oracle {docking_oracle} not supported")
 
-def log_synthesizable_metrics(seeds: List[str]) -> None:
+def log_synthesizable_metrics(
+    seeds_paths: List[str],
+    minimize_path_length: bool
+) -> None:
     """Log number of synthesizable molecules."""
     N = 0
     non_synthesizable = []
     synthesizable = []
     synthesizable_with_constraints = []
     
-    for seed in seeds:
-        df = pd.read_csv(os.path.join(seed, "oracle_history.csv"))
+    for seed_path in seeds_paths:
+        # Skip if oracle_history.csv doesn't exist (failed run)
+        if not os.path.exists(os.path.join(seed_path, "oracle_history.csv")):
+            continue
+
+        df = pd.read_csv(os.path.join(seed_path, "oracle_history.csv"))
         # Number of generated molecules
         num_generated_molecules = len(df)
 
         # Synthesizable molecules
-        syntheseus_results_dir = os.path.join(seed, "syntheseus_results")
+        syntheseus_results_dir = os.path.join(seed_path, "syntheseus_results")
         num_pkl = int(subprocess.check_output(f"find {syntheseus_results_dir} -type f -name '*.pkl' | wc -l", shell=True))
         synthesizable.append(num_pkl)
 
         # Non-synthesizable molecules
         non_synthesizable.append(num_generated_molecules - num_pkl)
 
-        # Solved molecules
-        df_synthesizable_with_constraints = df.loc[df[SYNTHESEUS_REWARD_ENUM] == 1]
-        try:
-            df_synthesizable_with_constraints = df_remove_duplicate_smiles(df_synthesizable_with_constraints)
-        except Exception:
-            logging.info("Error in *synthesizable with constraints* de-duplication")
-        synthesizable_with_constraints.append(len(df_synthesizable_with_constraints))
+        # Synthesizable molecules with all constraints
+        if not minimize_path_length:
+            df_synthesizable_with_constraints = df.loc[df[SYNTHESEUS_REWARD_ENUM] == 1]
+            try:
+                df_synthesizable_with_constraints = df_remove_duplicate_smiles(df_synthesizable_with_constraints)
+            except Exception:
+                logging.info("Error in *synthesizable with constraints* de-duplication")
+            synthesizable_with_constraints.append(len(df_synthesizable_with_constraints))
+        else:
+            enforce_reactions, enforced_reaction_classes, enforce_building_blocks, enforced_building_blocks_file = get_run_data(seed_path)
+            assert enforce_reactions, "Reaction presence was not enforced"
+            # Load and canonicalize SMILES from JSON files
+            smiles_rxn_tracker = json.load(open(os.path.join(seed_path, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
 
+            # If also enforcing building blocks
+            if enforce_building_blocks:
+                count_with_enforced_block = sum(1 for rxn_info in smiles_rxn_tracker.values() if rxn_info["enforced_block"] is not None)
+                synthesizable_with_constraints.append(count_with_enforced_block)
+            else:
+                # In case of duplicates
+                matched_smiles = set()
+                matched_rxn_count = 0
+                for smiles, rxn_info in smiles_rxn_tracker.items():
+                    canonical_smiles = canonicalize_smiles(smiles)
+                    if canonical_smiles in matched_smiles:
+                        continue
+                    for v in rxn_info.values():
+                        if (isinstance(v, dict)) and (v.get("rxn_class") is not None):
+                            if any(rxn in v["rxn_class"].lower() or rxn in v["rxn_name"].lower() for rxn in enforced_reaction_classes):
+                                matched_rxn_count += 1
+                                matched_smiles.add(canonical_smiles)
+                                break
+                synthesizable_with_constraints.append(matched_rxn_count)
+            
         # Number of successes
-        if len(df_synthesizable_with_constraints) > 0:
+        if synthesizable_with_constraints[-1] > 0:
             N += 1
 
     if len(synthesizable_with_constraints) > 0:
@@ -111,11 +145,12 @@ def log_wall_time(seeds: List[str]) -> None:
         mean_minutes = mean_minutes / 60
         std_hours, std_minutes = divmod(std_time, 3600)
         std_minutes = std_minutes / 60
-        logging.info(f"Wall Time (N={len(times)}): {int(mean_hours)}h {int(mean_minutes)}m ± {int(std_hours)}h {int(std_minutes)}m")
+        logging.info(f"Wall Time (N={len(times)}): {int(mean_hours)}h {int(mean_minutes)}m ± {int(std_hours)}h {int(std_minutes)}m\n")
 
 def log_pooled_molecules_metrics(
     pooled_data: List[Tuple[str, float, float]],  # (SMILES, docking_score, qed)
-    threshold_label: str
+    threshold_label: str,
+    add_new_line: bool = True
 ) -> None:
     """Log pooled molecules metrics."""
     if pooled_data:
@@ -140,13 +175,131 @@ def log_pooled_molecules_metrics(
 
         logging.info(f"{threshold_label}: {np.mean(docking_scores):.2f} ± {np.std(docking_scores):.2f} QED: {np.mean(qed_values):.2f} ± {np.std(qed_values):.2f}")
         logging.info(f"Ligand Efficiency: {np.mean(ligand_efficiency_values):.2f} ± {np.std(ligand_efficiency_values):.2f}, # Unique Bemis-Murcko Scaffolds: {scaffolds}")
-        logging.info(f"IntDiv1: {intdiv1:.3f}, #Circles (T=0.75): {circles_high}, #Circles (T=0.50): {circles_low}\n")
+        if add_new_line:
+            logging.info(f"IntDiv1: {intdiv1:.3f}, #Circles (T=0.75): {circles_high}, #Circles (T=0.50): {circles_low}\n")
+        else:
+            logging.info(f"IntDiv1: {intdiv1:.3f}, #Circles (T=0.75): {circles_high}, #Circles (T=0.50): {circles_low}")
 
     else:
         logging.info(f"No molecules generated for {threshold_label} docking score interval")
 
+def log_building_blocks_metrics(
+    top_oracle_histories: List[Tuple[pd.DataFrame, str]],  # (df, seed_path)
+    save_top_percentage_routes: float
+) -> None:
+    """
+    Log building blocks metrics for the molecules satisfying all reaction constraints:
+        1. Generated molecules' number of heavy atoms and molecular weight
+        2. Building blocks' number of heavy atoms and molecular weight
+    """
+    all_generated_mols = []
+    all_building_blocks = []
+    all_top_generated_mols = []
+    all_top_building_blocks = []
+
+    for top_df, seed_path in top_oracle_histories:
+        if not os.path.exists(os.path.join(seed_path, "oracle_history.csv")):
+            continue
+
+        smiles_rxn_tracker = json.load(open(os.path.join(seed_path, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
+        rxn_json = json.load(open(os.path.join(seed_path, "syntheseus_results", "matched_generated_smiles_with_rxn.json"), "r"))
+        enforced_rxn_smiles = set([canonicalize_smiles(s) for smiles_list in rxn_json.values() for s in smiles_list if s])
+
+        seed_generated_mols = []
+        seed_building_blocks = []
+
+        for smiles in enforced_rxn_smiles:
+            rxn_info = smiles_rxn_tracker[smiles]
+            for attribute, attribute_value in rxn_info.items():
+                if isinstance(attribute_value, dict):
+                    if attribute_value["is_mol"]:
+                        if attribute_value.get("depth") == 0:
+                            seed_generated_mols.append(Chem.MolFromSmiles(attribute_value["mol_smiles"]))
+                        elif attribute_value.get("is_purchasable") == 1:
+                            seed_building_blocks.append(Chem.MolFromSmiles(attribute_value["mol_smiles"]))
+        
+        # Also log metrics for the top molecules
+        seed_top_generated_mols = []
+        seed_top_building_blocks = []
+        
+        for _, row in top_df.iterrows():
+            smiles = canonicalize_smiles(row["canonical_smiles"])
+            if smiles in smiles_rxn_tracker:
+                rxn_info = smiles_rxn_tracker[smiles]
+                for attribute, attribute_value in rxn_info.items():
+                    if isinstance(attribute_value, dict):
+                        if attribute_value["is_mol"]:
+                            if attribute_value.get("depth") == 0:
+                                seed_top_generated_mols.append(Chem.MolFromSmiles(attribute_value["mol_smiles"]))
+                            elif attribute_value.get("is_purchasable") == 1:
+                                seed_top_building_blocks.append(Chem.MolFromSmiles(attribute_value["mol_smiles"]))
+        
+        # Add seed molecules to the overall lists
+        all_generated_mols.append(seed_generated_mols)
+        all_building_blocks.append(seed_building_blocks)
+        all_top_generated_mols.append(seed_top_generated_mols)
+        all_top_building_blocks.append(seed_top_building_blocks)
+    
+    # Flatten the lists for overall statistics
+    generated_mols = [mol for seed_mols in all_generated_mols for mol in seed_mols]
+    building_blocks = [mol for seed_mols in all_building_blocks for mol in seed_mols]
+    top_generated_mols = [mol for seed_mols in all_top_generated_mols for mol in seed_mols]
+    top_building_blocks = [mol for seed_mols in all_top_building_blocks for mol in seed_mols]
+    
+    # Calculate per-seed statistics for generated molecules
+    gen_heavy_atoms_per_seed = []
+    gen_mol_wt_per_seed = []
+    for seed_mols in all_generated_mols:
+        if len(seed_mols) > 0:
+            gen_heavy_atoms_per_seed.append((round(np.mean([mol.GetNumHeavyAtoms() for mol in seed_mols]), 2), 
+                                            round(np.std([mol.GetNumHeavyAtoms() for mol in seed_mols]), 2), 
+                                            len(seed_mols)))
+            gen_mol_wt_per_seed.append((round(np.mean([MolWt(mol) for mol in seed_mols]), 2), 
+                                        round(np.std([MolWt(mol) for mol in seed_mols]), 2), 
+                                        len(seed_mols)))
+    
+    # Calculate per-seed statistics for building blocks
+    bb_heavy_atoms_per_seed = []
+    bb_mol_wt_per_seed = []
+    for seed_mols in all_building_blocks:
+        if len(seed_mols) > 0:
+            bb_heavy_atoms_per_seed.append((round(np.mean([mol.GetNumHeavyAtoms() for mol in seed_mols]), 2), 
+                                           round(np.std([mol.GetNumHeavyAtoms() for mol in seed_mols]), 2), 
+                                           len(seed_mols)))
+            bb_mol_wt_per_seed.append((round(np.mean([MolWt(mol) for mol in seed_mols]), 2), 
+                                      round(np.std([MolWt(mol) for mol in seed_mols]), 2), 
+                                      len(seed_mols)))
+     
+    logging.info(f"The following stats are for molecules satisfying all reaction constraints:")
+    
+    # Log overall statistics for generated molecules
+    if generated_mols:
+        logging.info(f"Aggregated across all seeds: Generated molecules (N={len(generated_mols)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in generated_mols]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in generated_mols]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in generated_mols]), 2)} ± {round(np.std([MolWt(mol) for mol in generated_mols]), 2)}")
+        # Log per-seed statistics for generated molecules
+        if gen_heavy_atoms_per_seed:
+            logging.info(f"Per-seed # heavy atoms: {', '.join([f'{mean} ± {std} (N={N})' for mean, std, N in gen_heavy_atoms_per_seed])}")
+            logging.info(f"Per-seed molecular weight: {', '.join([f'{mean} ± {std} (N={N})' for mean, std, N in gen_mol_wt_per_seed])}\n")
+    
+    # Log overall statistics for building blocks
+    if building_blocks:
+        logging.info(f"Aggregated across all seeds: Building blocks (N={len(building_blocks)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in building_blocks]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in building_blocks]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in building_blocks]), 2)} ± {round(np.std([MolWt(mol) for mol in building_blocks]), 2)}")
+        # Log per-seed statistics for building blocks
+        if bb_heavy_atoms_per_seed:
+            logging.info(f"Per-seed # heavy atoms: {', '.join([f'{mean} ± {std} (N={N})' for mean, std, N in bb_heavy_atoms_per_seed])}")
+            logging.info(f"Per-seed molecular weight: {', '.join([f'{mean} ± {std} (N={N})' for mean, std, N in bb_mol_wt_per_seed])}\n")
+    
+    # Log statistics for top molecules
+    if top_generated_mols:
+        logging.info(f"The following stats are for the top {save_top_percentage_routes * 100}% generated molecules aggregated across all seeds:")
+        logging.info(f"Generated molecules (N={len(top_generated_mols)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in top_generated_mols]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in top_generated_mols]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in top_generated_mols]), 2)} ± {round(np.std([MolWt(mol) for mol in top_generated_mols]), 2)}")
+    
+    if top_building_blocks:
+        logging.info(f"Building blocks (N={len(top_building_blocks)}) - # heavy atoms: {round(np.mean([mol.GetNumHeavyAtoms() for mol in top_building_blocks]), 2)} ± {round(np.std([mol.GetNumHeavyAtoms() for mol in top_building_blocks]), 2)}, Molecular weight: {round(np.mean([MolWt(mol) for mol in top_building_blocks]), 2)} ± {round(np.std([MolWt(mol) for mol in top_building_blocks]), 2)}")
+
 def log_molecule_and_rxn_metrics(
-    seeds: List[str],    
+    seeds_paths: List[str],    
+    minimize_path_length: bool,
+    experiment_path: str,
     experiment_name: str,
     save_top_percentage_routes: float,
     save_dir: str = "./top_graphs/"
@@ -167,34 +320,33 @@ def log_molecule_and_rxn_metrics(
     # Store per-seed results
     seed_results = []
 
-    for seed in seeds:
-        enforce_reactions, enforce_building_blocks, enforced_building_blocks_file = get_run_data(seed)
+    for seed_path in seeds_paths:
+        enforce_reactions, enforced_reaction_classes, enforce_building_blocks, enforced_building_blocks_file = get_run_data(seed_path)
         assert enforce_reactions, "Reaction presence was not enforced"
 
         # Skip if oracle_history.csv doesn't exist (failed run)
-        if not os.path.exists(os.path.join(seed, "oracle_history.csv")):
+        if not os.path.exists(os.path.join(seed_path, "oracle_history.csv")):
             continue
             
         # Load and canonicalize SMILES from JSON files
-        rxn_json = json.load(open(os.path.join(seed, "syntheseus_results", "matched_generated_smiles_with_rxn.json"), "r"))
+        rxn_json = json.load(open(os.path.join(seed_path, "syntheseus_results", "matched_generated_smiles_with_rxn.json"), "r"))
         enforced_rxn_smiles = set([canonicalize_smiles(s) for smiles_list in rxn_json.values() for s in smiles_list if s])
-
-        # Load smiles_rxn_tracker.json
-        smiles_rxn_tracker = json.load(open(os.path.join(seed, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
 
         if len(enforced_rxn_smiles) > 0:
             N_rxn += 1
 
         # Load and filter DataFrame
-        df = df_remove_duplicate_smiles(pd.read_csv(os.path.join(seed, "oracle_history.csv")))
+        df = df_remove_duplicate_smiles(pd.read_csv(os.path.join(seed_path, "oracle_history.csv")))
         df["canonical_smiles"] = df["smiles"].apply(canonicalize_smiles)
         
         # Track metrics
         num_enforced_rxn.append(len(enforced_rxn_smiles))
-        df_enforced_rxn = df[df["canonical_smiles"].isin(enforced_rxn_smiles)]  
 
-        # Double check that all matched molecules have syntheseus_raw_values == 1
-        assert sum(df_enforced_rxn[SYNTHESEUS_REWARD_ENUM]) == len(df_enforced_rxn), "Error: Not all matched molecules from the JSON have syntheseus_raw_values == 1 in the oracle history."
+        df_enforced_rxn = df[df["canonical_smiles"].isin(enforced_rxn_smiles)]  
+        if not minimize_path_length:
+            # Double check that all matched molecules have syntheseus_raw_values == 1
+            if sum(df_enforced_rxn[SYNTHESEUS_REWARD_ENUM]) != len(df_enforced_rxn):
+                logging.warning(f"Not all matched molecules from the JSON have syntheseus_raw_values == 1 in the oracle history - {sum(df_enforced_rxn[SYNTHESEUS_REWARD_ENUM])} != {len(df_enforced_rxn)}")
 
         df_enforced_rxn = df_enforced_rxn.sort_values(by=REWARD_ENUM, ascending=False)
         # Get the top molecules
@@ -220,49 +372,53 @@ def log_molecule_and_rxn_metrics(
         ))
 
         # Store top molecules
-        top_oracle_histories.append((df_top_enforced_rxn, seed))
-
-    logging.info(f"# Enforced Blocks (if applicable) and Reaction (N={N_rxn}): {int(np.mean(num_enforced_rxn))} ± {int(np.std(num_enforced_rxn))}\n")
+        top_oracle_histories.append((df_top_enforced_rxn, seed_path))
 
     # Log pooled metrics with per-seed molecule counts in parentheses
     # -8 to -9
     metrics_8_9 = [(smiles, dock, qed) for smiles, dock, qed in enforced_rxn_metrics if -9 <= dock < -8]
     seed_counts_8_9 = [len([(smiles, dock, qed) for smiles, dock, qed in seed_metrics if -9 <= dock < -8]) for seed_metrics in seed_results]
     seed_counts_str_8_9 = [str(count) for count in seed_counts_8_9]
-    log_pooled_molecules_metrics(metrics_8_9, f"Docking Scores: -8 to -9 (N={len(metrics_8_9)}, per seed: {', '.join(seed_counts_str_8_9)}, Mean ± Std: {int(np.mean(seed_counts_8_9))} ± {int(np.std(seed_counts_8_9))})")
+    log_pooled_molecules_metrics(
+        pooled_data=metrics_8_9, 
+        threshold_label=f"Docking Scores: -8 to -9 (N={len(metrics_8_9)}, per seed: {', '.join(seed_counts_str_8_9)}, Mean ± Std: {int(np.mean(seed_counts_8_9))} ± {int(np.std(seed_counts_8_9))})",
+    )
     
     # -9 to -10
     metrics_9_10 = [(smiles, dock, qed) for smiles, dock, qed in enforced_rxn_metrics if -10 <= dock < -9]
     seed_counts_9_10 = [len([(smiles, dock, qed) for smiles, dock, qed in seed_metrics if -10 <= dock < -9]) for seed_metrics in seed_results]
     seed_counts_str_9_10 = [str(count) for count in seed_counts_9_10]
-    log_pooled_molecules_metrics(metrics_9_10, f"Docking Scores: -9 to -10 (N={len(metrics_9_10)}, per seed: {', '.join(seed_counts_str_9_10)}, Mean ± Std: {int(np.mean(seed_counts_9_10))} ± {int(np.std(seed_counts_9_10))})")
-    
+    log_pooled_molecules_metrics(
+        pooled_data=metrics_9_10, 
+        threshold_label=f"Docking Scores: -9 to -10 (N={len(metrics_9_10)}, per seed: {', '.join(seed_counts_str_9_10)}, Mean ± Std: {int(np.mean(seed_counts_9_10))} ± {int(np.std(seed_counts_9_10))})"
+    )
+
     # < -10
     metrics_10 = [(smiles, dock, qed) for smiles, dock, qed in enforced_rxn_metrics if dock < -10]
     seed_counts_10 = [len([(smiles, dock, qed) for smiles, dock, qed in seed_metrics if dock < -10]) for seed_metrics in seed_results]
     seed_counts_str_10 = [str(count) for count in seed_counts_10]
-    log_pooled_molecules_metrics(metrics_10, f"Docking Scores: < -10 (N={len(metrics_10)}, per seed: {', '.join(seed_counts_str_10)}, Mean ± Std: {int(np.mean(seed_counts_10))} ± {int(np.std(seed_counts_10))})")
-
-    # Highest Reward
-    metrics_highest_reward = [(smiles, dock, qed) for smiles, dock, qed in top_enforced_rxn_metrics]
-    log_pooled_molecules_metrics(metrics_highest_reward, f"Top {save_top_percentage_routes * 100}% by Reward, Docking Scores:")
+    log_pooled_molecules_metrics(
+        pooled_data=metrics_10, 
+        threshold_label=f"Docking Scores: < -10 (N={len(metrics_10)}, per seed: {', '.join(seed_counts_str_10)}, Mean ± Std: {int(np.mean(seed_counts_10))} ± {int(np.std(seed_counts_10))})"
+    )
 
     # Plot evolution of reaction classes
     plot_rxn_evolution(
-        smiles_rxn_tracker=smiles_rxn_tracker,
+        seeds_paths=seeds_paths,
         enforced_rxn=experiment_name,
         save_dir=save_dir,
-        experiment_name=experiment_name,
-        num_seeds=len(seeds)
+        experiment_name=experiment_name
     )
-    
+
     # Iterate over top molecules and save routes for visualization
-    logging.info(f"Saving top {save_top_percentage_routes * 100}% of routes for experiment: {experiment_name}")
+    logging.info(f"Saving top {save_top_percentage_routes * 100}% of routes - the below stats are filtered for this top %:")
 
     top_graphs = {}
 
     # For each DataFrame, slice the top % and save routes for visualization
-    for df, seed in top_oracle_histories:
+    for df, seed_path in top_oracle_histories:
+
+        smiles_rxn_tracker = json.load(open(os.path.join(seed_path, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
 
         extracted_graph = write_out_top_syntheseus_graphs(
             top_oracle_history=df,
@@ -270,6 +426,9 @@ def log_molecule_and_rxn_metrics(
         )
     
         top_graphs.update(extracted_graph)
+
+    with open(os.path.join(save_dir, f"{experiment_name}-top-graphs-routes.json"), "w") as f:
+        json.dump(top_graphs, f, indent=4)
 
     # Count number of unique enforced blocks amongst top graphs
     if enforce_building_blocks:
@@ -280,14 +439,26 @@ def log_molecule_and_rxn_metrics(
         total_num_enforced_blocks = len(set([canonicalize_smiles(s) for s in open(enforced_building_blocks_file).readlines()]))
         logging.info(f"Unique Enforced Blocks: {len(unique_enforced_blocks)}/{total_num_enforced_blocks}")
 
-    # Plot reactions
+    # Plot reactions and log stats of the highest reward generated molecules
     rxn_count, rxn_steps = count_rxn_graph(top_graphs)
-    logging.info(f"Top Graphs Reaction Steps: {np.mean(rxn_steps):.2f} ± {np.std(rxn_steps):.2f}")
+    metrics_highest_reward = [(smiles, dock, qed) for smiles, dock, qed in top_enforced_rxn_metrics]
+    log_pooled_molecules_metrics(
+        pooled_data=metrics_highest_reward, 
+        threshold_label=f"Top {save_top_percentage_routes * 100}% by Reward (N={len(metrics_highest_reward)}), Docking Scores:",
+        add_new_line=False
+    )
+    logging.info(f"Reaction Steps: {np.mean(rxn_steps):.2f} ± {np.std(rxn_steps):.2f}\n")
 
     plot_top_graphs_rxn_classes(
         rxn_count=rxn_count,
         save_dir=save_dir,
         experiment_name=experiment_name
+    )
+
+    # Log building block metrics
+    log_building_blocks_metrics(
+        top_oracle_histories=top_oracle_histories,
+        save_top_percentage_routes=save_top_percentage_routes
     )
 
     # Annotate reaction conditions
@@ -298,7 +469,7 @@ def log_molecule_and_rxn_metrics(
             reacon_dir="/home/jeff/saturn-dev/test/testing-reacon/reacon"
         )
     except Exception:
-        logging.info(f"Error in reaction condition annotation for experiment: {experiment_name}. Do not expect any reaction conditions to be annotated in the top graphs.")
+        logging.info(f"Error in reaction condition annotation for experiment: {experiment_name}. Do not expect any reaction conditions to be annotated for the top graphs.")
 
     with open(os.path.join(save_dir, f"{experiment_name}-top-graphs.json"), "w") as f:
         json.dump(top_graphs, f, indent=4)
@@ -330,14 +501,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_top_percentage_routes",
         type=float,
-        default=0.005,
-        help="Percentage of top routes to save (e.g. 0.005 for top 0.5%%)."
+        default=0.05,
+        help="Percentage of top routes to save (e.g. 0.05 for top 5%%)."
+    )
+    parser.add_argument(
+        "--minimize_path_length",
+        action="store_true",
+        help="Whether the experiment minimizes the path length of the synthetic routes."
     )
     args = parser.parse_args()
 
     # Setup logging
     setup_logging("./metrics.log")
-    logging.info(f"The script will save the top {args.save_top_percentage_routes * 100}% of routes for each experiment.")
+    logging.info(f"The script will save the top {args.save_top_percentage_routes * 100}% of routes for each experiment (aggregating across all seeds).")
     
     start_time = time.perf_counter()
 
@@ -346,22 +522,29 @@ if __name__ == "__main__":
         logging.info(f"Starting analysis for experiment: {experiment_name}\n")
 
         path = os.path.join(args.experiment_path, experiment_name)
-        seeds = [os.path.join(path, folder) for folder in os.listdir(path) if folder.startswith("seed") and os.path.isdir(os.path.join(path, folder))]
-        assert len(seeds) > 0, f"No seeds found for experiment {experiment_name}."
+        seeds_paths = [os.path.join(path, folder) for folder in os.listdir(path) if folder.startswith("seed") and os.path.isdir(os.path.join(path, folder))]
+        assert len(seeds_paths) > 0, f"No seeds found for experiment {experiment_name}."
+        # FIXME: Some parts of the code assume that the format of seed_paths ends with */seed{idx}
+        seeds_paths.sort()
 
         logging.info(f"----- Results for: {experiment_name} -----")
 
         # Log number of solved molecules
-        log_synthesizable_metrics(seeds)
+        log_synthesizable_metrics(
+            seeds_paths=seeds_paths,
+            minimize_path_length=args.minimize_path_length
+        )
 
         # Log wall time
-        log_wall_time(seeds)
+        log_wall_time(seeds_paths)
 
         DOCKING_SCORE_ENUM = get_docking_score_enum(args.docking_oracle)
 
         # Log enforced reaction and building blocks info
         log_molecule_and_rxn_metrics(
-            seeds=seeds,
+            seeds_paths=seeds_paths,
+            minimize_path_length=args.minimize_path_length,
+            experiment_path=args.experiment_path,
             experiment_name=experiment_name,
             save_top_percentage_routes=args.save_top_percentage_routes
         )

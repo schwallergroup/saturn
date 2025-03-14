@@ -253,7 +253,7 @@ def write_out_top_syntheseus_graphs(
 
     return output
 
-def get_run_data(path: str) -> Tuple[bool, bool, str]:
+def get_run_data(path: str) -> Tuple[bool, List[str], bool, str]:
     """
     Take run .json file and get info related to reaction and building blocks.
     """
@@ -270,45 +270,53 @@ def get_run_data(path: str) -> Tuple[bool, bool, str]:
     syntheseus_info = [component for component in data["oracle"]["components"] if component["name"] == "syntheseus"][0]["specific_parameters"]
     
     enforce_reactions = syntheseus_info["enforced_reactions"]["enforce_rxn_class_presence"]
+    enforced_reaction_classes = syntheseus_info["enforced_reactions"]["enforced_rxn_classes"]
     enforce_building_blocks = syntheseus_info["enforced_building_blocks"]["enforce_blocks"]
     enforced_building_blocks_file = syntheseus_info["enforced_building_blocks"]["enforced_building_blocks_file"]
+
     
-    return enforce_reactions, enforce_building_blocks, enforced_building_blocks_file
+    return enforce_reactions, enforced_reaction_classes, enforce_building_blocks, enforced_building_blocks_file
 
 def plot_rxn_evolution(
-    smiles_rxn_tracker: Dict[str, Dict[str, str]],
+    seeds_paths: List[str],
     enforced_rxn: str,
     save_dir: str,
     experiment_name: str,
-    num_seeds: int
 ) -> None:
-    """Plot evolution of reaction classes."""
+    """
+    Plot evolution of reaction classes and log the number of reaction steps.
+    """
+    all_rxn_steps = []
     # Load data
-    for seed in range(num_seeds):
-        experiment_path = f"test_files/{enforced_rxn}/seed{seed}"
-        oracle_history = pd.read_csv(f"{experiment_path}/oracle_history.csv")
+    for seed_path in seeds_paths:
+        if not os.path.exists(os.path.join(seed_path, "oracle_history.csv")):
+            continue
+
+        seed_rxn_steps = []
+
+        oracle_history = pd.read_csv(f"{seed_path}/oracle_history.csv")
         oracle_history["canonical_smiles"] = oracle_history["smiles"].apply(canonicalize_smiles)
 
         # Track reactions by class over time
+        smiles_rxn_tracker = json.load(open(os.path.join(seed_path, "syntheseus_results", "smiles_rxn_tracker.json"), "r"))
         rxn_stats = defaultdict(list)
-        all_rxn_steps = []
 
         for smiles, rxn_info in smiles_rxn_tracker.items():
             for attribute, attribute_value in rxn_info.items():
                 if attribute == "oracle_calls":
                     oracle_calls = attribute_value
+
                 elif attribute == "rxn_steps":
                     rxn_steps = attribute_value
-                    all_rxn_steps.append(rxn_steps)
+                    seed_rxn_steps.append(rxn_steps)
+
                 elif isinstance(attribute_value, dict):
                     if attribute_value["is_rxn"]:
                         rxn_class = attribute_value["rxn_class"]
                         rxn_name = attribute_value["rxn_name"]
                         if oracle_calls is not None and rxn_class != "Unrecognized":
                             rxn_stats[(rxn_class, rxn_name)].append(oracle_calls)
-                    
-        logging.info(f"{experiment_name} seed {seed} all synthesizable molecules: # reaction steps (N={len(all_rxn_steps)}): {round(np.mean(all_rxn_steps), 2)} ± {round(np.std(all_rxn_steps), 2)}")
-        
+
         # Sort each reaction class by oracle calls
         for rxn_class_name in rxn_stats:
             rxn_stats[rxn_class_name] = sorted(rxn_stats[rxn_class_name])
@@ -317,7 +325,7 @@ def plot_rxn_evolution(
         sorted_stats = sorted(rxn_stats.items(), key=lambda x: len(x[1]), reverse=True)
 
         # Filter for reactions with count > 500 and take top 10
-        sorted_stats = [(k,v) for k,v in sorted_stats if len(v) > 500][:10]
+        sorted_stats = [(k, v) for k, v in sorted_stats if len(v) > 500][:10]
 
         colours = [
             "#2ecc71", "#3498db", "#9b59b6", "#f1c40f", "#e67e22", 
@@ -349,7 +357,22 @@ def plot_rxn_evolution(
         plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=12)
         plt.tight_layout()
         
-        plt.savefig(os.path.join(save_dir, f"{experiment_name}-seed{seed}-rxn-evolution.png"))
+        plt.savefig(os.path.join(save_dir, f"{experiment_name}-seed{seed_path[-1]}-rxn-evolution.png"))
+        plt.close()
+
+        all_rxn_steps.append(seed_rxn_steps)  # List[List[int]]
+
+    # Flatten the list for overall statistics
+    flattened_rxn_steps = [step for seed_steps in all_rxn_steps for step in seed_steps]
+    
+    # Calculate per-seed statistics
+    per_seed_means_stds = [(round(np.mean(seed_steps), 2), round(np.std(seed_steps), 2), len(seed_steps)) for seed_steps in all_rxn_steps if len(seed_steps) > 0]
+    
+    # Log the overall number of reaction steps
+    logging.info(f"All synthesizable molecules across {len(seeds_paths)} seeds (N={len(flattened_rxn_steps)}) - # reaction steps: {round(np.mean(flattened_rxn_steps), 2)} ± {round(np.std(flattened_rxn_steps), 2)}")
+    
+    # Log the per-seed statistics
+    logging.info(f"Per-seed reaction steps - Means: {', '.join([f'{mean} ± {std} (N={N})' for mean, std, N in per_seed_means_stds])}\n")
 
 def count_rxn_graph(top_graphs: Dict[str, Union[str, float]]) -> Union[Dict[str, int], List[int]]:
     """
@@ -413,6 +436,7 @@ def plot_top_graphs_rxn_classes(
     plt.tight_layout()
 
     plt.savefig(os.path.join(save_dir, f"{experiment_name}-top-graphs-rxn-distribution.png"))
+    plt.close()
 
 def annotate_rxn_conditions(
     top_graphs: Dict[str, Dict[str, Union[str, int]]],

@@ -111,8 +111,8 @@ def base_oracle_params() -> dict:
                 "enforce_all_reactions": False,
                 "rxn_insight_env_name": "rxn-insight",
                 "use_namerxn": False,
-                # NOTE: The tests assume NameRXN version 3.7.3
-                # NOTE: User's should modify the path below to their local path
+                # NOTE: The tests assume NameRXN version 3.7.3 (reaction classification may differ between different versions)
+                # NOTE: Users should modify the path below to their local path
                 "namerxn_binary_path": "/home/jeff/saturn-dev/test/testing-namerxn/HazELNut/namerxn",
                 "enforced_rxn_classes": [],
                 "avoid_rxn_classes": [],
@@ -123,14 +123,14 @@ def base_oracle_params() -> dict:
             },
             "route_extraction_script_path": os.path.join(CURRENT_DIR, "../../../oracles/synthesizability/utils/extract_syntheseus_route_data.py"),
             "time_limit_s": 180,
-            "optimize_path_length": False,
+            "minimize_path_length": False,
             "parallelize": False,
             "max_workers": 4,
             "results_dir": os.path.join(CURRENT_DIR, "syntheseus_results")
         }
     }
 
-def test_route_data(route_file):
+def test_route_data(route_file) -> None:
     """
     Test the syntheseus-full environment can unpickle the route data correctly.
     """
@@ -151,7 +151,11 @@ def test_route_data(route_file):
     # Check there are 5 molecule nodes
     assert len(syntheseus_route_data) == 5
 
-def test_normal_synthesizability(aripiprazole_mol, aripiprazole_hexane_chain_mol, base_oracle_params):
+def test_normal_synthesizability(
+    aripiprazole_mol, 
+    aripiprazole_hexane_chain_mol, 
+    base_oracle_params
+) -> None:
     """
     Synthesizability with no constraints.
     """
@@ -174,7 +178,11 @@ def test_normal_synthesizability(aripiprazole_mol, aripiprazole_hexane_chain_mol
     assert len(solved) == 2, "Expected 2 molecules in the SMILES list"
     assert (solved == np.array([2, -99])).all(), "Expected aripiprazole to be solved and the hexane chain to be unsolvable"
 
-def test_rxn_class_synthesizability(aripiprazole_mol, amide_mol, base_oracle_params):
+def test_rxn_class_synthesizability(
+    aripiprazole_mol, 
+    amide_mol, 
+    base_oracle_params
+) -> None:
     """
     Synthesizability with a specific reaction class.
     """
@@ -254,7 +262,11 @@ def test_rxn_class_synthesizability(aripiprazole_mol, amide_mol, base_oracle_par
 
     shutil.rmtree(base_oracle_params["specific_parameters"]["results_dir"])
 
-def test_all_rxn_class_synthesizability(aripiprazole_mol, amide_mol, base_oracle_params):
+def test_all_rxn_class_synthesizability(
+    aripiprazole_mol, 
+    amide_mol, 
+    base_oracle_params
+) -> None:
     """
     Synthesizability where *all* reactions in the synthesis graph match the user-specified reaction classes.
     """
@@ -345,7 +357,10 @@ def test_all_rxn_class_synthesizability(aripiprazole_mol, amide_mol, base_oracle
 
     shutil.rmtree(base_oracle_params["specific_parameters"]["results_dir"])
 
-def test_avoid_rxn_class_synthesizability(aripiprazole_mol, base_oracle_params):
+def test_avoid_rxn_class_synthesizability(
+    aripiprazole_mol, 
+    base_oracle_params
+) -> None:
     """
     Synthesizability where *all* reactions in the synthesis graph match the user-specified reaction classes.
     """
@@ -409,7 +424,11 @@ def test_avoid_rxn_class_synthesizability(aripiprazole_mol, base_oracle_params):
     # Test enforcing all reactions
     shutil.rmtree(base_oracle_params["specific_parameters"]["results_dir"])
     
-def test_enforced_block_synthesizability(enforced_block_mol, aripiprazole_mol, base_oracle_params):
+def test_enforced_block_synthesizability(
+    enforced_block_mol, 
+    aripiprazole_mol, 
+    base_oracle_params
+) -> None:
     """
     Synthesizability with enforced building block.
     
@@ -507,7 +526,11 @@ def test_enforced_block_synthesizability(enforced_block_mol, aripiprazole_mol, b
 
     shutil.rmtree(base_oracle_params["specific_parameters"]["results_dir"])
 
-def test_enforced_block_rxn_class_synthesizability(enforced_block_mol, aripiprazole_mol, base_oracle_params):
+def test_enforced_block_rxn_class_synthesizability(
+    enforced_block_mol, 
+    aripiprazole_mol, 
+    base_oracle_params
+) -> None:
     """
     Synthesizability with enforced building block and reaction class.
     """
@@ -625,7 +648,11 @@ def test_enforced_block_rxn_class_synthesizability(enforced_block_mol, aripipraz
 
     shutil.rmtree(base_oracle_params["specific_parameters"]["results_dir"])
 
-def test_enforced_block_all_rxn_class_synthesizability(enforced_block_mol, aripiprazole_mol, base_oracle_params):
+def test_enforced_block_all_rxn_class_synthesizability(
+    enforced_block_mol, 
+    aripiprazole_mol, 
+    base_oracle_params
+) -> None:
     """
     Synthesizability with enforced building block and all reaction classes.
     """
@@ -740,7 +767,11 @@ def test_enforced_block_all_rxn_class_synthesizability(enforced_block_mol, aripi
 
     shutil.rmtree(base_oracle_params["specific_parameters"]["results_dir"])
 
-def test_enforced_block_avoid_rxn_class_synthesizability(enforced_block_mol, aripiprazole_mol, base_oracle_params):
+def test_enforced_block_avoid_rxn_class_synthesizability(
+    enforced_block_mol, 
+    aripiprazole_mol, 
+    base_oracle_params
+) -> None:
     """
     Synthesizability with enforced building block and avoiding reaction classes.
     """
@@ -854,6 +885,88 @@ def test_enforced_block_avoid_rxn_class_synthesizability(enforced_block_mol, ari
     }
     assert syntheseus_oracle.matched_generated_smiles_with_rxn == {
         1: []
+    }
+
+    shutil.rmtree(base_oracle_params["specific_parameters"]["results_dir"])
+
+def test_path_length_minimization(
+    enforced_block_mol, 
+    aripiprazole_mol, 
+    base_oracle_params
+) -> None:
+    """
+    Path length minimization.
+    Tests jointly enforcing blocks and reactions and avoiding reactions.
+    """
+    # General fixed parameters
+    base_oracle_params["reward_shaping_function_parameters"] = {
+        "transformation_function": "no_transformation"
+    }
+    base_oracle_params["specific_parameters"]["minimize_path_length"] = True
+
+    # 1. Test enforced blocks
+    base_oracle_params["specific_parameters"]["enforced_building_blocks"]["enforce_blocks"] = True
+    base_oracle_params["specific_parameters"]["enforced_building_blocks"]["enforced_building_blocks_file"] = os.path.join(CURRENT_DIR, "enforced-stock.smi")
+    base_oracle_params["specific_parameters"]["enforced_building_blocks"]["use_dense_reward"] = True
+
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    block_solved = syntheseus_oracle(
+        mols=np.array([aripiprazole_mol]),
+        oracle_calls=1
+    )
+    assert len(block_solved) == 1
+    assert abs(block_solved[0] - 0.29584108) < 1e-6
+
+    assert syntheseus_oracle.matched_generated_smiles == {
+        1: []
+    }
+
+    # 2. Test jointly enforcing blocks and reactions
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_rxn_class_presence"] = True
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_all_reactions"] = True
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["reduction", "oxidation", "deprotection", "acylation"]
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    block_solved = syntheseus_oracle(
+        mols=np.array([enforced_block_mol]),
+        oracle_calls=1
+    )
+    assert len(block_solved) == 1
+    assert abs(block_solved[0] - 0.39863019) < 1e-6
+
+    assert syntheseus_oracle.matched_generated_smiles == {
+        1: [
+            "Cc1ccc(CC(=O)Nc2ccc(C(=O)N3CCC(=O)C3)o2)cc1",
+        ]
+    }
+    assert syntheseus_oracle.matched_generated_smiles_with_rxn == {
+        1: [
+            "Cc1ccc(CC(=O)Nc2ccc(C(=O)N3CCC(=O)C3)o2)cc1",
+        ]
+    }
+    
+    # 3. Test > 1 molecule with enforced reactions (no enforced blocks)
+    #   * Positive control: aripiprazole (contains Williamson ether reaction)
+    #   * Negative control: enforced block mol (does not contain Williamson ether reaction)
+    base_oracle_params["specific_parameters"]["enforced_building_blocks"]["enforce_blocks"] = False
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_rxn_class_presence"] = True
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_all_reactions"] = False
+    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["williamson"]
+
+    syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
+    block_solved = syntheseus_oracle(
+        mols=np.array([aripiprazole_mol, enforced_block_mol]),
+        oracle_calls=1
+    )
+    assert len(block_solved) == 2
+    # Enforced block mol does not contain the Williamson ether reaction, so the reward should be 0
+    # Aripiprazole does contain the Williamson ether reaction, so the reward should be 1.0 * reward shaped path length
+    assert abs(block_solved[0] - 0.88654037) < 1e-6
+    assert block_solved[1] == 0
+
+    assert syntheseus_oracle.matched_generated_smiles_with_rxn == {
+        1: [
+            "O=C1CCc2ccc(OCCCCN3CCN(c4cccc(Cl)c4Cl)CC3)cc2N1",
+        ]
     }
 
     shutil.rmtree(base_oracle_params["specific_parameters"]["results_dir"])
