@@ -1,6 +1,6 @@
 from typing import List, Union, Dict, Set, Tuple
 import numpy as np
-from copy import copy
+from copy import deepcopy
 from rdkit import Chem
 from rdkit.Chem import Mol
 from rdkit.Chem import rdFMCS
@@ -176,8 +176,8 @@ def fuzzy_matching_substructure(
         if int(overlap) == 1:
 
             # Remove stereochemistry from molecules to guard against stereo problems
-            query_mol_copy = copy(query_mol)
-            block_mol_copy = copy(block_mol)
+            query_mol_copy = deepcopy(query_mol)
+            block_mol_copy = deepcopy(block_mol)
 
             Chem.RemoveStereochemistry(query_mol_copy)
             Chem.RemoveStereochemistry(block_mol_copy)
