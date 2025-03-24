@@ -1,5 +1,6 @@
 from typing import List, Union, Dict, Set, Tuple
 import numpy as np
+from copy import copy
 from rdkit import Chem
 from rdkit.Chem import Mol
 from rdkit.Chem import rdFMCS
@@ -173,8 +174,20 @@ def fuzzy_matching_substructure(
             )
         overlap = mcs_result.numAtoms / block_mol.GetNumAtoms()
         if int(overlap) == 1:
-            if canonicalize_smiles(query_smiles) == canonicalize_smiles(Chem.MolToSmiles(block_mol)):
+
+            # Remove stereochemistry from molecules to guard against stereo problems
+            query_mol_copy = copy(query_mol)
+            block_mol_copy = copy(block_mol)
+
+            Chem.RemoveStereochemistry(query_mol_copy)
+            Chem.RemoveStereochemistry(block_mol_copy)
+
+            if (
+                canonicalize_smiles(query_smiles) == canonicalize_smiles(Chem.MolToSmiles(block_mol)) 
+                or Chem.MolToSmiles(query_mol_copy, canonical=True) == Chem.MolToSmiles(block_mol_copy, canonical=True)
+            ):
                 return 1.0
+
             # Edge case
             else:
                 asymmetric_overlap = mcs_result.numAtoms / query_mol.GetNumAtoms()
