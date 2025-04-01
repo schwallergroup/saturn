@@ -274,6 +274,10 @@ class Syntheseus(OracleComponent):
                                 if node_data["is_mol"]:
                                     # Skip root node because this is the generated molecule
                                     if node_data["depth"] == 0:
+                                        is_matched, matched_block_smiles = match_stock(
+                                            query_smiles=canonicalize_smiles(node_data["mol_smiles"]), 
+                                            enforced_building_blocks_file=self.enforced_building_blocks_file
+                                        )
                                         continue
                                     # If the user specified that enforced building blocks must appear in the nodes at max depth (starting-material)
                                     if self.enforce_start:
