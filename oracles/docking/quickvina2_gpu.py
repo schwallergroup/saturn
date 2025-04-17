@@ -102,7 +102,7 @@ class QuickVina2_GPU(OracleComponent):
         # Skip molecules that fail to embed
             try:
                 # Generate conformer with ETKDG
-                AllChem.EmbedMolecule(mol, self.ETKDG, randomSeed=0)
+                AllChem.EmbedMolecule(mol, ETversion=2, randomSeed=0)
                 # Minimize conformer
                 self.force_field(mol)
             except Exception:
