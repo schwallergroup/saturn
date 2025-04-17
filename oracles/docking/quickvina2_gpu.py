@@ -58,9 +58,6 @@ class QuickVina2_GPU(OracleComponent):
         # Setup docking box
         self._setup_docking_box()
 
-        # Ligand embedding parameter - use ETKDG
-        self.ETKDG = AllChem.ETKDG()
-
         # Output directory
         output_dir = self.parameters.specific_parameters.get("results_dir", None)
         assert output_dir not in [None, ""], "Please provide the path to the output directory."

@@ -4,6 +4,8 @@ from oracles.dataclass import OracleComponentParameters
 from rdkit.Chem import Mol
 from oracles.physchem.utils.pestqed_calc import pestqed
 
+
+
 class PestQED(OracleComponent):
     """
     Modified QED class to compute insecticide QED from this paper: 

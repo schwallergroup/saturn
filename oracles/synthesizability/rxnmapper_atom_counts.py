@@ -9,6 +9,8 @@ from rdkit import Chem
 from rdkit.Chem import Mol
 from utils.chemistry_utils import canonicalize_smiles_batch
 
+
+
 class RXNMapperAtomCounts(OracleComponent):
     """
     Count the fraction of atoms in the enforced structures that can be mapped to the generated molecules using RXNMapper.

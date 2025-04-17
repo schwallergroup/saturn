@@ -4,6 +4,8 @@ from oracles.dataclass import OracleComponentParameters
 from rdkit.Chem import Mol
 from rdkit.Chem.Lipinski import NumHAcceptors
 
+
+
 class NumHydrogenBondAcceptors(OracleComponent):
     def __init__(self, parameters: OracleComponentParameters):
         super().__init__(parameters)

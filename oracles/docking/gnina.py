@@ -44,9 +44,6 @@ class GNINA(OracleComponent):
         self.reference_ligand = self.parameters.specific_parameters.get("reference_ligand", None)
         assert self.reference_ligand is not None and self.reference_ligand.endswith(".pdb"), "Please provide the path to the reference ligand PDB file."
 
-        # Ligand embedding parameter - use ETKDG: https://pubs.acs.org/doi/10.1021/acs.jcim.5b00654
-        self.ETKDG = AllChem.ETKDG()
-
         # `gnina` parameters
         self.exhaustiveness = self.parameters.specific_parameters.get("exhaustiveness", 8)  # Default to 8
         self.flexdist = self.parameters.specific_parameters.get("flexdist", 0)  # Allow flexible residues up to `flexdist` Angstroms from ligand. Default to 0

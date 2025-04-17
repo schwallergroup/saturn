@@ -5,6 +5,8 @@ from rdkit import Chem
 from rdkit.Chem import Mol
 from rdkit.Chem import rdFMCS
 
+
+
 class MatchingSubstructureAtomCount(OracleComponent):
     """
     Count the maximum number of atoms in the Maximum Common Substructure (MCS) between generated molecules and enforced structures.

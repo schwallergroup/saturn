@@ -4,6 +4,8 @@ from oracles.dataclass import OracleComponentParameters
 from rdkit.Chem import Mol
 from rdkit.Chem.Descriptors import MolWt
 
+
+
 class MolecularWeight(OracleComponent):
     def __init__(self, parameters: OracleComponentParameters):
         super().__init__(parameters)

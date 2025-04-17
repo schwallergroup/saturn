@@ -4,6 +4,8 @@ from oracles.dataclass import OracleComponentParameters
 from rdkit import Chem
 from rdkit.Chem import Mol
 
+
+
 class MatchingSubstructure(OracleComponent):
     def __init__(self, parameters: OracleComponentParameters):
         super().__init__(parameters)

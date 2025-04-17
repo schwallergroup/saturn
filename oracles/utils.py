@@ -24,6 +24,7 @@ from oracles.physchem.stereocenters import NumStereocenters
 from oracles.physchem.tpsa import tPSA
 from oracles.physchem.slogp import SlogP
 from oracles.physchem.pestqed import PestQED
+from oracles.physchem.heavy_atoms import HeavyAtoms
 
 # Structural
 from oracles.structural.matching_substructure import MatchingSubstructure
@@ -104,6 +105,8 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return SlogP(oracle_component_parameters)
     elif name == "pestqed":
         return PestQED(oracle_component_parameters)
+    elif name == "heavy_atoms":
+        return HeavyAtoms(oracle_component_parameters)
     # Structural
     elif name == "matching_substructure":
         return MatchingSubstructure(oracle_component_parameters)
