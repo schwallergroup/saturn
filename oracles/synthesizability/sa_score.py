@@ -4,6 +4,8 @@ from oracles.dataclass import OracleComponentParameters
 from rdkit.Chem import Mol
 from oracles.synthesizability.sascorer import calculateScore
 
+
+
 class SAScore(OracleComponent):
     """
     Synthetic Accessibility score based on: https://jcheminf.biomedcentral.com/articles/10.1186/1758-2946-1-8.

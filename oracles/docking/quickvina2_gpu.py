@@ -58,9 +58,6 @@ class QuickVina2_GPU(OracleComponent):
         # Setup docking box
         self._setup_docking_box()
 
-        # Ligand embedding parameter - use ETKDG
-        self.ETKDG = AllChem.ETKDG()
-
         # Output directory
         output_dir = self.parameters.specific_parameters.get("results_dir", None)
         assert output_dir not in [None, ""], "Please provide the path to the output directory."
@@ -102,7 +99,7 @@ class QuickVina2_GPU(OracleComponent):
         # Skip molecules that fail to embed
             try:
                 # Generate conformer with ETKDG
-                AllChem.EmbedMolecule(mol, self.ETKDG)
+                AllChem.EmbedMolecule(mol, ETversion=2, randomSeed=0)
                 # Minimize conformer
                 self.force_field(mol)
             except Exception:

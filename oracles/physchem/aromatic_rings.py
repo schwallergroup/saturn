@@ -4,6 +4,8 @@ from oracles.dataclass import OracleComponentParameters
 from rdkit.Chem import Mol
 from rdkit.Chem.rdMolDescriptors import CalcNumAromaticRings
 
+
+
 class NumAromaticRings(OracleComponent):
     def __init__(self, parameters: OracleComponentParameters):
         super().__init__(parameters)

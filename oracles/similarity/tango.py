@@ -7,6 +7,8 @@ from rdkit.Chem import Mol
 from utils.chemistry_utils import construct_morgan_fingerprints_batch, construct_morgan_fingerprints_batch_from_file
 from oracles.synthesizability.utils.utils import extract_functional_groups, tango_reward
 
+
+
 class Tango(OracleComponent):
     def __init__(self, parameters: OracleComponentParameters):
         super().__init__(parameters)

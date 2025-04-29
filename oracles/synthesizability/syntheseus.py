@@ -262,8 +262,6 @@ class Syntheseus(OracleComponent):
                             self.matched_generated_smiles[oracle_calls] = []
 
                         max_depth = self._get_max_depth(route)
-                        # Track whether the synthesis pathway contains an enforced building block
-                        is_matched = False
                         
                         # Check whether to use dense reward
                         if self.use_dense_reward:
@@ -273,16 +271,15 @@ class Syntheseus(OracleComponent):
                             for node, node_data in route.items():
                                 if node_data["is_mol"]:
                                     # Skip root node because this is the generated molecule
-                                    if node_data["depth"] == 0:
+                                    # Edge case: If there is only 1 node in the synthesis graph, then that node is the generated molecule and it is in the stock - check if it is a match
+                                    if node_data["depth"] == 0 and len(route) == 1:
                                         is_matched, matched_block_smiles = match_stock(
-                                            query_smiles=canonicalize_smiles(node_data["mol_smiles"]), 
-                                            enforced_building_blocks_file=self.enforced_building_blocks_file
-                                        )
-                                        continue
+                                             query_smiles=canonicalize_smiles(node_data["mol_smiles"]), 
+                                             enforced_building_blocks_file=self.enforced_building_blocks_file
+                                         )
                                     # If the user specified that enforced building blocks must appear in the nodes at max depth (starting-material)
-                                    if self.enforce_start:
-                                        if not node_data["depth"] == max_depth:
-                                            continue
+                                    if self.enforce_start and not node_data["depth"] == max_depth:
+                                        continue
                                     # Compute the node's reward
                                     node_reward = get_node_reward(
                                         reward_type=self.reward_type,
@@ -309,12 +306,15 @@ class Syntheseus(OracleComponent):
                             for node, node_data in route.items():
                                 if node_data["is_mol"]:
                                     # Skip root node because this is the generated molecule
-                                    if node_data["depth"] == 0:
+                                    # Edge case: If there is only 1 node in the synthesis graph, then that node is the generated molecule and it is in the stock - check if it is a match
+                                    if node_data["depth"] == 0 and len(route) == 1:
+                                        is_matched, matched_block_smiles = match_stock(
+                                             query_smiles=canonicalize_smiles(node_data["mol_smiles"]), 
+                                             enforced_building_blocks_file=self.enforced_building_blocks_file
+                                         )
+                                    # If the user specified that enforced building blocks must appear in the nodes at max depth (starting-material)
+                                    if self.enforce_start and not node_data["depth"] == max_depth:
                                         continue
-                                    # If the user specified that enforced building blocks must appear in the *leaf* nodes
-                                    if self.enforce_start:
-                                        if not node_data["depth"] == max_depth:
-                                            continue
                                     # Otherwise, just check if *any* node has a matching SMILES in the enforced building blocks file
                                     # NOTE: this means that the enforced building blocks appear *somewhere* in the synthesis graph
                                     is_matched, matched_block_smiles = match_stock(
