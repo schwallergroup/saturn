@@ -148,16 +148,17 @@ def log_wall_time(seeds: List[str]) -> None:
         logging.info(f"Wall Time (N={len(times)}): {int(mean_hours)}h {int(mean_minutes)}m ± {int(std_hours)}h {int(std_minutes)}m\n")
 
 def log_pooled_molecules_metrics(
-    pooled_data: List[Tuple[str, float, float]],  # (SMILES, docking_score, qed)
+    pooled_data: List[Tuple[str, float, float, int]],  # (SMILES, docking_score, qed, hbd)
     threshold_label: str,
     add_new_line: bool = True
 ) -> None:
     """Log pooled molecules metrics."""
     if pooled_data:
-        docking_scores = [dock for _, dock, _ in pooled_data]
-        qed_values = [qed for _, _, qed in pooled_data]
+        docking_scores = [dock for _, dock, _, _ in pooled_data]
+        qed_values = [qed for _, _, qed, _ in pooled_data]
+        num_hbd = [hbd for _, _ , _, hbd in pooled_data]
         # Isolate SMILES
-        smiles = [smiles for smiles, _, _ in pooled_data]
+        smiles = [smiles for smiles, _, _, _ in pooled_data]
         mols = [Chem.MolFromSmiles(smiles) for smiles in smiles]
         # Filter None
         mols = [mol for mol in mols if mol is not None]
@@ -172,8 +173,7 @@ def log_pooled_molecules_metrics(
         fps = get_morgan_fingerprints(mols, as_list=True)
         circles_high = NCircles(threshold=0.75).measure(fps)
         circles_low = NCircles(threshold=0.50).measure(fps)
-
-        logging.info(f"{threshold_label}: {np.mean(docking_scores):.2f} ± {np.std(docking_scores):.2f} QED: {np.mean(qed_values):.2f} ± {np.std(qed_values):.2f}")
+        logging.info(f"{threshold_label}: Docking Scores: {np.mean(docking_scores):.2f} ± {np.std(docking_scores):.2f}, QED: {np.mean(qed_values):.2f} ± {np.std(qed_values):.2f}, HBD: {np.mean(num_hbd):.2f} ± {np.std(num_hbd):.2f}")
         logging.info(f"Ligand Efficiency: {np.mean(ligand_efficiency_values):.2f} ± {np.std(ligand_efficiency_values):.2f}, # Unique Bemis-Murcko Scaffolds: {scaffolds}")
         if add_new_line:
             logging.info(f"IntDiv1: {intdiv1:.3f}, #Circles (T=0.75): {circles_high}, #Circles (T=0.50): {circles_low}\n")
@@ -302,7 +302,8 @@ def log_molecule_and_rxn_metrics(
     experiment_path: str,
     experiment_name: str,
     save_top_percentage_routes: float,
-    save_dir: str = "./top_graphs/"
+    save_dir: str = "./top_graphs/",
+    deduplicate: bool = False
 ) -> None:
     """Log molecule and reaction metrics."""
 
@@ -342,7 +343,8 @@ def log_molecule_and_rxn_metrics(
         # Track metrics
         num_enforced_rxn.append(len(enforced_rxn_smiles))
 
-        df_enforced_rxn = df[df["canonical_smiles"].isin(enforced_rxn_smiles)]  
+        df_enforced_rxn = df[df["canonical_smiles"].isin(enforced_rxn_smiles)]
+
         if not minimize_path_length:
             # Double check that all matched molecules have syntheseus_raw_values == 1
             if sum(df_enforced_rxn[SYNTHESEUS_REWARD_ENUM]) != len(df_enforced_rxn):
@@ -358,7 +360,8 @@ def log_molecule_and_rxn_metrics(
         seed_metrics = list(zip(
             df_enforced_rxn["canonical_smiles"],
             df_enforced_rxn[DOCKING_SCORE_ENUM],
-            df_enforced_rxn[QED_ENUM]
+            df_enforced_rxn[QED_ENUM],
+            df_enforced_rxn[HBD_ENUM]
         ))
         seed_results.append(seed_metrics)
 
@@ -368,37 +371,59 @@ def log_molecule_and_rxn_metrics(
         top_enforced_rxn_metrics.extend(zip(  # Top molecules (by reward, given syntheseus_raw_values == 1)
             df_top_enforced_rxn["canonical_smiles"], 
             df_top_enforced_rxn[DOCKING_SCORE_ENUM], 
-            df_top_enforced_rxn[QED_ENUM]
+            df_top_enforced_rxn[QED_ENUM],
+            df_enforced_rxn[HBD_ENUM]
         ))
 
         # Store top molecules
         top_oracle_histories.append((df_top_enforced_rxn, seed_path))
+    
+    # If you want to deduplicate SMILES from the pooled ensemble across seeds
+    if deduplicate:
+        filtered_enforced_rxn_metrics = []
+        unique_smiles = set()
+
+        for smiles, docking, qed, hbd in enforced_rxn_metrics:
+            if canonicalize_smiles(smiles) not in unique_smiles:
+                filtered_enforced_rxn_metrics.append((smiles, docking, qed, hbd))
+                unique_smiles.add(smiles)
+        
+        unique_smiles_top = set()
+        filtered_top_enforced_metrics = []
+
+        for smiles, docking, qed, hbd in top_enforced_rxn_metrics:
+            if canonicalize_smiles(smiles) not in unique_smiles_top:
+                filtered_top_enforced_metrics.append((smiles, docking, qed, hbd))
+                unique_smiles_top.add(smiles)
+        
+        enforced_rxn_metrics = filtered_enforced_rxn_metrics
+        top_enforced_rxn_metrics = filtered_top_enforced_metrics
 
     # Log pooled metrics with per-seed molecule counts in parentheses
     # -8 to -9
-    metrics_8_9 = [(smiles, dock, qed) for smiles, dock, qed in enforced_rxn_metrics if -9 <= dock < -8]
-    seed_counts_8_9 = [len([(smiles, dock, qed) for smiles, dock, qed in seed_metrics if -9 <= dock < -8]) for seed_metrics in seed_results]
+    metrics_8_9 = [(smiles, dock, qed, hbd) for smiles, dock, qed, hbd in enforced_rxn_metrics if -9 <= dock < -8]
+    seed_counts_8_9 = [len([(smiles, dock, qed, hbd) for smiles, dock, qed, hbd in seed_metrics if -9 <= dock < -8]) for seed_metrics in seed_results]
     seed_counts_str_8_9 = [str(count) for count in seed_counts_8_9]
     log_pooled_molecules_metrics(
-        pooled_data=metrics_8_9, 
+        pooled_data=[(smiles, dock, qed, hbd) for smiles, dock, qed, hbd in metrics_8_9], 
         threshold_label=f"Docking Scores: -8 to -9 (N={len(metrics_8_9)}, per seed: {', '.join(seed_counts_str_8_9)}, Mean ± Std: {int(np.mean(seed_counts_8_9))} ± {int(np.std(seed_counts_8_9))})",
     )
-    
+   
     # -9 to -10
-    metrics_9_10 = [(smiles, dock, qed) for smiles, dock, qed in enforced_rxn_metrics if -10 <= dock < -9]
-    seed_counts_9_10 = [len([(smiles, dock, qed) for smiles, dock, qed in seed_metrics if -10 <= dock < -9]) for seed_metrics in seed_results]
+    metrics_9_10 = [(smiles, dock, qed, hbd) for smiles, dock, qed, hbd in enforced_rxn_metrics if -10 <= dock < -9]
+    seed_counts_9_10 = [len([(smiles, dock, qed, hbd) for smiles, dock, qed, hbd in seed_metrics if -10 <= dock < -9]) for seed_metrics in seed_results]
     seed_counts_str_9_10 = [str(count) for count in seed_counts_9_10]
     log_pooled_molecules_metrics(
-        pooled_data=metrics_9_10, 
+        pooled_data=[(smiles, dock, qed, hbd) for smiles, dock, qed, hbd in metrics_9_10], 
         threshold_label=f"Docking Scores: -9 to -10 (N={len(metrics_9_10)}, per seed: {', '.join(seed_counts_str_9_10)}, Mean ± Std: {int(np.mean(seed_counts_9_10))} ± {int(np.std(seed_counts_9_10))})"
     )
 
     # < -10
-    metrics_10 = [(smiles, dock, qed) for smiles, dock, qed in enforced_rxn_metrics if dock < -10]
-    seed_counts_10 = [len([(smiles, dock, qed) for smiles, dock, qed in seed_metrics if dock < -10]) for seed_metrics in seed_results]
+    metrics_10 = [(smiles, dock, qed, hbd) for smiles, dock, qed, hbd in enforced_rxn_metrics if dock < -10]
+    seed_counts_10 = [len([(smiles, dock, qed, hbd) for smiles, dock, qed, hbd in seed_metrics if dock < -10]) for seed_metrics in seed_results]
     seed_counts_str_10 = [str(count) for count in seed_counts_10]
     log_pooled_molecules_metrics(
-        pooled_data=metrics_10, 
+        pooled_data=[(smiles, dock, qed, hbd) for smiles, dock, qed, hbd in metrics_10], 
         threshold_label=f"Docking Scores: < -10 (N={len(metrics_10)}, per seed: {', '.join(seed_counts_str_10)}, Mean ± Std: {int(np.mean(seed_counts_10))} ± {int(np.std(seed_counts_10))})"
     )
 
@@ -441,7 +466,7 @@ def log_molecule_and_rxn_metrics(
 
     # Plot reactions and log stats of the highest reward generated molecules
     rxn_count, rxn_steps = count_rxn_graph(top_graphs)
-    metrics_highest_reward = [(smiles, dock, qed) for smiles, dock, qed in top_enforced_rxn_metrics]
+    metrics_highest_reward = [(smiles, dock, qed, hbd) for smiles, dock, qed, hbd in top_enforced_rxn_metrics]
     log_pooled_molecules_metrics(
         pooled_data=metrics_highest_reward, 
         threshold_label=f"Top {save_top_percentage_routes * 100}% by Reward (N={len(metrics_highest_reward)}), Docking Scores:",
@@ -509,6 +534,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Whether the experiment minimizes the path length of the synthetic routes."
     )
+    parser.add_argument(
+        "--deduplicate",
+        action="store_true",
+        help="Whether to deduplicate the pooled molecules across seeds for the analysis"
+    )
     args = parser.parse_args()
 
     # Setup logging
@@ -546,7 +576,8 @@ if __name__ == "__main__":
             minimize_path_length=args.minimize_path_length,
             experiment_path=args.experiment_path,
             experiment_name=experiment_name,
-            save_top_percentage_routes=args.save_top_percentage_routes
+            save_top_percentage_routes=args.save_top_percentage_routes,
+            deduplicate=args.deduplicate
         )
 
         experiment_end_time = time.perf_counter()
