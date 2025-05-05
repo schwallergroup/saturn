@@ -378,7 +378,7 @@ def log_molecule_and_rxn_metrics(
         # Store top molecules
         top_oracle_histories.append((df_top_enforced_rxn, seed_path))
     
-    # If you want to deduplicate SMILES from the pooled ensemble across seeds
+    # De-duplicate SMILES from the pooled (across all seeds) results
     if deduplicate:
         filtered_enforced_rxn_metrics = []
         unique_smiles = set()
@@ -537,7 +537,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--deduplicate",
         action="store_true",
-        help="Whether to deduplicate the pooled molecules across seeds for the analysis"
+        help="Whether to de-duplicate the pooled molecules across seeds for the analysis. This would mean the metrics are reported for all *unique* molecules generated across all seeds."
     )
     args = parser.parse_args()
 
