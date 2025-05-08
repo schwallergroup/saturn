@@ -37,6 +37,7 @@ from oracles.synthesizability.sa_score import SAScore
 from oracles.synthesizability.rxnmapper_atom_counts import RXNMapperAtomCounts
 from oracles.synthesizability.aizynthfinder import AiZynthFinder
 from oracles.synthesizability.syntheseus import Syntheseus
+from oracles.synthesizability.freedom import Freedom
 
 # Docking
 from oracles.docking.dockstream import DockStream
@@ -125,6 +126,8 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return AiZynthFinder(oracle_component_parameters)
     elif name == "syntheseus":
         return Syntheseus(oracle_component_parameters)
+    elif name == "freedom":
+        return Freedom(oracle_component_parameters)
     # Docking
     elif name == "dockstream":
         return DockStream(oracle_component_parameters)
