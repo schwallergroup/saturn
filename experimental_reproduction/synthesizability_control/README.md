@@ -83,6 +83,21 @@ Gnina (Docking used in Waste Valorization Experiments)
 The developers of `Gnina` offer pre-built binaries. Download a compatible one from: https://github.com/gnina/gnina/releases. Alternatively, instructions are provided in the codebase to build the binary, if desired.
 
 
+Unit Tests
+------------------------------------------------------
+Check that the reaction constraints are properly working with the units tests located in `<path to saturn>/tests/oracles/syntheseus/test_syntheseus.py`.
+
+**NOTE**: The `NameRxn` binary executable path needs to be specified in the unit test file. If not using `NameRxn`, note that currently some tests will fail. In the future, `Rxn-INSIGHT` and `NameRxn` unit tests will be disentangled.
+
+With the `syntheseus-full` environment activated:
+
+`conda activate syntheseus-full`
+
+Change directory to `<path to saturn>/tests/oracles/syntheseus` and run:
+
+`pytest test_syntheseus.py`
+
+
 Synthesizability Control Experiments
 ---------------------------------------------------------------------------
 
