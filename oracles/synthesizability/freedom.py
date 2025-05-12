@@ -7,10 +7,11 @@ from rdkit import Chem
 from rdkit.Chem import Mol
 
 
+
 class Freedom(OracleComponent):
     """
     Freedom search score based on: https://greglandrum.github.io/rdkit-blog/posts/2024-12-03-introducing-synthon-search.html
-    Checks if the molecules are contained in Freedom or not.
+    Checks if the molecules are contained in Chemspace's Freedom 4.0 space or not.
     """
     def __init__(self, parameters: OracleComponentParameters):
         super().__init__(parameters)
@@ -33,15 +34,19 @@ class Freedom(OracleComponent):
         # Maximum number of hits
         self.max_hits = self.parameters.specific_parameters.get("max_hits", 5000)
 
-    def __call__(self, 
-                 mols: np.ndarray[Mol]) -> np.ndarray[int]:
+    def __call__(
+        self, 
+        mols: np.ndarray[Mol]
+    ) -> np.ndarray[int]:
 
         smiles = np.vectorize(Chem.MolToSmiles)(mols)
 
         return self._compute_property(smiles)
 
-    def _compute_property(self, 
-                          smiles: np.ndarray[str]) -> np.ndarray[int]:
+    def _compute_property(
+        self, 
+        smiles: np.ndarray[str]
+    ) -> np.ndarray[int]:
         """
         Execute Freedom search on the SMILES batch.
         """
