@@ -18,6 +18,5 @@ data/
 output/
 *.xyz
 *.png
-*.ipynb
 *.log
 *top_graphs*/

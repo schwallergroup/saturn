@@ -19,8 +19,6 @@ all experiments can be run by passing the `JSON` configuration:
 Preliminary Installations
 -------------------------
 
-
-
 Syntheseus (Retrosynthesis Framework)
 -------------------------------------
 1. Clone the [repository](https://github.com/microsoft/syntheseus)
@@ -82,16 +80,21 @@ will display NVIDIA information.
 
 Gnina (Docking used in Waste Valorization Experiments)
 ------------------------------------------------------
-The developeres of `Gnina` offer pre-built binaries. Download a compatible one from: https://github.com/gnina/gnina/releases
+The developers of `Gnina` offer pre-built binaries. Download a compatible one from: https://github.com/gnina/gnina/releases. Alternatively, instructions are provided in the codebase to build the binary, if desired.
 
 
 Synthesizability Control Experiments
 ---------------------------------------------------------------------------
 
-All experiments can essentially be run with the same provided configuration file. The only arguments that need to be changed are the `building_blocks_file` and `enforced_building_blocks_file` in the `Syntheseus` oracle. The building block stocks used in the [pre-print](https://arxiv.org/abs/2410.11527) can be found [here](https://figshare.com/s/07867a1e1025c192e6a9).
+The raw data and building blocks stocks used in the pre-print are available [here](https://doi.org/10.6084/m9.figshare.29040977.v1). In the pre-print, many reaction constraints were imposed. Instead of providing individual run configurations (as `JSONs`), we thought it would be most practical to provide a minimal Jupyter notebook demonstrating how to impose arbitrary constraints. This way, if interested, the framework can be adapted to user-specific case studies. 
 
-Toggling between `starting-material` and `intermediate` constraints can be done by changing the `enforce_start` (True denotes starting-material constraint) argument in the `Syntheseus` oracle.
 
-**Note**: To run different retrosynthesis models (other than `MEGAN` used in the pre-print), change the `reaction_model` argument in the `Syntheseus` oracle. The current supported models are `MEGAN`, `RetroKNN`, `Graph2Edits`, and `RootAligned`.
+`./tutorial.ipynb` is a minimal tutorial to generate configuration `JSONs` with arbitrary reaction constraints. Running the notebook requires `jupyter notebook` installed in the environment. If the above installation instructions were followed, the `rxn-insight` environment can be used to run the notebook. Otherwise, one can use any other environments as no specific packages are required. We then re-iterate that all experiments can be run as follows:
 
-Add the new eMolecules stock to figshare
+With the `saturn` environment activated:
+
+`conda activate saturn`
+
+all experiments can be run by passing the `JSON` configuration: 
+
+`python saturn.py` <`JSON path`>
