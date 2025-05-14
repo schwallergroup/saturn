@@ -3,6 +3,7 @@ import os
 import json
 import pandas as pd
 import numpy as np
+from copy import deepcopy
 from rdkit import Chem
 from rdkit.Chem import Mol
 from utils.chemistry_utils import canonicalize_smiles_batch, get_bemis_murcko_scaffold
@@ -86,22 +87,25 @@ class Oracle:
         """
         # 1. Only keep the valid SMILES (RDKit parsable into Mols)
         smiles = np.array([s for s in smiles if Chem.MolFromSmiles(s) is not None])
+
+        # 2. De-duplicate SMILES batch
+        smiles = self.de_duplicate_smiles(smiles)
         
-        # 2. Rewards can be obtained directly for SMILES in the Oracle Cache 
+        # 3. Rewards can be obtained directly for SMILES in the Oracle Cache 
         repeat_smiles, cached_rewards, new_smiles = self.rewards_from_oracle_cache(smiles, is_hallucinated_batch)
 
         # In case all SMILES are repeats
         if len(new_smiles) > 0:
-            # 3. Get the Mols for the new SMILES
+            # 4. Get the Mols for the new SMILES
             new_mols = np.vectorize(Chem.MolFromSmiles)(new_smiles)
 
-            # 4. Execute preliminary check (if applicable) which removes Mols that do not satisfy the (relatively) cheaper oracle components
+            # 5. Execute preliminary check (if applicable) which removes Mols that do not satisfy the (relatively) cheaper oracle components
             #    e.g., molecular weight is too high (> 500 Da), so discard without wasting computational resources on a docking oracle
             new_smiles, new_mols = self.execute_preliminary_check(new_smiles, new_mols)
 
             # In case no SMILES pass the preliminary check
             if len(new_smiles) > 0:
-                # 5. Call each oracle component and aggregate the rewards
+                # 6. Call each oracle component and aggregate the rewards
                 #    Initialize a DataFrame to store the raw values and rewards of each oracle component for tracking purposes
                 oracle_components_df = pd.DataFrame()
                 rewards = np.empty((len(self.oracle), len(new_mols)))
@@ -118,7 +122,7 @@ class Oracle:
                         oracle_components_df[f"{oracle.name}_reward"] = component_rewards
                         rewards[idx] = component_rewards
                 
-                # 6. Aggregate the rewards
+                # 7. Aggregate the rewards
                 if oracle.name == "geam":
                     rewards = np.array([aggregated_rewards])
                 else:
@@ -130,20 +134,20 @@ class Oracle:
         else:
             aggregated_rewards = np.array([0.0])
 
-        # 7. At this point, rewards have been obtained for the new SMILES
+        # 8. At this point, rewards have been obtained for the new SMILES
         #    Increment the number of oracle calls
         self.calls += len(new_smiles)
 
-        # 8. Concatenate the repeated and new SMILES and their corresponding rewards
+        # 9. Concatenate the repeated and new SMILES and their corresponding rewards
         #    The Diversity Filter operations are performed on the concatenated set
         all_smiles = np.concatenate([repeat_smiles, new_smiles])
         all_rewards = np.concatenate([cached_rewards, aggregated_rewards])
 
-        # 9. Penalize the rewards based on the Diversity Filter
+        # 10. Penalize the rewards based on the Diversity Filter
         penalized_new_rewards = diversity_filter.penalize_reward(new_smiles, aggregated_rewards)
         penalized_all_rewards = diversity_filter.penalize_reward(all_smiles, all_rewards)
 
-        # 10. Update the Oracle History
+        # 11. Update the Oracle History
         if len(new_smiles) > 0:
             # Only update with the new SMILES
             if not self.allow_oracle_repeats:
@@ -164,10 +168,10 @@ class Oracle:
                 oracle_components_df=oracle_components_df
             )
 
-        # 11. Update the Diversity Filter
+        # 12. Update the Diversity Filter
         diversity_filter.update(all_smiles)
         
-        # 12. Update the Oracle Cache - important to cache the penalized rewards
+        # 13. Update the Oracle Cache - important to cache the penalized rewards
         self.update_oracle_cache(all_smiles, penalized_all_rewards)
                            
         return all_smiles, penalized_all_rewards
@@ -292,21 +296,43 @@ class Oracle:
                 "reward": rewards, 
                 "penalized_reward": penalized_rewards 
             })
-        df = pd.concat([df, oracle_components_df], axis=1)  
+        df = pd.concat([df, oracle_components_df], axis=1)
 
-        self.oracle_history = pd.concat([self.oracle_history, df])
+        self.oracle_history = pd.concat([self.oracle_history, df]) if len(self.oracle_history) > 0 else df
+
+    @staticmethod
+    def de_duplicate_smiles(smiles: np.ndarray[str]) -> np.ndarray[str]:
+        """
+        De-duplicate a batch of SMILES.
+        """
+        smiles_copy = deepcopy(smiles)
+        smiles_copy = canonicalize_smiles_batch(smiles_copy)
+        _, unique_indices = np.unique(smiles_copy, return_index=True)
+        unique_indices.sort()
+
+        return smiles[unique_indices]
 
     def budget_exceeded(self) -> bool:
         """Check if the oracle budget has been exceeded."""
         return self.calls >= self.budget
 
-    def write_out_oracle_history(self, path: str):
+    def write_out_oracle_history(
+        self, 
+        path: str
+    ) -> None:
         """Write out the oracle history as a CSV."""
         self.oracle_history.to_csv(os.path.join(path, "oracle_history.csv"), index=False)
 
-    def write_out_repeat_history(self, path: str):
+    def write_out_repeat_history(
+        self, 
+        path: str
+    ) -> None:
         """Write out the repeated SMILES histories as JSON."""
-        with open(os.path.join(path, "repeated_sampled_smiles_history.json"), "w") as f:
-            json.dump(self.repeated_sampled_smiles, f, indent=2)
-        with open(os.path.join(path, "repeated_hallucinated_smiles_history.json"), "w") as f:
-            json.dump(self.repeated_hallucinated_smiles, f, indent=2)
+        # FIXME: Reproduce json dump error
+        try:
+            with open(os.path.join(path, "repeated_sampled_smiles_history.json"), "w") as f:
+                json.dump(self.repeated_sampled_smiles, f, indent=2)
+            with open(os.path.join(path, "repeated_hallucinated_smiles_history.json"), "w") as f:
+                json.dump(self.repeated_hallucinated_smiles, f, indent=2)
+        except Exception:
+            print("Failed to write out repeat histories.")

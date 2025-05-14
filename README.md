@@ -45,8 +45,9 @@ The `Mamba` architecture code was adapted from the following sources:
 References
 ----------
 1. [Saturn Pre-print](https://arxiv.org/abs/2405.17066)
-2. [Saturn Synthesizability Pre-print](https://arxiv.org/abs/2407.12186v1)
+2. [Generating Synthesizable Molecules - Coupling Saturn with Retrosynthesis Models](https://pubs.rsc.org/en/content/articlehtml/2025/sc/d5sc01476j)
 3. [TANGO Constrained Synthesizability Pre-print](https://arxiv.org/abs/2410.11527)
-3. [Augmented Memory](https://pubs.acs.org/doi/10.1021/jacsau.4c00066)
-4. [Beam Enumeration](https://arxiv.org/abs/2309.13957)
-5. [GraphGA](https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc05372c)
+4. [Steerable and Granular Synthesizability Control Pre-print](https://arxiv.org/abs/2505.08774)
+5. [Augmented Memory](https://pubs.acs.org/doi/10.1021/jacsau.4c00066)
+6. [Beam Enumeration](https://arxiv.org/abs/2309.13957)
+7. [GraphGA](https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc05372c)

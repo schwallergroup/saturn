@@ -1,5 +1,6 @@
 from typing import List, Union, Dict, Set, Tuple
 import numpy as np
+from copy import deepcopy
 from rdkit import Chem
 from rdkit.Chem import Mol
 from rdkit.Chem import rdFMCS
@@ -127,25 +128,73 @@ def functional_groups_overlap(
     return sum(fraction_overlaps) / len(fraction_overlaps)
 
 def fuzzy_matching_substructure(
-    query_smiles: str, 
-    enforced_blocks_functional_groups: Dict[str, List[str]], 
+    query_smiles: str,
+    enforced_blocks_functional_groups: Dict[str, List[str]],
 ) -> float:
     """
     Calculate the *max* substructure overlap between the query SMILES and each enforced block.
     """
+
+    def _query_is_in_bbs(query_mol: str, 
+                         enforced_blocks_mols: List[Mol]
+    ) -> bool:
+        """
+        Return True if query mol is in enforced building blocks.
+        """
+        canon_query = Chem.MolToSmiles(query_mol)
+
+        # Edge case when score != 1 but the block is enforced
+        canonicalized_bbs_smiles = [Chem.MolToSmiles(mol) 
+                                    for mol in enforced_blocks_mols]
+        
+        is_in_bbs = any([
+            (canon_query == smiles) for smiles in canonicalized_bbs_smiles
+        ])
+        
+        return True if is_in_bbs else False
+
     query_mol = Chem.MolFromSmiles(query_smiles)
     enforced_blocks_mols = [Chem.MolFromSmiles(smiles) for smiles in enforced_blocks_functional_groups.keys()]
     max_mcs_atoms = 0
+
+    # Edge case if query mol is in enforced building blocks
+    if _query_is_in_bbs(query_mol, enforced_blocks_mols):
+        return 1.0
+
+    # FMS computation
     for block_mol in enforced_blocks_mols:
+
         # Perform MCS (find Maximum Common Substructure)
         mcs_result = rdFMCS.FindMCS(
-                mols=[query_mol, block_mol], 
-                matchChiralTag=True, 
-                bondCompare=rdFMCS.BondCompare.CompareOrderExact, 
-                ringCompare=rdFMCS.RingCompare.StrictRingFusion, 
+                mols=[query_mol, block_mol],
+                matchChiralTag=True,
+                bondCompare=rdFMCS.BondCompare.CompareOrderExact,
+                ringCompare=rdFMCS.RingCompare.StrictRingFusion,
                 completeRingsOnly=True
-            ) 
-        max_mcs_atoms = max(max_mcs_atoms, (mcs_result.numAtoms / block_mol.GetNumAtoms()))
+            )
+        overlap = mcs_result.numAtoms / block_mol.GetNumAtoms()
+        if int(overlap) == 1:
+
+            # Remove stereochemistry from molecules to guard against stereo problems
+            query_mol_copy = deepcopy(query_mol)
+            block_mol_copy = deepcopy(block_mol)
+
+            Chem.RemoveStereochemistry(query_mol_copy)
+            Chem.RemoveStereochemistry(block_mol_copy)
+
+            if (
+                canonicalize_smiles(query_smiles) == canonicalize_smiles(Chem.MolToSmiles(block_mol)) 
+                or Chem.MolToSmiles(query_mol_copy, canonical=True) == Chem.MolToSmiles(block_mol_copy, canonical=True)
+            ):
+                return 1.0
+
+            # Edge case
+            else:
+                asymmetric_overlap = mcs_result.numAtoms / query_mol.GetNumAtoms()
+                assert int(asymmetric_overlap) != 1, "Asymmetric FMS error"
+                return asymmetric_overlap
+        else:
+            max_mcs_atoms = max(max_mcs_atoms, overlap)
     return max_mcs_atoms
     
 def tango_reward(
@@ -166,10 +215,14 @@ def tango_reward(
         query_smiles=query_smiles, 
         enforced_building_blocks_fps=enforce_blocks_fps
     )
-    fg_overlap = functional_groups_overlap(
-        query_smiles=query_smiles, 
-        enforced_blocks_functional_groups=enforced_blocks_functional_groups
-    )
+    
+    # Compute FG overlap depending on reward type
+    if "fg" in reward_type or "all" in reward_type:
+        fg_overlap = functional_groups_overlap(
+            query_smiles=query_smiles, 
+            enforced_blocks_functional_groups=enforced_blocks_functional_groups
+        )
+
     fms_overlap = fuzzy_matching_substructure(
         query_smiles=query_smiles, 
         enforced_blocks_functional_groups=enforced_blocks_functional_groups
@@ -203,7 +256,7 @@ def get_node_reward(
         6. TANGO-All: *Max* Tanimoto similarity + *Mean* Functional Groups overlap + *Max* Fuzzy Matching Substructure
 
     """
-    if reward_type in ["tan_sim", "tanimoto_similarity"]:
+    if reward_type in ["tanimoto", "tanimoto_similarity", "tan_sim", "tansim"]:
         reward = get_max_stock_similarity(
             query_smiles=query_smiles,
             enforced_building_blocks_fps=enforce_blocks_fps
@@ -229,3 +282,48 @@ def get_node_reward(
     else:
         raise ValueError(f"Invalid reward type: {reward_type}")
     return reward
+
+def get_percentage_of_carbon(
+    smiles_bb: str, 
+    smiles_target: str
+) -> float:
+    """
+    Get percentage of carbon atoms in structure based on reference molecule.
+    """
+
+    bb = Chem.MolFromSmiles(smiles_bb)
+    target = Chem.MolFromSmiles(smiles_target)
+
+    # Find MCS. We use CompareAny
+    mcs = rdFMCS.FindMCS(
+        mols = [bb, target],
+        matchChiralTag=True,
+        bondCompare=rdFMCS.BondCompare.CompareAny,
+        ringCompare=rdFMCS.RingCompare.StrictRingFusion,
+        completeRingsOnly=True
+    )
+
+    # Get match
+    matched_atoms = Chem.MolFromSmarts(mcs.smartsString).GetAtoms()
+
+    # Get number of matched carbons 
+    matched_C = len([atom for atom in matched_atoms if atom.GetSymbol() == "C"])
+    
+    # Get total number of carbons
+    total_C = len([atom for atom in target.GetAtoms() if atom.GetSymbol() == "C"])
+    assert total_C > 0, "Total number of carbons must be greater than 0."
+    
+    return matched_C/total_C
+
+def shape_path_length_reward(
+    length: int,
+    low: float = 1.0,
+    high: float = 8.0,
+    k: float = 0.25
+) -> float:
+    """
+    Hard-coded reverse sigmoid reward tranformation for the path length of a synthetic route.
+    Output is in the range [0, 1].
+    Used if minimizing path length while also enforcing block and/or reaction constraints.
+    """
+    return 1 / (1 + 10 ** (k * (length - (high + low) / 2) * 10 / (high - low)))

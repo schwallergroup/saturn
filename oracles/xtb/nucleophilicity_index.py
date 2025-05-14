@@ -15,7 +15,7 @@ class NucleophilicityIndex(OracleComponent):
         raw_nucleophilicity_index_values = []
         for mol in mols:
             try:
-                temp_dir, geometry_path = self.geometry_optimizer.optimize_geometry(mol)
+                temp_dir, geometry_path, xtb_output = self.geometry_optimizer.optimize_geometry(mol)
                 elements, coordinates = read_xyz(geometry_path)
                 xtb = XTB(elements, coordinates)
                 # delete temp file storing the geometry

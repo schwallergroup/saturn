@@ -12,7 +12,7 @@ class ReinforcementLearningParameters:
     learning_rate: float = 0.0001
     sigma: float = 128.0
     augmented_memory: bool = True
-    augmentation_rounds: int = 100
+    augmentation_rounds: int = 10
     selective_memory_purge: bool = True
 
 @dataclass

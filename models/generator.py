@@ -16,7 +16,6 @@ from models.vocabulary import Vocabulary, SMILESTokenizer
 
 from utils.utils import generate_causal_mask
 
-
 class Generator:
     """
     Parent class for all models. 

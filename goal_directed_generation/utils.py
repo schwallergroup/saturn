@@ -1,5 +1,6 @@
-import torch
 import numpy as np
+
+from models.generator import Generator
 
 def get_indices_of_unique_smiles(smiles: np.ndarray[str]) -> np.ndarray[int]:
     """
@@ -11,7 +12,7 @@ def get_indices_of_unique_smiles(smiles: np.ndarray[str]) -> np.ndarray[int]:
 
 # TODO: can move this to the class itself
 def sample_unique_sequences(
-    agent, 
+    agent: Generator, 
     batch_size: int
 ):
     seqs, smiles, agent_likelihood = agent.sample_sequences_and_smiles(batch_size)

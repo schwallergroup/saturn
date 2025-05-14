@@ -4,6 +4,8 @@ from oracles.dataclass import OracleComponentParameters
 from rdkit.Chem import Mol
 from rdkit.Chem.MolSurf import TPSA
 
+
+
 class tPSA(OracleComponent):
     def __init__(self, parameters: OracleComponentParameters):
         super().__init__(parameters)

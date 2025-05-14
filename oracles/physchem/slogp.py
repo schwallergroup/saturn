@@ -4,6 +4,8 @@ from oracles.dataclass import OracleComponentParameters
 from rdkit.Chem import Mol
 from rdkit.Chem.Crippen import MolLogP
 
+
+
 class SlogP(OracleComponent):
     """
     Wildman-Crippen LogP based on: https://pubs.acs.org/doi/full/10.1021/ci990307l.

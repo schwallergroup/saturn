@@ -6,6 +6,14 @@ from rdkit.Chem.rdmolops import RenumberAtoms
 from rdkit.Chem.AllChem import GetMorganFingerprintAsBitVect
 from rdkit.Chem.Scaffolds.MurckoScaffold import GetScaffoldForMol
 
+
+def batch_validity(smiles: np.ndarray[str]) -> float:
+    """
+    Compute the Validity of a batch of SMILES strings.
+    """
+    valid_mols = [mol for mol in (Chem.MolFromSmiles(s) for s in smiles) if mol is not None]
+    return len(valid_mols) / len(smiles)
+
 def canonicalize_smiles(smiles: str) -> str:
     """
     Canonicalize a SMILES string based on RDKit convention.
@@ -56,6 +64,17 @@ def can_be_encoded(original_smiles: str, randomized_smiles: str, prior) -> str:
         return randomized_smiles
     except KeyError:
         return original_smiles
+
+def is_encodable(smiles: str, prior) -> bool:
+    """
+    Returns True if the SMILES string can be encoded by the Vocabulary.
+    """
+    try:
+        tokens = prior.tokenizer.tokenize(smiles)
+        seq = prior.vocabulary.encode(tokens)
+        return True
+    except KeyError:
+        return False
     
 def get_bemis_murcko_scaffold(smiles: str) -> str:
     """
@@ -83,3 +102,16 @@ def construct_morgan_fingerprints_batch_from_file(file_path: str) -> List[np.nda
     with open(file_path, "r") as f:
         smiles_batch = f.readlines()
     return construct_morgan_fingerprints_batch(smiles_batch)
+
+def remove_molecules_with_radicals(smiles_batch: np.ndarray[str]) -> np.ndarray[str]:
+    """
+    Remove molecules with radicals from a batch of SMILES strings.
+    """
+    def has_radicals(smiles: str) -> bool:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is not None:
+            return any(atom.GetNumRadicalElectrons() > 0 for atom in mol.GetAtoms())
+        else:
+            return True
+
+    return np.array([smiles for smiles in smiles_batch if not has_radicals(smiles)])

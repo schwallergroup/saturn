@@ -5,6 +5,8 @@ from rdkit import Chem
 from rdkit.Chem import Mol
 from rdkit.Chem import rdFMCS
 
+
+
 class FuzzyMatchingSubstructure(OracleComponent):
     def __init__(self, parameters: OracleComponentParameters):
         super().__init__(parameters)

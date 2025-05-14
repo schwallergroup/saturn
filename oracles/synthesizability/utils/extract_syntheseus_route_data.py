@@ -3,25 +3,44 @@ import pickle
 import json
 import sys
 
-def data_from_pickle(file_path: str) -> Dict[str, Union[str, int]]:
+def extract_data(file_path: str,) -> Dict[str, Union[str, int]]:
+    """
+    Extract Mols, Reactions, and relevant information.
+
+    Extracted node information includes:
+    - depth
+    - is_mol
+    - mol_smiles
+    - is_rxn
+    - rxn_smiles
+    - rxn_class (dummy value added)
+    - rxn_name (dummy value added)
+    - is_purchasable
+
+    """
     # Load the pickle file
     with open(file_path, "rb") as f:
-        route = pickle.load(f)
+        route = pickle.load(f)  # set of syntheseus nodes
 
-    # For every entry, extract the nodes' SMILES and depth
     syntheseus_route_data = {}
-    for idx, node in enumerate(route):
-        attributes = dir(node)
-        if "mol" in attributes:
-            syntheseus_route_data[idx] = {
-                "smiles": node.mol.smiles,
-                "depth": node.depth
-            }
+    # Sort nodes by depth
+    sorted_nodes = sorted(enumerate(route), key=lambda x: x[1].depth)
+    for idx, (_, node) in enumerate(sorted_nodes):
+        syntheseus_route_data[f"node_{idx+1}"] = {
+            "depth": node.depth,
+            "is_mol": hasattr(node, "mol"),
+            "mol_smiles": getattr(node, "mol", None).smiles if hasattr(node, "mol") else None,
+            "is_rxn": hasattr(node, "reaction"),
+            "rxn_smiles": str(getattr(node, "reaction", None)) if hasattr(node, "reaction") else None,
+            "rxn_class": None,  # Dummy value
+            "rxn_name": None,  # Dummy value
+            "is_purchasable": node.mol.metadata["is_purchasable"] if hasattr(node, "mol") else None
+        }
 
-    # Convert the route data to JSON format
+    # Convert the data to JSON format
     return json.dumps(syntheseus_route_data)
 
 if __name__ == "__main__":
     pickle_file = sys.argv[1]  # The path to the pickle file is passed as an argument
-    data = data_from_pickle(pickle_file)
+    data = extract_data(pickle_file)
     print(data)  # Capture result

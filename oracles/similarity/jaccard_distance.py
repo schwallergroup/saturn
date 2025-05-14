@@ -6,6 +6,8 @@ from rdkit.Chem import Mol
 from rdkit.Chem.AllChem import GetMorganFingerprint
 from rdkit.DataStructs import BulkTanimotoSimilarity
 
+
+
 class JaccardDistance(OracleComponent):
     def __init__(self, parameters: OracleComponentParameters):
         super().__init__(parameters)

@@ -4,6 +4,7 @@ Adapted from https://github.com/MolecularAI/Reinvent with code additions for:
     2. Beam Enumeration: https://openreview.net/forum?id=7UhxsmbdaQ
     3. Hallucinated Memory (GraphGA based: https://pubs.rsc.org/en/content/articlelanding/2019/sc/c8sc05372c)
 """
+from typing import Tuple
 import os
 import logging
 import time
@@ -22,6 +23,10 @@ from experience_replay.replay_buffer import ReplayBuffer
 from diversity_filter.diversity_filter import DiversityFilter
 from hallucinated_memory.utils import initialize_hallucinator
 from beam_enumeration.beam_enumeration import BeamEnumeration
+
+# Syntheseus oracle for custom results write-out
+from oracles.synthesizability.syntheseus import Syntheseus
+
 
 
 class ReinforcementLearningAgent:
@@ -90,13 +95,19 @@ class ReinforcementLearningAgent:
         )
 
         # Only the Agent is updated so the Prior does not need an optimizer
-        self.optimizer = torch.optim.AdamW(self.agent.get_network_parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(self.agent.get_network_parameters(), lr=self.learning_rate)
+
         # Model checkpointing save directory
         self.model_checkpoints_dir = model_checkpoints_dir
         os.makedirs(self.model_checkpoints_dir, exist_ok=True)
         self.logging_path = logging_path
         self.logging_frequency = logging_frequency
         self.logging_multiple = 1
+
+        # Best Agent checkpointing
+        self.best_agent_reward = float("-inf")
+        self.patience = 0
+
         # Set up logging
         setup_logging(logging_path)
   
@@ -105,16 +116,30 @@ class ReinforcementLearningAgent:
         logging.info(f"Starting RL generative experiment with oracle budget: {self.oracle.budget}")
         # FIXME: could be dangerous in case of infinite loop
         while not self.oracle.budget_exceeded():
-            logging.info(f"Oracle calls: {self.oracle.calls}/{self.oracle.budget}")
-
             # 1. Sample unique SMILES from the Agent
             seqs, smiles, _ = sample_unique_sequences(self.agent, self.batch_size)
 
-            # 2. Beam Enumeration: Filter SMILES using the Beam Enumeration pool
+            # 2. Compute Validity and guard against Agent drift leading to invalid SMILES
+            # NOTE: This is a rare occurrence and has been observed with repeated 0 reward batches
+            # This has also been reported in https://link.springer.com/article/10.1007/s10994-024-06519-w
+            reset, validity = self._validity_drift_guard(smiles)
+            if reset:
+                continue
+
+            logging.info(f"Oracle calls: {self.oracle.calls}/{self.oracle.budget} (Batch Validity: {round(validity * 100, 2)}%, {int(validity * len(smiles))} / {len(smiles)})")
+
+            # 3. Remove molecules with radicals
+            # NOTE: This occurs due to SMILES syntax
+            smiles = chemistry_utils.remove_molecules_with_radicals(smiles)
+            if len(smiles) == 0:
+                logging.info("No valid SMILES in this batch. Generating a new batch.")
+                continue
+
+            # 4. Beam Enumeration: Filter SMILES using the Beam Enumeration pool
             if (self.execute_beam_enumeration) and (len(self.beam_enumeration.pool) != 0):
                 seqs, smiles = self.beam_enumeration.filter_batch(seqs, smiles)
 
-            # 3. Beam Enumeration: If all SMILES are filtered, proceed to generate a new batch
+            # 5. Beam Enumeration: If all SMILES are filtered, proceed to generate a new batch
             if len(smiles) == 0:
                 self.beam_enumeration.filtered_epoch_updates()
                 if self.beam_enumeration.patience_limit_reached():
@@ -122,11 +147,11 @@ class ReinforcementLearningAgent:
                     break
                 continue
 
-            # 4. Oracle call on sampled batch
+            # 6. Oracle call on sampled batch
             #    Rewards are already penalized by the Diversity Filter
             smiles, penalized_rewards = self.oracle(smiles, self.diversity_filter)
 
-            # 5. Beam Enumeration: Check whether to execute Beam Enumeration
+            # 7. Beam Enumeration: Check whether to execute Beam Enumeration
             #    NOTE: Beam Enumeration execution criterion is based only on the *sampled* batch
             if self.execute_beam_enumeration:
                 self.beam_enumeration.epoch_updates(
@@ -136,12 +161,12 @@ class ReinforcementLearningAgent:
                     oracle_calls=self.oracle.calls
                 )
 
-            # 6. Hallucinated Memory: Hallucinate new SMILES from the Replay Buffer
+            # 8. Hallucinated Memory: Hallucinate new SMILES from the Replay Buffer
             if (self.execute_hallucinated_memory) and (len(self.replay_buffer.memory) == self.replay_buffer.memory_size):
                 hallucinated_smiles = self.hallucinator.hallucinate(self.replay_buffer.memory)
-                # 7. Hallucinated Memory: Oracle call on hallucinated batch
+                # 9. Hallucinated Memory: Oracle call on hallucinated batch
                 hallucinated_smiles, hallucinated_penalized_rewards = self.oracle(hallucinated_smiles, self.diversity_filter, is_hallucinated_batch=True)
-                # 8. Update the hallucination history
+                # 10. Update the hallucination history
                 self.hallucinator.epoch_updates(
                     oracle_calls=self.oracle.calls,
                     buffer_rewards=self.replay_buffer.memory["reward"],
@@ -151,33 +176,33 @@ class ReinforcementLearningAgent:
             else:
                 hallucinated_smiles, hallucinated_penalized_rewards = np.array([]), np.array([])
 
-            # 9. Concatenate sampled batch with hallucinated batch
+            # 11. Concatenate sampled batch with hallucinated batch
             # TODO: Hallucinated SMILES' loss could be scaled via Importance Sampling
             smiles = np.concatenate((smiles, hallucinated_smiles), 0)
             penalized_rewards = np.concatenate((penalized_rewards, hallucinated_penalized_rewards), 0)
 
-            # 10. Compute the loss
+            # 12. Compute the loss
             #     "smiles" contains the concatenated sampled and hallucinated SMILES
             loss = self.compute_loss(smiles, penalized_rewards)
 
-            # 11. Update Replay Buffer
+            # 13. Update Replay Buffer
             self.replay_buffer.add(
-                smiles=smiles, 
+                smiles=smiles,
                 rewards=penalized_rewards
             )
 
-            # 12. Add experience replay to the loss
+            # 14. Add experience replay to the loss
             #     NOTE: this is done *after* updating the Replay Buffer so new best-so-far sampled *and* hallucinated SMILES can be sampled
             er_smiles, er_rewards = self.replay_buffer.sample_memory()
 
-            # 13. Compute the loss for the experience replay SMILES
+            # 15. Compute the loss for the experience replay SMILES
             er_loss = self.compute_loss(er_smiles, er_rewards)
         
-            # 14. Concatenate losses to get the total loss and backpropagate
+            # 16. Concatenate losses to get the total loss and backpropagate
             loss = torch.cat((loss, er_loss), 0)
             self.backpropagate(loss)
 
-            # 15. Augmented Memory
+            # 17. Augmented Memory
             if self.augmented_memory and len(self.replay_buffer.memory) > 0:
                 # NOTE: *Highly* recommended that Selective Memory Purge is enabled
                 #       All penalized scaffolds are removed from the Replay Buffer *before* executing Augmented Memory
@@ -194,15 +219,20 @@ class ReinforcementLearningAgent:
                     loss = torch.cat((loss, augmented_memory_loss), 0)
                     self.backpropagate(loss)
 
-            # 16. Intermediate results write-out
+            # 18. Intermediate results write-out
             if self.oracle.calls > self.logging_frequency * self.logging_multiple:
                 logging.info(f"Logging intermediate results at {self.oracle.calls} oracle calls.")
-                self.write_out_results()
+                self._write_out_results()
                 self.agent.save(os.path.join(self.model_checkpoints_dir, f"{self.agent.model_architecture}_{self.oracle.calls}_agent.ckpt"))
                 self.logging_multiple += 1
 
+            # 19. Checkpoint best Agent (by average reward)
+            if (np.mean(penalized_rewards) > self.best_agent_reward) and (validity > 0.5):
+                self.best_agent_reward = np.mean(penalized_rewards)
+                self.agent.save(os.path.join(self.model_checkpoints_dir, "best_agent.ckpt"))
+
         logging.info(f"Budget reached - final oracle calls: {self.oracle.calls}/{self.oracle.budget}")
-        self.write_out_results()
+        self._write_out_results()
         end_time = time.perf_counter()
         logging.info(f"Total wall time: {end_time - start_time} seconds.")
         self.agent.save(os.path.join(self.model_checkpoints_dir, f"final_{self.agent.model_architecture}_agent.ckpt"))
@@ -217,10 +247,11 @@ class ReinforcementLearningAgent:
         Based on REINVENT's original loss function: https://jcheminf.biomedcentral.com/articles/10.1186/s13321-017-0235-x
         """
         if len(smiles) != 0:
-            prior_likelihoods = -self.prior.likelihood_smiles(smiles)
-            agent_likelihoods = -self.agent.likelihood_smiles(smiles)
-            augmented_likelihoods = prior_likelihoods + self.sigma * to_tensor(rewards, self.device)
-            loss = torch.pow((augmented_likelihoods - agent_likelihoods), 2)
+            # NOTE: likelihood_smiles returns the NLL so negation recovers the log-likelihood
+            prior_log_likelihoods = -self.prior.likelihood_smiles(smiles)
+            agent_log_likelihoods = -self.agent.likelihood_smiles(smiles)
+            augmented_log_likelihoods = prior_log_likelihoods + self.sigma * to_tensor(rewards, self.device)
+            loss = torch.pow((augmented_log_likelihoods - agent_log_likelihoods), 2)
             return loss
         else:
             return torch.tensor([], dtype=torch.float64, device=self.device)
@@ -243,13 +274,41 @@ class ReinforcementLearningAgent:
         for param in self.prior.get_network_parameters():
             param.requires_grad = False
 
-    def write_out_results(self):
+    def _validity_drift_guard(self, smiles: np.ndarray[str]) -> Tuple[bool, float]:
+        """
+        Guard against Agent drift leading to invalid SMILES.
+
+        Returns (True, validity float) if patience limit is reached or (False, validity float) otherwise.
+        """
+        validity = chemistry_utils.batch_validity(smiles)
+        if validity == 0.0:
+            if self.patience == 10:
+                logging.info("Resetting to best Agent checkpoint.")
+                self._reset_agent()
+                self.patience = 0
+                return True, validity
+            else:
+                self.patience += 1
+                return False, validity
+        else:
+            self.patience = 0
+            return False, validity
+
+    def _reset_agent(self):
+        """Reset the Agent to the best checkpoint."""
+        self.agent = Generator.load_from_file(os.path.join(
+            self.model_checkpoints_dir, 
+            "best_agent.ckpt"
+        ), self.device)
+
+    def _write_out_results(self):
         """
         Writes out the following results:
             1. Oracle History
-            2. Beam Enumeration History
-            3. Hallucination History
-            4. Number of Oracle repeats
+            2. Number of Oracle Repeats
+            3. Beam Enumeration History
+            4. Hallucination History
+            5. Syntheseus Synthesis Graphs
         """
         base_save_path = os.path.dirname(self.logging_path)
         self.oracle.write_out_oracle_history(base_save_path)
@@ -260,3 +319,8 @@ class ReinforcementLearningAgent:
 
         if self.execute_hallucinated_memory:
             self.hallucinator.write_out_history(base_save_path)
+
+        for oracle in self.oracle.oracle:
+            if isinstance(oracle, Syntheseus):
+                oracle._write_out_smiles_rxn_tracker()
+        

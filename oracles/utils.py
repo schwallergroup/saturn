@@ -23,6 +23,7 @@ from oracles.physchem.rotatable_bonds import NumRotatableBonds
 from oracles.physchem.stereocenters import NumStereocenters
 from oracles.physchem.tpsa import tPSA
 from oracles.physchem.slogp import SlogP
+from oracles.physchem.heavy_atoms import HeavyAtoms
 
 # Structural
 from oracles.structural.matching_substructure import MatchingSubstructure
@@ -35,10 +36,12 @@ from oracles.synthesizability.sa_score import SAScore
 from oracles.synthesizability.rxnmapper_atom_counts import RXNMapperAtomCounts
 from oracles.synthesizability.aizynthfinder import AiZynthFinder
 from oracles.synthesizability.syntheseus import Syntheseus
+from oracles.synthesizability.freedom import Freedom
 
 # Docking
 from oracles.docking.dockstream import DockStream
 from oracles.docking.quickvina2_gpu import QuickVina2_GPU
+from oracles.docking.gnina import GNINA
 
 # xTB electronic properties
 from oracles.xtb.chemical_potential import ChemicalPotential
@@ -52,6 +55,8 @@ from oracles.xtb.ionization_potential import IonizationPotential
 from oracles.xtb.lumo import LUMO
 from oracles.xtb.nucleophilicity_index import NucleophilicityIndex
 from oracles.xtb.nucleophilicity import Nucleophilicity
+from oracles.xtb.homo_lumo_gap import HOMOLUMOGap
+from oracles.xtb.molecular_dipole import MolecularDipole
 
 # GEAM's oracle
 from oracles.docking.geam_oracle import GEAMOracle
@@ -95,6 +100,8 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return tPSA(oracle_component_parameters)
     elif name == "slogp":
         return SlogP(oracle_component_parameters)
+    elif name == "heavy_atoms":
+        return HeavyAtoms(oracle_component_parameters)
     # Structural
     elif name == "matching_substructure":
         return MatchingSubstructure(oracle_component_parameters)
@@ -113,11 +120,15 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return AiZynthFinder(oracle_component_parameters)
     elif name == "syntheseus":
         return Syntheseus(oracle_component_parameters)
+    elif name == "freedom":
+        return Freedom(oracle_component_parameters)
     # Docking
     elif name == "dockstream":
         return DockStream(oracle_component_parameters)
     elif name == "quickvina2_gpu":
         return QuickVina2_GPU(oracle_component_parameters)
+    elif name == "gnina":
+        return GNINA(oracle_component_parameters)
     # xTB electronic properties
     elif name == "chemical_potential":
         return ChemicalPotential(oracle_component_parameters)
@@ -141,6 +152,10 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return NucleophilicityIndex(oracle_component_parameters)
     elif name == "nucleophilicity":
         return Nucleophilicity(oracle_component_parameters)
+    elif name == "homo_lumo_gap":
+        return HOMOLUMOGap(oracle_component_parameters)
+    elif name == "molecular_dipole":
+        return MolecularDipole(oracle_component_parameters)
     # GEAM's oracle
     elif name == "geam":
         return GEAMOracle(oracle_component_parameters)

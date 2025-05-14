@@ -1,5 +1,3 @@
-import time
-import logging
 import numpy as np
 from oracles.oracle_component import OracleComponent
 from oracles.dataclass import OracleComponentParameters
@@ -7,6 +5,8 @@ from rdkit import Chem
 from rdkit.Chem import Mol
 from rdkit.Chem.AllChem import GetMorganFingerprint
 from rdkit.DataStructs import BulkTanimotoSimilarity
+
+
 
 class JaccardDistanceDataset(OracleComponent):
     """
