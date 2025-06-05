@@ -38,11 +38,11 @@ class GNINA(OracleComponent):
 
         # Receptor path
         self.receptor = self.parameters.specific_parameters.get("receptor", None)
-        assert self.receptor is not None and self.receptor.endswith(".pdbqt"), "Please provide the path to the receptor PDBQT file."
+        assert self.receptor is not None and (self.receptor.endswith(".pdbqt") or self.receptor.endswith(".pdb")), "Please provide the path to the receptor PDBQT or PDB file."
 
         # Reference ligand path
         self.reference_ligand = self.parameters.specific_parameters.get("reference_ligand", None)
-        assert self.reference_ligand is not None and self.reference_ligand.endswith(".pdb"), "Please provide the path to the reference ligand PDB file."
+        assert self.reference_ligand is not None and (self.reference_ligand.endswith(".pdb") or self.reference_ligand.endswith(".sdf")), "Please provide the path to the reference ligand PDB or SDF file."
 
         # `gnina` parameters
         self.exhaustiveness = self.parameters.specific_parameters.get("exhaustiveness", 8)  # Default to 8
