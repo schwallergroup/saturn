@@ -7,6 +7,12 @@
 In the **experimental_reproduction** sub-folder, prepared files and checkpoint models are provided to reproduce the experiments. 
 There is also a `Jupyter` notebook to construct your own configuration files to run `Saturn`.
 
+Git Hash Code Versions
+----------------------
+* [Saturn Pre-print](https://arxiv.org/abs/2405.17066): fee0179
+* [TANGO Constrained Synthesizability Pre-print](https://arxiv.org/abs/2410.11527): de5cd7f
+* [Steerable and Granular Synthesizability Control Pre-print](https://arxiv.org/abs/2505.08774): 468b1f4
+
 Installation
 -------------
 
