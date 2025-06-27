@@ -10,6 +10,7 @@ import datetime
 import pandas as pd
 import numpy as np
 import torch
+import ast
 
 from rdkit import Chem
 from rdkit.Chem import Mol
@@ -223,7 +224,8 @@ class NCircles():
 
 def write_out_top_syntheseus_graphs(
     top_oracle_history: pd.DataFrame,
-    smiles_rxn_tracker: dict
+    smiles_rxn_tracker: dict,
+    seed: int = None
 ) -> Dict[str, Dict[str, Union[str, int]]]:
     """
     Extract the Syntheseus synthesis graph information for the highest reward molecules (given they satisfy all reaction constraints).
@@ -246,6 +248,7 @@ def write_out_top_syntheseus_graphs(
         # Construct the JSON for the current molecule
         output[generated_smiles] = {
             "reward": reward,
+            "seed": seed,
             "enforced_block": synthesis_data["enforced_block"],
             # FIXME: This is due to the current GUI expecting a certain data structure
             "synthesis_data": {k:v for k,v in synthesis_data.items() if k != "enforced_block"},
@@ -440,62 +443,43 @@ def plot_top_graphs_rxn_classes(
 
 def annotate_rxn_conditions(
     top_graphs: Dict[str, Dict[str, Union[str, int]]],
-    reacon_dir: str
+    condition_script: str
 ) -> Dict[str, Dict[str, Union[str, int]]]:
     """
     Annotate the conditions for the top graphs using Reacon: https://pubs.rsc.org/en/content/articlehtml/2024/sc/d4sc05946h#cit27.
     """
+    
     # Loop through top_graphs and extract all reaction nodes
     reaction_smiles = []
+
     for smiles, data in top_graphs.items():
         synthesis_graph = {k:v for k,v in data["synthesis_data"].items() if "node" in k}
         for node, attributes in synthesis_graph.items():
             if attributes["is_rxn"]:
                 reaction_smiles.append(attributes["rxn_smiles"])
 
-    # Write a temporary DataFrame out following the required format
-    df = pd.DataFrame({
-        "_id": list(range(len(reaction_smiles))),  # Dummy attribute
-        "reaction_smiles": reaction_smiles
-    })
-    df.to_csv("temp_reaction_smiles.csv", index=False)
+    # Run the condition prediction
+    conditions = subprocess.run([
+        "conda",
+        "run",
+        "-n",
+        "conditions",
+        "python",
+        condition_script,
+        ",".join(reaction_smiles)
+        ], capture_output=True, text=True)
 
-    # Run Reacon
-    subprocess.run([
-        "bash", 
-        os.path.join(reacon_dir, "map_and_pred_conditions.sh"),
-        os.path.abspath(os.path.dirname(__file__)),
-        reacon_dir
-    ])
-
-    # Extract the cluster predictions
-    conditions = []
-    reacon_output = json.load(open("temp_predictions/cluster_condition_prediction.json"))
-    for rxn_id, preds in reacon_output.items():
-        top_1_condition = preds[1][0]["best condition"]
-        conditions.append(top_1_condition)
+    assert conditions.returncode == 0, f"Error during condition annotation: {conditions.stderr}"
+    conditions = ast.literal_eval(conditions.stdout)  # List[str]
 
     # Add conditions to top_graphs
     condition_idx = 0
+
     for smiles, data in top_graphs.items():
         synthesis_graph = {k:v for k,v in data["synthesis_data"].items() if "node" in k}
         for node, attributes in synthesis_graph.items():
             if attributes["is_rxn"]:
-                condition_dict = {
-                    "catalyst": conditions[condition_idx][0],
-                    "solvent_1": conditions[condition_idx][1], 
-                    "solvent_2": conditions[condition_idx][2],
-                    "reagent_1": conditions[condition_idx][3],
-                    "reagent_2": conditions[condition_idx][4], 
-                    "reagent_3": conditions[condition_idx][5]
-                }
-                attributes["conditions"] = condition_dict
+                attributes["conditions"] = conditions[condition_idx]
                 condition_idx += 1
-
-    # Remove temporary files
-    os.remove("temp_reaction_smiles.csv")
-    os.remove("temp_reaction_templates.csv")
-    shutil.rmtree("temp_predictions")
-    os.remove("sample_preds.csv")
-    
+                
     return top_graphs
