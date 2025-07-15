@@ -31,6 +31,7 @@ from oracles.structural.matching_substructure import MatchingSubstructure
 from oracles.structural.fuzzy_matching_structure import FuzzyMatchingSubstructure
 from oracles.structural.matching_structure_atom_count import MatchingSubstructureAtomCount
 from oracles.structural.smarts_alerts import SMARTSAlert
+from oracles.structural.match_smarts import MatchSMARTS
 
 # Synthesizability
 from oracles.synthesizability.sa_score import SAScore
@@ -117,6 +118,8 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return MatchingSubstructureAtomCount(oracle_component_parameters)
     elif name == "smarts_alerts":
         return SMARTSAlert(oracle_component_parameters)
+    elif name == "match_smarts":
+        return MatchSMARTS(oracle_component_parameters)
     # Synthesizability
     elif name == "sa_score":
         return SAScore(oracle_component_parameters)
