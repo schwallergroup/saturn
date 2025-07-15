@@ -25,6 +25,12 @@ Potential Installation Issues
         $ conda install gxx_linux-64
         $ conda install -c conda-forge openbabel
 
+* `ImportError: GLIBCXX_3.4.29 not found` - running the below commands may solve the issue:
+
+        $ sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+        $ sudo apt update
+        $ sudo apt install gcc-11 g++-11
+
 * `causal-conv1d` and `mamba-ssm` installation error - see [Issue 1](https://github.com/schwallergroup/saturn/issues/1) - thank you to [@surendraphd](https://github.com/surendraphd) for sharing their solution.
 
 System Requirements
