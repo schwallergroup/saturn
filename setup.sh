@@ -16,3 +16,4 @@ pip install scipy==1.10.0
 pip install pathos
 pip install causal-conv1d==1.2.0.post2
 pip install mamba-ssm==1.2.0.post1
+pip install paramiko
