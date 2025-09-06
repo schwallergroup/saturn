@@ -92,7 +92,7 @@ class Boltz(OracleComponent):
         for file in folders:
             folder_path = os.path.join(preds_path, file)
             
-            index = int(file[-1])
+            index = int(file.split("_")[-1])
 
             # In case the execution gives an error
             # FIXME: sometimes the ligand is not predicted, try this
