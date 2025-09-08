@@ -40,46 +40,61 @@ class Boltz(OracleComponent):
         self.msa_file_path = parameters.specific_parameters.get("msa_file_path", None)
         assert self.msa_file_path is not None, "Please provide a precomputed MSA file with a .csv format"
 
+        # Saving folder for predictions
+        self.output_dir = parameters.specific_parameters.get("saving_folder", None)
+        assert self.output_dir is not None, "Please provide a path to save Boltz predictions"
+        os.makedirs(self.output_dir, exist_ok=True)
+
         # Whether to parallelize Boltz execution (specify number of threads)
         self.parallelize = parameters.specific_parameters.get("parallelize", 1)
 
     def __call__(self, mols: np.ndarray[Mol]) -> np.ndarray[float]:
+
         smiles = np.vectorize(Chem.MolToSmiles)(mols)
-        return self._compute_property(smiles) if self.parallelize == 1 else self._parallelize_compute(smiles, max_workers=self.parallelize)
-    
+
+        scores = np.zeros(len(smiles))
+
+        # 1. We need to check which molecules can be computed into a conformer to avoid Boltz error
+        valid_molecules_indices = np.where(np.array([self._can_embed_conformer(smile) for smile in smiles]) == True)[0]
+        
+        # Only valid molecules are passed to Boltz
+        valid_smiles = smiles[valid_molecules_indices]
+
+        if self.parallelize == 1:
+            valid_scores = self._compute_property(valid_smiles)
+        
+        else:
+            valid_scores = self._parallelize_compute(valid_smiles, self.parallelize)
+
+        scores[valid_molecules_indices] = valid_scores
+
+        return scores
+
     def _compute_property(self,
                           smiles: np.ndarray[str]) -> np.ndarray[Union[int, float]]:
         """Run boltz to get affinity prediction.
         """
         scores = np.zeros(len(smiles))
 
-        # We need to check which molecules can be computed into a conformer to avoid Boltz error
-        valid_molecules_indices = np.where(np.array([self._can_embed_conformer(smile) for smile in smiles]) == True)[0]
-        
-        valid_molecules = smiles[valid_molecules_indices]
-
         # Make temporary directory to store input and output files
         temp_dir = tempfile.mkdtemp()
 
         # Write input files using indexes
         self._write_input_yaml(temp_dir,
-                        valid_molecules,
-                        valid_molecules_indices)
+                               smiles)
         
         # Call boltz in a subprocess
         output = subprocess.run([
                 "conda",
                 "run",
                 "-n",
-                "boltz",
                 self.boltz_env_name,
+                "boltz",
                 "predict",
                 os.path.join(temp_dir),
                 "--seed",
                 "0"
-            ], capture_output=True)
-        
-        print(output)
+            ], capture_output=False)
 
         # Get the name of the last directory of temp_dir
         last_dir_name = os.path.basename(os.path.join(temp_dir))
@@ -94,18 +109,39 @@ class Boltz(OracleComponent):
             
             index = int(file.split("_")[-1])
 
-            # In case the execution gives an error
-            # FIXME: sometimes the ligand is not predicted, try this
-            try:
-                with open(f"{folder_path}/affinity_{file}.json", "r") as f:
-                    data = json.load(f)
-                    affinity = data["affinity_probability_binary"]
-                    scores[index] = affinity
-            
-            except Exception:
-                print(smiles[index])
-                scores[index] = 0.0
+            # Check if file path exists, otherwise score == 0
+            file_path = f"{folder_path}/affinity_{file}.json"
 
+            if not os.path.exists(file_path):
+                scores[index] = 0
+                continue
+
+            with open(file_path, "r") as f:
+                data = json.load(f)
+                affinity = data["affinity_probability_binary"]
+                scores[index] = affinity
+
+            # Copy .cif and affinity file
+            cif_path = f"{folder_path}/{file}_model_0.cif"
+
+            #FIX: very bad solution based on file saving order
+            target_index = len(os.listdir(self.output_dir)) // 2
+
+            # copy .cif
+            subprocess.run([
+                "cp",
+                "-r",
+                cif_path,
+                os.path.join(self.output_dir, f"{target_index}.cif")
+            ])
+            # copy .json
+            subprocess.run([
+                "cp",
+                "-r",
+                file_path,
+                os.path.join(self.output_dir, f"{target_index}.json")
+            ])
+        
         # Remove final folder
         shutil.rmtree(os.path.join(f"boltz_results_{last_dir_name}"))
 
@@ -141,12 +177,11 @@ class Boltz(OracleComponent):
     
     def _write_input_yaml(self,
                         dir_path: str,
-                        smiles: np.ndarray,
-                        indices: np.ndarray) -> None:
+                        smiles: np.ndarray) -> None:
         """Write input yaml file. If indices
         """
 
-        for i, smile in zip(indices, smiles):
+        for i, smile in enumerate(smiles):
 
             data = {
                 "version": 1,
