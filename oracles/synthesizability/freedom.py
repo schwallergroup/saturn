@@ -29,7 +29,7 @@ class Freedom(OracleComponent):
         assert self.freedom_file_path is not None, "Please provide the path to the Freedom .spc file"
 
         # Random seed for search
-        self.random_seed = self.parameters.specific_parameters.get("random_seed", 33)
+        self.random_seed = self.parameters.specific_parameters.get("random_seed", 0)
         
         # Maximum number of hits
         self.max_hits = self.parameters.specific_parameters.get("max_hits", 5000)
@@ -50,28 +50,23 @@ class Freedom(OracleComponent):
         """
         Execute Freedom search on the SMILES batch.
         """
-
         smiles_string = ",".join(list(smiles))
 
-        try:
-            output = subprocess.run([
-                "conda",
-                "run",
-                "-n",
-                self.env_name,
-                "python",
-                self.freedom_script,
-                smiles_string,
-                self.freedom_file_path,
-                str(self.random_seed),
-                str(self.max_hits)
-            ], 
-            capture_output=True, 
-            text=True)
+        output = subprocess.run([
+            "conda",
+            "run",
+            "-n",
+            self.env_name,
+            "python",
+            self.freedom_script,
+            smiles_string,
+            self.freedom_file_path,
+            str(self.random_seed),
+            str(self.max_hits)
+        ], 
+        capture_output=True, 
+        text=True)
 
-            is_in_freedom = ast.literal_eval(output.stdout)
+        is_in_freedom = ast.literal_eval(output.stdout)
 
-            return np.array(is_in_freedom)
-        
-        except Exception:
-            return np.zeros(len(smiles))
+        return np.array(is_in_freedom)

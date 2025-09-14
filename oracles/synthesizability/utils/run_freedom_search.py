@@ -1,13 +1,18 @@
-"""Run search on Freedom from list of SMILES and given parameters.
 """
+Given an input SMILES, run search in Chemspace's Freedom 4.0 space.
+"""
+import sys
+import numpy as np
 from rdkit import Chem
 from rdkit.Chem import rdSynthonSpaceSearch
-import sys
-import subprocess
 
-def freedom_search(smiles: str,
-                   random_seed: int,
-                   max_hits: int) -> bool:
+
+
+def freedom_search(
+    smiles: str,
+    random_seed: int,
+    max_hits: int
+) -> bool:
     """
     Perform an exact match search for a given SMILES string and retrieve FreedomSpace ID and SMILES.
     Returns the first exact match found.
@@ -20,7 +25,6 @@ def freedom_search(smiles: str,
     Returns:
         bool: whether input SMILES was found in Freedom or not
     """
-
     # Random seed is fixed in both cases, in second case we use it 
     params = rdSynthonSpaceSearch.SynthonSpaceSearchParams()
     params.randomSeed = random_seed
@@ -31,37 +35,38 @@ def freedom_search(smiles: str,
 
     try:
         query_mol = Chem.MolFromSmiles(smiles)
-        canonical_smiles = Chem.MolToSmiles(query_mol)
+        canonical_smiles = Chem.MolToSmiles(query_mol, canonical=True)
 
-        results = synthonspace.SubstructureSearch(query_mol,
-                                                  params)
+        results = synthonspace.SubstructureSearch(
+            query_mol,
+            params
+        )
 
         for mol in results.GetHitMolecules():
             # If hit
-            if Chem.MolToSmiles(mol) == canonical_smiles:
+            if Chem.MolToSmiles(mol, canonical=True) == canonical_smiles:
                 return 1
 
         if len(results.GetHitMolecules()) < 1000:
             return 0
 
         else:
-            # making a deep search
-            results = synthonspace.SubstructureSearch(query_mol, 
-                                                      params_extended)
+            # Making a deep search
+            results = synthonspace.SubstructureSearch(
+                query_mol, 
+                params_extended
+            )
             
             for mol in results.GetHitMolecules():
-                if Chem.MolToSmiles(mol) == canonical_smiles:
+                if Chem.MolToSmiles(mol, canonical=True) == canonical_smiles:
                     return 1
             
             return 0
         
     except Exception:
         return 0
-    
 
 if __name__ == "__main__":
-
-    # Take synthons file and parameters and SMILES
     smiles_list = sys.argv[1]
     synthons_file = sys.argv[2]
     random_seed = int(sys.argv[3])
@@ -72,8 +77,18 @@ if __name__ == "__main__":
     # Create synthon object
     synthonspace = rdSynthonSpaceSearch.SynthonSpace()
     synthonspace.ReadDBFile(synthons_file)
-    
-    # Perform search
-    hits = [freedom_search(smiles, random_seed, max_hits) for smiles in smiles_list]
 
-    print(hits)
+    output = np.zeros(len(smiles_list))
+
+    for idx, smiles in enumerate(smiles_list):
+        try:
+            # Perform search
+            output[idx] = freedom_search(
+                smiles=smiles, 
+                random_seed=random_seed, 
+                max_hits=max_hits
+            )
+        except Exception:
+            output[idx] = 0
+
+    print(output.tolist())

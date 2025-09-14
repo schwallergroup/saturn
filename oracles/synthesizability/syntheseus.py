@@ -217,6 +217,8 @@ class Syntheseus(OracleComponent):
         steps = np.zeros(len(smiles))
         steps.fill(99)
         node_rewards = np.zeros(len(smiles))
+        # FIXME: Currently, if any one molecule fails, the entire batch is marked as failed
+        #        While this has not been observed, a better way is to try each molecule individually
         try:
             # Syntheseus output is tagged by the reaction model name
             output_results_dir = [folder for folder in os.listdir(os.path.join(temp_dir)) if self.reaction_model in folder][0]
