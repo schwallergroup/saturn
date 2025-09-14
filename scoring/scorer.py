@@ -91,19 +91,16 @@ class Scorer:
 
         # 2. Oracle call on SMILES
         logging.info(f"Scoring {len(smiles)} SMILES...")
-        scoring_start_time = time.perf_counter()
         smiles, _ = self.oracle(
             smiles=smiles,
             diversity_filter=self.diversity_filter
         )
-        scoring_end_time = time.perf_counter()
-        logging.info(f"Finished scoring in {round(scoring_end_time - scoring_start_time, 2)} seconds.")
 
         # 3. Write out results
-        self.oracle.oracle_history["negative_log_likelihood"] = negative_log_likelihoods
+        if self.sample:
+            self.oracle.oracle_history["negative_log_likelihood"] = negative_log_likelihoods
         self.oracle.oracle_history.to_csv(self.output_csv_path, index=False)
  
-        
         end_time = time.perf_counter()
-        logging.info(f"Total wall time: {round(end_time - start_time, 2)} seconds.")
+        logging.info(f"Finished scoring in {round(end_time - start_time, 2)} seconds.")
    
