@@ -135,18 +135,17 @@ def fuzzy_matching_substructure(
     Calculate the *max* substructure overlap between the query SMILES and each enforced block.
     """
 
-    def _query_is_in_bbs(query_mol: str, 
-                         enforced_blocks_mols: List[Mol]
+    def _query_is_in_bbs(
+        query_mol: str, 
+        enforced_blocks_mols: List[Mol]
     ) -> bool:
         """
         Return True if query mol is in enforced building blocks.
         """
         canon_query = Chem.MolToSmiles(query_mol)
+        # Re-canonicalize to double check
+        canonicalized_bbs_smiles = [Chem.MolToSmiles(mol, canonical=True) for mol in enforced_blocks_mols]
 
-        # Edge case when score != 1 but the block is enforced
-        canonicalized_bbs_smiles = [Chem.MolToSmiles(mol) 
-                                    for mol in enforced_blocks_mols]
-        
         is_in_bbs = any([
             (canon_query == smiles) for smiles in canonicalized_bbs_smiles
         ])
@@ -172,7 +171,10 @@ def fuzzy_matching_substructure(
                 ringCompare=rdFMCS.RingCompare.StrictRingFusion,
                 completeRingsOnly=True
             )
-        overlap = mcs_result.numAtoms / block_mol.GetNumAtoms()
+        # NOTE: MCS considers heavy atoms by default and we normalize against heavy atoms.
+        #       By default, generated molecules only have implicit hydrogens so GetNumAtoms == GetNumHeavyAtoms.
+        #       But using GetNumHeavyAtoms below makes it explicit that we normalize against heavy atoms.
+        overlap = mcs_result.numAtoms / block_mol.GetNumHeavyAtoms()
         if int(overlap) == 1:
 
             # Remove stereochemistry from molecules to guard against stereo problems
@@ -190,11 +192,12 @@ def fuzzy_matching_substructure(
 
             # Edge case
             else:
-                asymmetric_overlap = mcs_result.numAtoms / query_mol.GetNumAtoms()
+                asymmetric_overlap = mcs_result.numAtoms / query_mol.GetNumHeavyAtoms()
                 assert int(asymmetric_overlap) != 1, "Asymmetric FMS error"
                 return asymmetric_overlap
         else:
             max_mcs_atoms = max(max_mcs_atoms, overlap)
+
     return max_mcs_atoms
     
 def tango_reward(
