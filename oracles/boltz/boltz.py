@@ -104,7 +104,10 @@ class Boltz(OracleComponent):
 
         folders = sorted(os.listdir(preds_path))
 
-        for file in folders:
+        # Reference index to save files based on the molecules that were already saved
+        target_index = len(os.listdir(self.output_dir)) // 2
+
+        for i, file in enumerate(folders):
             folder_path = os.path.join(preds_path, file)
             
             index = int(file.split("_")[-1])
@@ -124,22 +127,20 @@ class Boltz(OracleComponent):
             # Copy .cif and affinity file
             cif_path = f"{folder_path}/{file}_model_0.cif"
 
-            #FIX: very bad solution based on file saving order
-            target_index = len(os.listdir(self.output_dir)) // 2
-
             # copy .cif
             subprocess.run([
                 "cp",
                 "-r",
                 cif_path,
-                os.path.join(self.output_dir, f"{target_index}.cif")
+                os.path.join(self.output_dir, f"{target_index+i}.cif")
             ])
+            
             # copy .json
             subprocess.run([
                 "cp",
                 "-r",
                 file_path,
-                os.path.join(self.output_dir, f"{target_index}.json")
+                os.path.join(self.output_dir, f"{target_index+i}.json")
             ])
         
         # Remove final folder
@@ -152,6 +153,8 @@ class Boltz(OracleComponent):
                              smiles: np.ndarray[str],
                              max_workers: int = 4) -> np.ndarray[Union[float, int]]:
         """Parallelize Boltz execution in the same GPU.
+        FIXME: multithreading/multiprocessing do not provide significant acceleration,
+        we should use multi-GPU instead.
         """
 
         # Chunk SMILES
