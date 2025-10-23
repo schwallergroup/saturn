@@ -67,6 +67,9 @@ from oracles.dft.dft_score import DFTScore
 from oracles.docking.geam_oracle import GEAMOracle
 from oracles.docking.quickvina2 import QuickVina2
 
+# Boltz
+from oracles.boltz.boltz import Boltz
+
 
 def construct_oracle_component(oracle_component_parameters: OracleComponentParameters) -> OracleComponent:
     """
@@ -173,6 +176,9 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return GEAMOracle(oracle_component_parameters)
     elif name == "quickvina2":
         return QuickVina2(oracle_component_parameters)
+    # Boltz
+    elif name == "boltz":
+        return Boltz(oracle_component_parameters)
     # TODO: Pharmacophore and Shape Match
     # TODO: MD
     else:
