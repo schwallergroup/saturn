@@ -90,7 +90,7 @@ class Syntheseus(OracleComponent):
 
         # Avoid reaction classes
         self.avoid_rxn_classes = self.enforced_reactions_parameters.avoid_rxn_classes
-
+        
         # -------------------------------------------------------------------
         # Scripts required to extract reaction nodes and reaction information
         # -------------------------------------------------------------------
@@ -108,7 +108,14 @@ class Syntheseus(OracleComponent):
 
             self.namerxn_extraction_script_path = self.enforced_reactions_parameters.namerxn_extraction_script_path
             assert self.namerxn_extraction_script_path is not None, "The run specifies to use NameRXN, please provide the path to the NameRXN extraction script."
-
+        
+        # TO DO: add conditions: assert namerxn as we only use this for now
+        self.avoid_conditions = [canonicalize_smiles(smi) for smi in self.enforced_reactions_parameters.avoid_conditions]
+        
+        if self.avoid_conditions:
+            assert self.namerxn_extraction_script_path is not None and self.namerxn_binary_path is not None, "Avoiding conditions requires NameRXN, please provide the binary path and the extraction script"
+        
+        #self.avoid_conditions = []
         # Path to the script that extracts the SMILES and depth from the Syntheseus route pickle file
         self.route_extraction_script_path = self.parameters.specific_parameters.get("route_extraction_script_path", None)
         # TODO: Avoid certain building blocks/reagents
@@ -250,6 +257,7 @@ class Syntheseus(OracleComponent):
                 if is_solved[idx] == 1:
 
                     # Satisfying either of the below conditions means the route data is needed
+                    # ADD CONDITIONS CONDITION here
                     if self.enforced_building_blocks_parameters.enforce_blocks or self.enforced_reactions_parameters.enforce_rxn_class_presence or len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0:
                         route = self._extract_syntheseus_route_data(os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"))
 
@@ -341,7 +349,8 @@ class Syntheseus(OracleComponent):
                     # Extract all reactions in the Syntheseus route if this information is required - either:
                     #   1. Enforcing reaction classes
                     #   2. Avoiding reaction classes
-                    if (self.enforced_reactions_parameters.enforce_rxn_class_presence) or (self.enforced_reactions_parameters.avoid_rxn_classes):
+                    #   3. Avoiding reaction conditions
+                    if (self.enforced_reactions_parameters.enforce_rxn_class_presence) or (self.enforced_reactions_parameters.avoid_rxn_classes) or (self.enforced_reactions_parameters.avoid_conditions):
 
                         if oracle_calls not in self.matched_generated_smiles_with_rxn:
                             self.matched_generated_smiles_with_rxn[oracle_calls] = []
@@ -353,7 +362,8 @@ class Syntheseus(OracleComponent):
                                 reaction_depth_smiles.append((node_data["depth"], node_data["rxn_smiles"]))
 
                         all_rxns_labels = []  # List[Tuple[str, str]] --> (rxn_class, rxn_name)
-                
+                        all_conditions = []
+
                         # NameRXN classification of every reaction in the route
                         if self.enforced_reactions_parameters.use_namerxn:
                             # Write the reaction SMILES to a temp file
@@ -375,6 +385,26 @@ class Syntheseus(OracleComponent):
                             # Check for errors
                             assert all_rxns_labels.returncode == 0, f"Error during NameRXN reaction information extraction: {all_rxns_labels.stderr}"
                             all_rxns_labels = ast.literal_eval(all_rxns_labels.stdout)
+
+                            # If conditions, extract them here (currently only supported through NameRXN cause QUARC uses it)
+                            if self.avoid_conditions:
+
+                                conditions = subprocess.run([
+                                    "python",
+                                    "/home/sabanza/Documents/saturn-local/oracles/synthesizability/utils/extract_conditions.py",
+                                    f"{self.namerxn_binary_path}",
+                                    "/home/sabanza/Documents/quarc/",
+                                    "quarc",
+                                    f"{temp_rxn_smiles_file}"
+                                ], capture_output=True, text=True)
+
+                                conditions = ast.literal_eval(conditions.stdout)
+
+                                all_conditions = [(cond["agents"], cond["temperature"]) for cond in conditions]
+                            
+                            # FIXME: in case we don't want conditions, this is needed to iterate and complete the route information
+                            else:
+                                all_conditions = [([], []) for i in range(len(all_rxns_labels))]                        
 
                         else:
                             for _, rxn_smiles in reaction_depth_smiles:
@@ -411,17 +441,21 @@ class Syntheseus(OracleComponent):
                         # All the information required to re-construct the synthesis graph
                         for node, node_data in route.items():
                             if node_data["is_rxn"]:
-                                for (depth, rxn_smiles), (rxn_class, rxn_name) in zip(reaction_depth_smiles, all_rxns_labels):
+                                for (depth, rxn_smiles), (rxn_class, rxn_name), (rxn_agents, rxn_temp) in zip(reaction_depth_smiles, all_rxns_labels, all_conditions):
                                     if depth == node_data["depth"]:
                                         if rxn_smiles == node_data["rxn_smiles"]:
                                             node_data["rxn_class"] = rxn_class
                                             node_data["rxn_name"] = rxn_name
+                                            node_data["agents"] = rxn_agents
+                                            node_data["temperature"] = rxn_temp
 
                         # Double check that all reaction classes and names are assigned
                         for node, node_data in route.items():
                             if node_data["is_rxn"]:
                                 assert node_data["rxn_class"] is not None
                                 assert node_data["rxn_name"] is not None
+                                assert node_data["agents"] is not None
+                                assert node_data["temperature"] is not None
                         
                         self.smiles_rxn_tracker[generated_smiles] = {**rxn_dict, **route}
 
@@ -442,7 +476,7 @@ class Syntheseus(OracleComponent):
                         # NOTE: This block of code is only relevant when enforcing building blocks *and* reaction classes *and not* avoiding reaction classes
                         # -----------------------------------------------------------------------------------------------------------------------------------
 
-                        if (not self.enforced_reactions_parameters.enforce_all_reactions) and (not self.enforced_reactions_parameters.avoid_rxn_classes):
+                        if (not self.enforced_reactions_parameters.enforce_all_reactions) and (not self.enforced_reactions_parameters.avoid_rxn_classes) and (not self.avoid_conditions):
                             # Check if the node exactly matches an enforced building block
                             if self.enforced_building_blocks_parameters.enforce_blocks: 
                                 if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
@@ -528,12 +562,43 @@ class Syntheseus(OracleComponent):
                         if node_rewards[idx] == 1.0:
                             self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
-                    if self.enforced_reactions_parameters.enforce_rxn_class_presence or len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0:
+
+                    # Test for avoiding certain conditions
+                    if self.avoid_conditions:
+                        avoid_conditions_multiplier = 1.0
+                        # for each chemical or agent, canonicalize and compare
+                        for conditions, _ in all_conditions:
+                            canonical_conditions = [canonicalize_smiles(smi) for smi in conditions]
+                            for avoid_condition in self.avoid_conditions:
+                                if avoid_condition in canonical_conditions:
+                                    avoid_conditions_multiplier = 0.0
+                                    break
+                        
+                        # If the avoid_conditions_multiplier is 0.0, then the reward can automatically be set to 0.0
+                        if avoid_conditions_multiplier == 0.0:
+                            node_rewards[idx] = 0.0
+                        # Otherwise, the node reward *might* need to be updated
+                        elif avoid_conditions_multiplier == 1.0:
+                            # Check whether the user wants to enforce blocks
+                            # The below operation ensures that dense reward is respected
+                            if self.enforced_building_blocks_parameters.enforce_blocks:
+                                node_rewards[idx] *= 1.0
+                            # If the user is *not* enforcing reaction class presence, then the node reward is 1.0
+                            elif not self.enforced_reactions_parameters.enforce_rxn_class_presence:
+                                node_rewards[idx] = 1.0
+                            # Otherwise, the node reward *might* still be 0.0 if the reaction class constraint(s) are not satisfied
+                            else:
+                                node_rewards[idx] *= 1.0
+                        
+                        if node_rewards[idx] == 1.0:
+                            self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+
+                    if self.enforced_reactions_parameters.enforce_rxn_class_presence or len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0 or len(self.avoid_conditions) > 0:
                         # In case of redundancy
                         self.matched_generated_smiles_with_rxn[oracle_calls] = list(set(self.matched_generated_smiles_with_rxn[oracle_calls]))
                         with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
                             json.dump(self.matched_generated_smiles_with_rxn, f, indent=4)          
-
+                    
             # HACK: In case a molecule is in the building blocks stock, Syntheseus returns 0. 
             #       Set these to 1 to work with Binary Reward Shaping
             steps[steps == 0] = 1
