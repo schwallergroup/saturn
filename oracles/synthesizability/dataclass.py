@@ -24,3 +24,6 @@ class EnforcedReactionsParameters:
     namerxn_extraction_script_path: str  # Path to the NameRXN extraction script
     seed_reactions: bool  # Whether to seed the route with enforced reaction classes
     seed_reactions_file_folder: str  # Path to the folder where the pre-loaded reactions file for the seeding is stored
+    condition_extraction_script_path: str # Path to the conditions extraction script
+    quarc_repo_path: str # Path to the repository containing quarc
+    quarc_env_name: str # name of the quarc enviroment

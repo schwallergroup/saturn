@@ -45,6 +45,12 @@ NameRxn (Proprietary Reaction Labeling Tool from NextMove Software)
 
 This should return the program interface.
 
+QUARC (Reaction condition annotation tool)
+-------------------------------------------------------------------
+Go to the [QUARC](https://github.com/coleygroup/quarc) repo and follow the Quick Start installation instructions. We used the version from commit `88cce64`. You would additionally need the `Pistachio Reaction Types.csv` file (available upon request from the authors of `QUARC`). 
+
+**NOTE**: We use the option with `NameRxn` integration, although a full open-source version is also available.
+
 
 QuickVina2-GPU-2.1 (GPU-accelerated Docking)
 --------------------------------------------

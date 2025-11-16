@@ -90,7 +90,7 @@ class Syntheseus(OracleComponent):
 
         # Avoid reaction classes
         self.avoid_rxn_classes = self.enforced_reactions_parameters.avoid_rxn_classes
-        
+
         # -------------------------------------------------------------------
         # Scripts required to extract reaction nodes and reaction information
         # -------------------------------------------------------------------
@@ -111,11 +111,13 @@ class Syntheseus(OracleComponent):
         
         # TO DO: add conditions: assert namerxn as we only use this for now
         self.avoid_conditions = [canonicalize_smiles(smi) for smi in self.enforced_reactions_parameters.avoid_conditions]
-        
+        self.condition_extraction_script_path = self.enforced_reactions_parameters.condition_extraction_script_path
+        self.quarc_repo_path = self.enforced_reactions_parameters.quarc_repo_path
+        self.quarc_env_name = self.enforced_reactions_parameters.quarc_env_name
+
         if self.avoid_conditions:
             assert self.namerxn_extraction_script_path is not None and self.namerxn_binary_path is not None, "Avoiding conditions requires NameRXN, please provide the binary path and the extraction script"
-        
-        #self.avoid_conditions = []
+
         # Path to the script that extracts the SMILES and depth from the Syntheseus route pickle file
         self.route_extraction_script_path = self.parameters.specific_parameters.get("route_extraction_script_path", None)
         # TODO: Avoid certain building blocks/reagents
@@ -391,11 +393,11 @@ class Syntheseus(OracleComponent):
 
                                 conditions = subprocess.run([
                                     "python",
-                                    "/home/sabanza/Documents/saturn-local/oracles/synthesizability/utils/extract_conditions.py",
-                                    f"{self.namerxn_binary_path}",
-                                    "/home/sabanza/Documents/quarc/",
-                                    "quarc",
-                                    f"{temp_rxn_smiles_file}"
+                                    self.condition_extraction_script_path,
+                                    self.namerxn_binary_path,
+                                    self.quarc_repo_path,
+                                    self.quarc_env_name,
+                                    temp_rxn_smiles_file
                                 ], capture_output=True, text=True)
 
                                 conditions = ast.literal_eval(conditions.stdout)
