@@ -6,12 +6,11 @@ import os
 import subprocess
 import sys
 
-def quarc_condition_extraction(smiles: List[str],
+def quarc_condition_extraction(smiles_file: str,
                                namerxn_binary: str,
                                quarc_path: str,
                                quarc_env: str,
-                               model: str = "ffn",
-                               smiles_file: str | None = None) -> Dict:
+                               model: str = "ffn") -> Dict:
     """Extract conditions for given SMILES using QUARC.
     """
 
@@ -21,20 +20,10 @@ def quarc_condition_extraction(smiles: List[str],
     temporary_dir = tempfile.mkdtemp()
     output_smiles_path = os.path.join(temporary_dir, "out.smi")
 
-    # If previously created SMILES file
-    if smiles_file:
-        input_smiles_path = smiles_file
-    else:
-        input_smiles_path = os.path.join(temporary_dir, "in.smi")
-
-        with open(input_smiles_path, "w") as f:
-            for smile in smiles:
-                f.write(smile + "\n")
-    
     # Call namerxn
     subprocess.run(
         [f"{namerxn_binary}",
-        f"{input_smiles_path}",
+        f"{smiles_file}",
         f"{output_smiles_path}"
         ]
     )
@@ -96,14 +85,9 @@ if __name__ == "__main__":
     quarc_env = sys.argv[3]
     smiles_file = sys.argv[4]
 
-    # FIXME: fix this
-    smiles_pred = ["IC(C=C1)=CC=C1/C(C2=CC=C(C(F)(F)F)C=C2)=C\COC3=CC(C)=C(OCC(OC)=O)C=C3.CN(C)CC#C>>CC4=C(OCC(OC)=O)C=CC(OC/C=C(C5=CC=C(C#CCN(C)C)C=C5)/C6=CC=C(C(F)(F)F)C=C6)=C4",
-              "O[C@@H]1C[C@@H](C(OC)=O)C(C(OC(C)(C)C)=O)C1.OC2=CC=C(C(F)(F)F)C=C2>>O=C(OC(C)(C)C)C3C[C@H](OC4=CC=C(C(F)(F)F)C=C4)C[C@H]3C(OC)=O"]
-
-    conds = quarc_condition_extraction(smiles_pred,
+    conds = quarc_condition_extraction(smiles_file,
                                namerxn_binary,
                                quarc_script,
-                               quarc_env,
-                               smiles_file=smiles_file)
+                               quarc_env)
 
     print(conds)
