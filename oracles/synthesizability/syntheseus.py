@@ -428,10 +428,6 @@ class Syntheseus(OracleComponent):
 
                                 all_conditions = [(cond["agents"], cond["temperature"]) for cond in conditions]
 
-                                # FIXME: for some reason there are reactions where conditions fail, consider that molecule as not solved
-                                if len(all_conditions) != len(all_rxns_labels):
-                                    all_conditions = [([], []) for i in range(len(all_rxns_labels))]
-                            
                             # FIXME: in case we don't want conditions, this is needed to iterate and complete the route information
                             else:
                                 all_conditions = [([], []) for i in range(len(all_rxns_labels))]                        
