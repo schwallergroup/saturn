@@ -109,8 +109,20 @@ class Syntheseus(OracleComponent):
             self.namerxn_extraction_script_path = self.enforced_reactions_parameters.namerxn_extraction_script_path
             assert self.namerxn_extraction_script_path is not None, "The run specifies to use NameRXN, please provide the path to the NameRXN extraction script."
         
-        # TO DO: add conditions: assert namerxn as we only use this for now
+        # Block for condition extraction
         self.avoid_conditions = [canonicalize_smiles(smi) for smi in self.enforced_reactions_parameters.avoid_conditions]
+        self.enforce_conditions = [canonicalize_smiles(smi) for smi in self.enforced_reactions_parameters.enforce_conditions]
+        self.enforce_temperature_range = self.enforced_reactions_parameters.enforce_temperature_range
+
+        # Check if you have to enforce conditions
+        if self.avoid_conditions or self.enforce_conditions or self.enforce_temperature_range:
+            self.condition_enforcing = True
+        else:
+            self.condition_enforcing = False
+        
+        if self.condition_enforcing:
+            assert self.enforced_reactions_parameters.use_namerxn, f"Condition enforcing requires namerxn use"
+
         self.condition_extraction_script_path = self.enforced_reactions_parameters.condition_extraction_script_path
         self.quarc_repo_path = self.enforced_reactions_parameters.quarc_repo_path
         self.quarc_env_name = self.enforced_reactions_parameters.quarc_env_name
@@ -260,7 +272,12 @@ class Syntheseus(OracleComponent):
 
                     # Satisfying either of the below conditions means the route data is needed
                     # ADD CONDITIONS CONDITION here
-                    if self.enforced_building_blocks_parameters.enforce_blocks or self.enforced_reactions_parameters.enforce_rxn_class_presence or len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0:
+                    if self.enforced_building_blocks_parameters.enforce_blocks or \
+                       self.enforced_reactions_parameters.enforce_rxn_class_presence or \
+                       len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0 or \
+                       self.enforce_conditions or \
+                       self.avoid_conditions or \
+                       self.enforce_temperature_range:
                         route = self._extract_syntheseus_route_data(os.path.join(temp_dir, output_results_dir, mol_results, "route_0.pkl"))
 
                     # ------------------------
@@ -351,8 +368,12 @@ class Syntheseus(OracleComponent):
                     # Extract all reactions in the Syntheseus route if this information is required - either:
                     #   1. Enforcing reaction classes
                     #   2. Avoiding reaction classes
-                    #   3. Avoiding reaction conditions
-                    if (self.enforced_reactions_parameters.enforce_rxn_class_presence) or (self.enforced_reactions_parameters.avoid_rxn_classes) or (self.enforced_reactions_parameters.avoid_conditions):
+                    #   3. Avoiding/enforcing reaction conditions and/or temperature range
+                    if (self.enforced_reactions_parameters.enforce_rxn_class_presence) or \
+                       (self.enforced_reactions_parameters.avoid_rxn_classes) or \
+                       (self.enforced_reactions_parameters.avoid_conditions) or \
+                       (self.enforce_conditions) or \
+                       (self.enforce_temperature_range):
 
                         if oracle_calls not in self.matched_generated_smiles_with_rxn:
                             self.matched_generated_smiles_with_rxn[oracle_calls] = []
@@ -389,7 +410,9 @@ class Syntheseus(OracleComponent):
                             all_rxns_labels = ast.literal_eval(all_rxns_labels.stdout)
 
                             # If conditions, extract them here (currently only supported through NameRXN cause QUARC uses it)
-                            if self.avoid_conditions:
+                            if self.avoid_conditions or \
+                               self.enforce_conditions or \
+                               self.enforce_temperature_range:
 
                                 conditions = subprocess.run([
                                     "python",
@@ -407,7 +430,7 @@ class Syntheseus(OracleComponent):
                             # FIXME: in case we don't want conditions, this is needed to iterate and complete the route information
                             else:
                                 all_conditions = [([], []) for i in range(len(all_rxns_labels))]                        
-
+                                
                         else:
                             for _, rxn_smiles in reaction_depth_smiles:
                                 # Execute Rxn-INSIGHT on the rxn SMILES
@@ -428,6 +451,9 @@ class Syntheseus(OracleComponent):
                                 rxn_info = ast.literal_eval(extraction_result.stdout)
 
                                 all_rxns_labels.append((rxn_info["CLASS"], rxn_info["NAME"]))
+
+                            # just to keep logic
+                            all_conditions = [([], []) for i in range(len(all_rxns_labels))]
 
                         # Track all reaction information for the route
                         # NOTE: This is for *all* generated molecules that have a solved route
@@ -461,6 +487,20 @@ class Syntheseus(OracleComponent):
                         
                         self.smiles_rxn_tracker[generated_smiles] = {**rxn_dict, **route}
 
+
+                    # -----------------------------------------------------------------------------------------------------------------------------------
+                    # NOTE: this is only relevant if enforcing reaction conditions, it acts as a multiplier of the other cases
+                    # -----------------------------------------------------------------------------------------------------------------------------------
+                    conditions_check = False
+
+                    # If we enforce any reaction condition
+                    if self.avoid_conditions or self.enforce_conditions or self.enforce_temperature_range:
+                        conditions_check = True
+                        conditions_multiplier = self._check_reaction_conditions(all_conditions)
+
+                    # end of conditions check
+                    # -----------------------------------------------------------------------------------------------------------------------------------
+
                     # Assume the reaction constraints are not satisfied
                     rxn_multiplier = 0.0
 
@@ -473,22 +513,30 @@ class Syntheseus(OracleComponent):
                                     rxn_multiplier = 1.0
                                 if rxn_multiplier == 1.0:
                                     break
-
                         # -----------------------------------------------------------------------------------------------------------------------------------
                         # NOTE: This block of code is only relevant when enforcing building blocks *and* reaction classes *and not* avoiding reaction classes
                         # -----------------------------------------------------------------------------------------------------------------------------------
 
-                        if (not self.enforced_reactions_parameters.enforce_all_reactions) and (not self.enforced_reactions_parameters.avoid_rxn_classes) and (not self.avoid_conditions):
+                        if (not self.enforced_reactions_parameters.enforce_all_reactions) and (not self.enforced_reactions_parameters.avoid_rxn_classes):
                             # Check if the node exactly matches an enforced building block
-                            if self.enforced_building_blocks_parameters.enforce_blocks: 
-                                if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                    self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                            if self.enforced_building_blocks_parameters.enforce_blocks:
+                                # check if conditions
+                                if conditions_check: 
+                                    if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0 and conditions_multiplier == 1:
+                                        self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                                else:
+                                    if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
+                                        self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
                             elif not self.enforced_building_blocks_parameters.enforce_blocks:
-                                # If the reaction class is matched, then the node reward is 1
-                                if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                    self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
-
+                                if conditions_check:
+                                    if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0 and conditions_multiplier == 1:
+                                        self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                                else:
+                                    # If the reaction class is matched, then the node reward is 1
+                                    if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
+                                        self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                        
                         # ------------------------------------------------------------------------
                         # NOTE: This block of code is only relevant when enforcing *all* reactions
                         # ------------------------------------------------------------------------
@@ -511,17 +559,30 @@ class Syntheseus(OracleComponent):
                             
                             # Enforcing blocks and *all* reactions
                             if self.enforced_building_blocks_parameters.enforce_blocks:
-                                if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                    self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                                if conditions_check:
+                                    if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0 and conditions_multiplier == 1:
+                                        self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                                else:
+                                    if (is_matched) and (rxn_multiplier) == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
+                                        self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
                             # Only enforcing *all* reactions
                             else:
-                                if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
-                                    self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                                if conditions_check:
+                                    if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0 and conditions_multiplier == 1:
+                                        self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
+                                else:
+                                    if rxn_multiplier == 1.0 and len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0:
+                                        self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
                         # Reaching this code requires that there is a solved route
                         # This truncates the node reward to 0 if the reaction class is not matched
                         # If *not* enforcing blocks, then the reward is 1.0 * rxn_multiplier because the route is solved in the first place and the user specified to enforce *only* reaction classes
+                        
+                        # This is an add on to modify the rxn multiplier based on conditions when they are active
+                        if conditions_check:
+                            rxn_multiplier = rxn_multiplier*conditions_multiplier
+
                         if rxn_multiplier == 0.0:
                             node_rewards[idx] = 0.0
                         elif rxn_multiplier == 1.0:
@@ -545,6 +606,11 @@ class Syntheseus(OracleComponent):
                                     avoid_rxn_multiplier = 0.0
                                     break
                         
+                        # add conditions multiplier if conditions not met, otherwise it is fine
+                        if conditions_check:
+                            if conditions_multiplier == 0:
+                                avoid_rxn_multiplier = 0
+
                         # If the avoid_rxn_multiplier is 0.0, then the reward can automatically be set to 0.0
                         if avoid_rxn_multiplier == 0.0:
                             node_rewards[idx] = 0.0
@@ -564,38 +630,28 @@ class Syntheseus(OracleComponent):
                         if node_rewards[idx] == 1.0:
                             self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
-
-                    # Test for avoiding certain conditions
-                    if self.avoid_conditions:
-                        avoid_conditions_multiplier = 1.0
-                        # for each chemical or agent, canonicalize and compare
-                        for conditions, _ in all_conditions:
-                            canonical_conditions = [canonicalize_smiles(smi) for smi in conditions]
-                            for avoid_condition in self.avoid_conditions:
-                                if avoid_condition in canonical_conditions:
-                                    avoid_conditions_multiplier = 0.0
-                                    break
+                    # -----------------------------------------------------------------------------------------------
+                    # NOTE: This block of code is only relevant when enforcing conditions alone
+                    # -----------------------------------------------------------------------------------------------
+                    if conditions_check and (not self.enforced_reactions_parameters.enforce_rxn_class_presence) and (not len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0):
                         
-                        # If the avoid_conditions_multiplier is 0.0, then the reward can automatically be set to 0.0
-                        if avoid_conditions_multiplier == 0.0:
+                        # If the conditions_multiplier is 0.0, then the reward can automatically be set to 0.0
+                        if conditions_multiplier == 0.0:
                             node_rewards[idx] = 0.0
                         # Otherwise, the node reward *might* need to be updated
-                        elif avoid_conditions_multiplier == 1.0:
+                        elif conditions_multiplier == 1.0:
                             # Check whether the user wants to enforce blocks
                             # The below operation ensures that dense reward is respected
                             if self.enforced_building_blocks_parameters.enforce_blocks:
                                 node_rewards[idx] *= 1.0
-                            # If the user is *not* enforcing reaction class presence, then the node reward is 1.0
-                            elif not self.enforced_reactions_parameters.enforce_rxn_class_presence:
-                                node_rewards[idx] = 1.0
-                            # Otherwise, the node reward *might* still be 0.0 if the reaction class constraint(s) are not satisfied
+                            # else, all conditions met
                             else:
-                                node_rewards[idx] *= 1.0
-                        
+                                node_rewards[idx] = 1.0
+
                         if node_rewards[idx] == 1.0:
                             self.matched_generated_smiles_with_rxn[oracle_calls].append(generated_smiles)
 
-                    if self.enforced_reactions_parameters.enforce_rxn_class_presence or len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0 or len(self.avoid_conditions) > 0:
+                    if self.enforced_reactions_parameters.enforce_rxn_class_presence or len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0 or conditions_check:
                         # In case of redundancy
                         self.matched_generated_smiles_with_rxn[oracle_calls] = list(set(self.matched_generated_smiles_with_rxn[oracle_calls]))
                         with open(os.path.join(self.output_dir, "matched_generated_smiles_with_rxn.json"), "w") as f:
@@ -630,7 +686,8 @@ class Syntheseus(OracleComponent):
         # 9. Prepare and/or return the output
         if (self.enforced_building_blocks_parameters.enforce_blocks) or \
            (self.enforced_reactions_parameters.enforce_rxn_class_presence) or \
-           len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0:
+           len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0 or \
+           conditions_check:
 
             if not self.parallelize:
                 assert len(node_rewards) == len(smiles), "Syntheseus output length mismatch."
@@ -749,11 +806,45 @@ class Syntheseus(OracleComponent):
         """
         if (not self.enforced_building_blocks_parameters.enforce_blocks) and \
            (not self.enforced_reactions_parameters.enforce_rxn_class_presence) and \
-           (len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0):
-            assert self.parameters.reward_shaping_function_parameters["transformation_function"] == "binary", "The run specifies to enforce neither building blocks nor reaction classes, please use the Binary Reward Shaping function. A Reverse Sigmoid Reward Shaping function can also be used to incentivize minimizing path length."
+           (len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0) and \
+           (not self.enforce_conditions) and \
+           (not self.avoid_conditions) and \
+           (not self.enforce_temperature_range):
+            assert self.parameters.reward_shaping_function_parameters["transformation_function"] == "binary", "The run specifies to enforce neither building blocks, reaction classes, nor reaction/avoid conditions or temperature range, please use the Binary Reward Shaping function. A Reverse Sigmoid Reward Shaping function can also be used to incentivize minimizing path length."
 
         if self.enforced_reactions_parameters.enforce_rxn_class_presence and len(self.enforced_reactions_parameters.enforced_rxn_classes) == 0:
             raise ValueError("The run specifies to enforce a reaction class but no reaction classes were provided.")
 
         if self.enforced_reactions_parameters.enforce_all_reactions and len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0:
             raise ValueError("The run specifies to enforce all reactions but also specifies to avoid certain reaction classes. Enforcing all reactions implies reactions not in the list are avoided. Please set `avoid_rxn_classes` to an empty list when enforcing all reactions.")
+    
+    def _check_reaction_conditions(self, all_conditions: list[tuple]) -> float:
+        """Check if reaction conditions are satisfied for the given synthesis route and return corresponding multiplier
+        """
+        conditions_multiplier = 1.0
+
+        # for each chemical or agent, canonicalize and compare
+        if self.avoid_conditions or self.enforce_conditions:
+            for conditions, _ in all_conditions:
+                canonical_conditions = [canonicalize_smiles(smi) for smi in conditions]
+                if self.avoid_conditions:
+                    for avoid_condition in self.avoid_conditions:
+                        if avoid_condition in canonical_conditions:
+                            conditions_multiplier = 0.0
+                            break
+                if self.enforce_conditions:
+                    for enforce_conditions in self.enforce_conditions:
+                        if enforce_conditions not in canonical_conditions:
+                            conditions_multiplier = 0.0
+                            break
+        
+        # Check temperatures
+        if self.enforce_temperature_range:
+            # Check that every temperature in all_conditions is within at least one range in self.enforce_temperature_range
+            for _, temperature in all_conditions:
+                if temperature not in self.enforce_temperature_range:
+                    conditions_multiplier = 0.0
+                    break
+
+        return conditions_multiplier
+    
