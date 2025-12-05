@@ -422,10 +422,15 @@ class Syntheseus(OracleComponent):
                                     self.quarc_env_name,
                                     temp_rxn_smiles_file
                                 ], capture_output=True, text=True)
-
+                                # print(conditions.stdout)
+                                # print(conditions.stderr)
                                 conditions = ast.literal_eval(conditions.stdout)
 
                                 all_conditions = [(cond["agents"], cond["temperature"]) for cond in conditions]
+
+                                # FIXME: for some reason there are reactions where conditions fail, consider that molecule as not solved
+                                if len(all_conditions) != len(all_rxns_labels):
+                                    all_conditions = [([], []) for i in range(len(all_rxns_labels))]
                             
                             # FIXME: in case we don't want conditions, this is needed to iterate and complete the route information
                             else:
@@ -466,6 +471,7 @@ class Syntheseus(OracleComponent):
                             rxn_dict["enforced_block"] = matched_block_smiles
                         else:
                             rxn_dict["enforced_block"] = None
+                        
                         # All the information required to re-construct the synthesis graph
                         for node, node_data in route.items():
                             if node_data["is_rxn"]:
