@@ -409,7 +409,7 @@ class Syntheseus(OracleComponent):
                             assert all_rxns_labels.returncode == 0, f"Error during NameRXN reaction information extraction: {all_rxns_labels.stderr}"
                             all_rxns_labels = ast.literal_eval(all_rxns_labels.stdout)
 
-                            # If conditions, extract them here (currently only supported through NameRXN cause QUARC uses it)
+                            # If conditions, extract them here (currently only supported through NameRXN because QUARC uses it)
                             if self.avoid_conditions or \
                                self.enforce_conditions or \
                                self.enforce_temperature_range:
@@ -422,8 +422,7 @@ class Syntheseus(OracleComponent):
                                     self.quarc_env_name,
                                     temp_rxn_smiles_file
                                 ], capture_output=True, text=True)
-                                # print(conditions.stdout)
-                                # print(conditions.stderr)
+                                assert conditions.returncode == 0, f"Error during QUARC condition extraction: {conditions.stderr}"
                                 conditions = ast.literal_eval(conditions.stdout)
 
                                 all_conditions = [(cond["agents"], cond["temperature"]) for cond in conditions]
