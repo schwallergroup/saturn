@@ -1,17 +1,24 @@
+from typing import List, Dict
+import os
+import sys
+import subprocess
 import json
 import tempfile
-from typing import List, Dict
 from pathlib import Path
-import os
-import subprocess
-import sys
 
-def quarc_condition_extraction(smiles_file: str,
-                               namerxn_binary: str,
-                               quarc_path: str,
-                               quarc_env: str,
-                               model: str = "ffn") -> Dict:
-    """Extract conditions for given SMILES using QUARC.
+
+def quarc_condition_extraction(
+    smiles_file: str,
+    namerxn_binary: str,
+    quarc_path: str,
+    quarc_env: str,
+    model: str = "ffn"
+    # FIXME: add the expected type to output Dict
+) -> Dict:
+    """
+    Extract conditions for given SMILES using QUARC.
+    
+    Reference: https://pubs.rsc.org/en/content/articlehtml/2025/sc/d5sc04957a 
     """
 
     assert model in ["gnn", "ffn"], f"{model} is not valid, please, provide valid inference pipeline"
@@ -27,7 +34,6 @@ def quarc_condition_extraction(smiles_file: str,
         f"{output_smiles_path}"
         ]
     )
-
     rxns = []
 
     # Extract output
@@ -36,14 +42,11 @@ def quarc_condition_extraction(smiles_file: str,
             outs = rxn.strip().split(" ")
             rxns.append((outs[0], outs[1]))
 
-
     # 2. Write QUARC input and execute it
-
-    # Move to QUARC directory
+    
     os.chdir(quarc_path)
-
-    input_quarc = os.path.join(quarc_path, "input.json")
-    output_quarc = os.path.join(quarc_path, "output.json")
+    input_quarc = os.path.join(temporary_dir, "input.json")
+    output_quarc = os.path.join(temporary_dir, "output.json")
 
     with open(input_quarc, "w") as f:
         data = [{"rxn_smiles": rxn[0], "rxn_class": rxn[1], "doc_id": i} for i, rxn in enumerate(rxns)]
@@ -74,7 +77,6 @@ def quarc_condition_extraction(smiles_file: str,
     conditions = [cond["predictions"][0] for cond in conditions]
 
     return conditions
-
 
 if __name__ == "__main__":
     
