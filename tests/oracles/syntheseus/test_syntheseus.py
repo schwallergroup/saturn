@@ -120,6 +120,8 @@ def base_oracle_params() -> dict:
                 "namerxn_extraction_script_path": os.path.join(CURRENT_DIR, "../../../oracles/synthesizability/utils/extract_namerxn_info.py"),
                 "seed_reactions": False,
                 "seed_reactions_file_folder": os.path.join(CURRENT_DIR, "../../../test/mitsunobu-seeding-preprocessed"),
+            },
+            "enforced_conditions": {
                 #NOTE: conditions block, not used here
                 "avoid_conditions": [],
                 "enforce_conditions": [],

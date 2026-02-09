@@ -162,6 +162,8 @@ def base_oracle_params() -> dict:
                 "namerxn_extraction_script_path": os.path.join(CURRENT_DIR, "../../../oracles/synthesizability/utils/extract_namerxn_info.py"),
                 "seed_reactions": False,
                 "seed_reactions_file_folder": os.path.join(CURRENT_DIR, "../../../test/mitsunobu-seeding-preprocessed"),
+            },
+            "enforced_conditions": {
                 #NOTE: conditions block, not used here
                 "avoid_conditions": [],
                 "enforce_conditions": [],
@@ -192,7 +194,7 @@ def test_conditions_enforcing(
     }
 
     # Test avoid DMF for (should be false)
-    base_oracle_params["specific_parameters"]["enforced_reactions"]["avoid_conditions"] = ["CN(C)C=O"]
+    base_oracle_params["specific_parameters"]["enforced_conditions"]["avoid_conditions"] = ["CN(C)C=O"]
 
     syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
     namerxn_solved = syntheseus_oracle(
@@ -217,9 +219,9 @@ def test_conditions_enforcing(
     
     # Test enforce condition and temperature range for 1 (should match)
 
-    base_oracle_params["specific_parameters"]["enforced_reactions"]["avoid_conditions"] = []
-    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_conditions"] = ["O"]
-    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_temperature_range"] = ["[40.00, 50.00)", "[50.00, 60.00)"]
+    base_oracle_params["specific_parameters"]["enforced_conditions"]["avoid_conditions"] = []
+    base_oracle_params["specific_parameters"]["enforced_conditions"]["enforce_conditions"] = ["O"]
+    base_oracle_params["specific_parameters"]["enforced_conditions"]["enforce_temperature_range"] = ["[40.00, 50.00)", "[50.00, 60.00)"]
     
     syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
     namerxn_solved = syntheseus_oracle(
@@ -234,9 +236,9 @@ def test_conditions_enforcing(
     }
 
     # Test avoid and temperature range for 2
-    base_oracle_params["specific_parameters"]["enforced_reactions"]["avoid_conditions"] = ["CCN(C(C)C)C(C)C"]
-    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_conditions"] = []
-    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_temperature_range"] = ["[40.00, 50.00)", "[50.00, 60.00)"]
+    base_oracle_params["specific_parameters"]["enforced_conditions"]["avoid_conditions"] = ["CCN(C(C)C)C(C)C"]
+    base_oracle_params["specific_parameters"]["enforced_conditions"]["enforce_conditions"] = []
+    base_oracle_params["specific_parameters"]["enforced_conditions"]["enforce_temperature_range"] = ["[40.00, 50.00)", "[50.00, 60.00)"]
     
     syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
     namerxn_solved = syntheseus_oracle(
@@ -263,8 +265,8 @@ def test_conditions_enforcing_and_rxn(
     base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["williamson"]
     
     # Avoid DMF (should be false)
-    base_oracle_params["specific_parameters"]["enforced_reactions"]["avoid_conditions"] = ["C1CCOC1"]
-    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_temperature_range"] = ["[40.00, 50.00)", "[50.00, 60.00)"]
+    base_oracle_params["specific_parameters"]["enforced_conditions"]["avoid_conditions"] = ["C1CCOC1"]
+    base_oracle_params["specific_parameters"]["enforced_conditions"]["enforce_temperature_range"] = ["[40.00, 50.00)", "[50.00, 60.00)"]
     
     syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
     namerxn_solved = syntheseus_oracle(
@@ -301,9 +303,9 @@ def test_conditions_enforcing_and_rxn(
     base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["williamson", "alkylation"]
 
     # Enforce presence of water and avoid benzene
-    base_oracle_params["specific_parameters"]["enforced_reactions"]["avoid_conditions"] = ["c1ccccc1", "Cc1ccccc1"]
-    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_conditions"] = ["O"]
-    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_temperature_range"] = []
+    base_oracle_params["specific_parameters"]["enforced_conditions"]["avoid_conditions"] = ["c1ccccc1", "Cc1ccccc1"]
+    base_oracle_params["specific_parameters"]["enforced_conditions"]["enforce_conditions"] = ["O"]
+    base_oracle_params["specific_parameters"]["enforced_conditions"]["enforce_temperature_range"] = []
     
     syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
     namerxn_solved = syntheseus_oracle(
@@ -325,7 +327,7 @@ def test_conditions_enforcing_and_rxn_and_block(
     """Tests conditions, reaction enforcing and block enforcing
     """
     # Test conditions, rxn and block for one
-    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_temperature_range"] = ["[40.00, 50.00)", "[50.00, 60.00)"]
+    base_oracle_params["specific_parameters"]["enforced_conditions"]["enforce_temperature_range"] = ["[40.00, 50.00)", "[50.00, 60.00)"]
     
     # Parameters for reaction enforcing
     base_oracle_params["reward_shaping_function_parameters"] = {
@@ -355,7 +357,7 @@ def test_conditions_enforcing_and_rxn_and_block(
     }
 
     # Test enforced block molecule satisfies all conditions
-    base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_temperature_range"] = ["[0.00, 10.00)", "[20.00, 30.00)","[50.00, 60.00)"]
+    base_oracle_params["specific_parameters"]["enforced_conditions"]["enforce_temperature_range"] = ["[0.00, 10.00)", "[20.00, 30.00)","[50.00, 60.00)"]
     
     base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["to amide"]
     syntheseus_oracle = Syntheseus(OracleComponentParameters(**base_oracle_params))
@@ -398,7 +400,7 @@ def test_conditions_enforcing_and_rxn_and_block(
     }
     
     # Test the scenario where the block and reaction is matched but the condition is not
-    base_oracle_params["specific_parameters"]["enforced_reactions"]["avoid_conditions"] = ["O=[Mn]=O", 
+    base_oracle_params["specific_parameters"]["enforced_conditions"]["avoid_conditions"] = ["O=[Mn]=O", 
                                                                                            "[Ni]"]
     base_oracle_params["specific_parameters"]["enforced_reactions"]["enforce_all_reactions"] = True
     base_oracle_params["specific_parameters"]["enforced_reactions"]["enforced_rxn_classes"] = ["to amide",
