@@ -18,7 +18,7 @@ from oracles.synthesizability.utils.utils import match_stock, extract_functional
 from concurrent.futures import ThreadPoolExecutor
 from oracles.synthesizability.utils.CONSTANTS import DEFAULT_TANGO_WEIGHTS
 
-from oracles.synthesizability.dataclass import EnforcedBuildingBlocksParameters, EnforcedReactionsParameters
+from oracles.synthesizability.dataclass import EnforcedBuildingBlocksParameters, EnforcedReactionsParameters, EnforcedReactionConditionsParameters
 
 
 
@@ -109,10 +109,13 @@ class Syntheseus(OracleComponent):
             self.namerxn_extraction_script_path = self.enforced_reactions_parameters.namerxn_extraction_script_path
             assert self.namerxn_extraction_script_path is not None, "The run specifies to use NameRXN, please provide the path to the NameRXN extraction script."
         
-        # Block for condition extraction
-        self.avoid_conditions = [canonicalize_smiles(smi) for smi in self.enforced_reactions_parameters.avoid_conditions]
-        self.enforce_conditions = [canonicalize_smiles(smi) for smi in self.enforced_reactions_parameters.enforce_conditions]
-        self.enforce_temperature_range = self.enforced_reactions_parameters.enforce_temperature_range
+        # Enforced reaction conditions
+        self.enforced_conditions_parameters = EnforcedReactionConditionsParameters(
+            **self.parameters.specific_parameters.get("enforced_conditions", None)
+        )
+        self.avoid_conditions = [canonicalize_smiles(smi) for smi in self.enforced_conditions_parameters.avoid_conditions]
+        self.enforce_conditions = [canonicalize_smiles(smi) for smi in self.enforced_conditions_parameters.enforce_conditions]
+        self.enforce_temperature_range = self.enforced_conditions_parameters.enforce_temperature_range
 
         # Check if you have to enforce conditions
         if self.avoid_conditions or self.enforce_conditions or self.enforce_temperature_range:
@@ -121,14 +124,14 @@ class Syntheseus(OracleComponent):
             self.conditions_check = False
         
         if self.conditions_check:
-            assert self.enforced_reactions_parameters.use_namerxn, f"Condition enforcing requires namerxn use"
+            assert self.enforced_reactions_parameters.use_namerxn, f"Condition enforcing requires namerxn use in reaction type checking"
 
-        self.condition_extraction_script_path = self.enforced_reactions_parameters.condition_extraction_script_path
-        self.quarc_repo_path = self.enforced_reactions_parameters.quarc_repo_path
-        self.quarc_env_name = self.enforced_reactions_parameters.quarc_env_name
+        self.condition_extraction_script_path = self.enforced_conditions_parameters.condition_extraction_script_path
+        self.quarc_repo_path = self.enforced_conditions_parameters.quarc_repo_path
+        self.quarc_env_name = self.enforced_conditions_parameters.quarc_env_name
 
-        if self.avoid_conditions:
-            assert self.namerxn_extraction_script_path is not None and self.namerxn_binary_path is not None, "Avoiding conditions requires NameRXN, please provide the binary path and the extraction script"
+        if self.conditions_check:
+            assert self.namerxn_extraction_script_path is not None and self.namerxn_binary_path is not None, "Condition enforcing requires NameRXN, please provide the binary path and the extraction script"
 
         # Path to the script that extracts the SMILES and depth from the Syntheseus route pickle file
         self.route_extraction_script_path = self.parameters.specific_parameters.get("route_extraction_script_path", None)
@@ -371,9 +374,7 @@ class Syntheseus(OracleComponent):
                     #   3. Avoiding/enforcing reaction conditions and/or temperature range
                     if (self.enforced_reactions_parameters.enforce_rxn_class_presence) or \
                        (self.enforced_reactions_parameters.avoid_rxn_classes) or \
-                       (self.enforced_reactions_parameters.avoid_conditions) or \
-                       (self.enforce_conditions) or \
-                       (self.enforce_temperature_range):
+                       (self.conditions_check):
 
                         if oracle_calls not in self.matched_generated_smiles_with_rxn:
                             self.matched_generated_smiles_with_rxn[oracle_calls] = []
@@ -410,9 +411,7 @@ class Syntheseus(OracleComponent):
                             all_rxns_labels = ast.literal_eval(all_rxns_labels.stdout)
 
                             # If conditions, extract them here (currently only supported through NameRXN because QUARC uses it)
-                            if self.avoid_conditions or \
-                               self.enforce_conditions or \
-                               self.enforce_temperature_range:
+                            if self.conditions_check:
 
                                 conditions = subprocess.run([
                                     "python",
@@ -805,9 +804,7 @@ class Syntheseus(OracleComponent):
         if (not self.enforced_building_blocks_parameters.enforce_blocks) and \
            (not self.enforced_reactions_parameters.enforce_rxn_class_presence) and \
            (len(self.enforced_reactions_parameters.avoid_rxn_classes) == 0) and \
-           (not self.enforce_conditions) and \
-           (not self.avoid_conditions) and \
-           (not self.enforce_temperature_range):
+           (not self.conditions_check):
             assert self.parameters.reward_shaping_function_parameters["transformation_function"] == "binary", "The run specifies to enforce neither building blocks, reaction classes, nor reaction/avoid conditions or temperature range, please use the Binary Reward Shaping function. A Reverse Sigmoid Reward Shaping function can also be used to incentivize minimizing path length."
 
         if self.enforced_reactions_parameters.enforce_rxn_class_presence and len(self.enforced_reactions_parameters.enforced_rxn_classes) == 0:
