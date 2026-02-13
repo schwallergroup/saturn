@@ -32,3 +32,5 @@ class EnforcedReactionConditionsParameters:
     condition_extraction_script_path: str # Path to the conditions extraction script
     quarc_repo_path: str # Path to the repository containing quarc
     quarc_env_name: str # name of the quarc enviroment
+    use_continuous_reward: bool # Use continous reward for solvents or any specified reagent
+    reagent_guide_path: str # Path to the file contanining the reagents with specific scores
