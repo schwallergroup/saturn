@@ -10,6 +10,7 @@ from oracles.similarity.tanimoto_similarity import TanimotoSimilarity
 from oracles.similarity.jaccard_distance import JaccardDistance
 from oracles.similarity.jaccard_distance_dataset import JaccardDistanceDataset
 from oracles.similarity.tango import Tango
+from oracles.similarity.lig3dlens import Lig3DLens
 
 # Physchem properties
 from oracles.physchem.aliphatic_rings import NumAliphaticRings
@@ -85,6 +86,8 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
         return Tango(oracle_component_parameters)
     elif name == "jaccard_distance_dataset":
         return JaccardDistanceDataset(oracle_component_parameters)
+    elif name == "lig3dlens":
+        return Lig3DLens(oracle_component_parameters)
     # Physchem properties
     elif name == "num_aliphatic_rings":
         return NumAliphaticRings(oracle_component_parameters)
