@@ -1,0 +1,105 @@
+{
+  "logging": {
+    "logging_frequency": 100,
+    "logging_path": "/home/miquelaperez/saturn/MBH/mbh_catalyst_run/log.log",
+    "model_checkpoints_dir": "/home/miquelaperez/saturn/MBH/mbh_catalyst_run"
+  },
+  "oracle": {
+    "budget": 1500,
+    "allow_oracle_repeats": false,
+    "aggregator": "product",
+    "components": [
+      {
+        "name": "MBH_catalyst_score",
+        "weight": 1,
+        "preliminary_check": false,
+        "specific_parameters": {
+          "api_key": "AIzaSyAOiu9CkEWhbWSKVFUu49OJqDipvkh119k",
+          "model_name": "gemini-3.5-flash",
+          "num_calls": 3,
+          "batch_size": 16,
+          "rate_limit_delay": 1.0
+        },
+        "reward_shaping_function_parameters": {
+          "transformation_function": "sigmoid",
+          "parameters": {
+            "low": 40,
+            "high": 90,
+            "k": 0.15
+          }
+        }
+      },
+      {
+        "name": "mw",
+        "weight": 1,
+        "preliminary_check": false,
+        "specific_parameters": {},
+        "reward_shaping_function_parameters": {
+          "transformation_function": "double_sigmoid",
+          "parameters": {
+            "low": 50,
+            "high": 400,
+            "coef_div": 500,
+            "coef_si": 250,
+            "coef_se": 250
+          }
+        }
+      }
+    ]
+  },
+  "goal_directed_generation": {
+    "reinforcement_learning": {
+      "prior": "/home/miquelaperez/saturn/experimental_reproduction/checkpoint_models/zinc-250k-aizynth-purged-epoch-100.prior",
+      "agent": "/home/miquelaperez/saturn/experimental_reproduction/checkpoint_models/zinc-250k-aizynth-purged-epoch-100.prior",
+      "batch_size": 16,
+      "learning_rate": 0.0001,
+      "sigma": 128.0,
+      "augmented_memory": true,
+      "augmentation_rounds": 10,
+      "selective_memory_purge": true
+    },
+    "experience_replay": {
+      "memory_size": 100,
+      "sample_size": 10,
+      "smiles": []
+    },
+    "diversity_filter": {
+      "name": "IdenticalMurckoScaffold",
+      "bucket_size": 10
+    },
+    "hallucinated_memory": {
+      "execute_hallucinated_memory": false,
+      "hallucination_method": "ga",
+      "num_hallucinations": 100,
+      "num_selected": 5,
+      "selection_criterion": "random"
+    },
+    "beam_enumeration": {
+      "execute_beam_enumeration": false,
+      "beam_k": 2,
+      "beam_steps": 18,
+      "substructure_type": "structure",
+      "structure_min_size": 15,
+      "pool_size": 4,
+      "pool_saving_frequency": 1000,
+      "patience": 5,
+      "token_sampling_method": "topk",
+      "filter_patience_limit": 100000
+    }
+  },
+  "distribution_learning": {
+    "parameters": {
+      "agent": "<unused>",
+      "training_steps": 20,
+      "batch_size": 512,
+      "learning_rate": 0.0001,
+      "training_dataset_path": "cleaned-chembl-33.smi",
+      "train_with_randomization": true,
+      "transfer_learning": false
+    }
+  },
+  "running_mode": "goal_directed_generation",
+  "model_architecture": "mamba",
+  "device": "cuda",
+  "seed": 0
+}
