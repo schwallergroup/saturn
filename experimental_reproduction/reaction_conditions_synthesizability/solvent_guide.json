@@ -1,0 +1,78 @@
+{   "categories": {
+        "Recommended": [
+            "O",                
+            "CCO",              
+            "CC(C)O",           
+            "CCCCO",            
+            "CCOC(C)=O",        
+            "CC(C)OC(C)=O",     
+            "CCCCOC(C)=O",      
+            "COc1ccccc1",       
+            "O=S1(=O)CCCC1"
+        ],
+        "Recommended or problematic?": [
+            "CO",
+            "CC(C)(C)O",
+            "OCc1ccccc1",
+            "OCCO",
+            "CC(C)=O",
+            "CCC(C)=O",
+            "CC(C)CC(C)=O",
+            "O=C1CCCCC1",
+            "COC(C)=O",
+            "CC(=O)O",
+            "CC(=O)OC(C)=O"
+        ],
+        "Problematic": [
+            "CC1CCCO1",
+            "CCCCCCC",
+            "CC1CCCCC1",
+            "Cc1ccccc1",
+            "Cc1ccc(C)cc1",
+            "Cc1c(C)cccc1",
+            "Cc1cccc(C)c1",
+            "Clc1ccccc1",
+            "CC#N",
+            "CN1CCCN(C)C1=O",
+            "CS(C)=O"
+        ],
+        "Problematic or hazardous?": [
+            "COC(C)(C)C",
+            "C1CCOC1",
+            "C1CCCCC1",
+            "ClCCl",
+            "O=CO",
+            "c1ccncc1"
+        ],
+        "Hazardous": [
+            "CC(C)OC(C)C",
+            "C1COCCO1",
+            "COCCOC",
+            "CCCCC",
+            "CCCCCC",
+            "CN(C)C=O",
+            "CC(=O)N(C)C",
+            "CN1CCCC1=O",
+            "COCCO",
+            "CCN(CC)CC"
+        ],
+        "Highly hazardous": [
+            "CCOCC",            
+            "c1ccccc1",
+            "ClC(Cl)Cl",
+            "ClC(Cl)(Cl)Cl",
+            "ClCCCl",
+            "C[N+]([O-])=O",
+            "S=C=S",
+            "CN(C)P(=O)(N(C)C)N(C)C" 
+        ]
+    },
+    "weights": {
+        "Recommended": 1.0,
+        "Recommended or problematic?": 0.8,
+        "Problematic": 0.6,
+        "Problematic or hazardous?": 0.4,
+        "Hazardous": 0.2,
+        "Highly hazardous": 0.05
+    }
+}

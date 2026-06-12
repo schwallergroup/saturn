@@ -23,3 +23,14 @@ class EnforcedReactionsParameters:
     namerxn_extraction_script_path: str  # Path to the NameRXN extraction script
     seed_reactions: bool  # Whether to seed the route with enforced reaction classes
     seed_reactions_file_folder: str  # Path to the folder where the pre-loaded reactions file for the seeding is stored
+
+@dataclass
+class EnforcedReactionConditionsParameters:
+    avoid_conditions: List[str] # List of reaction conditions to avoid 
+    enforce_conditions: List[str] # List of reaction conditions to enforce
+    enforce_temperature_range: List[str] # List of temperature ranges to enforce
+    condition_extraction_script_path: str # Path to the conditions extraction script
+    quarc_repo_path: str # Path to the repository containing quarc
+    quarc_env_name: str # name of the quarc enviroment
+    use_continuous_reward: bool # Use continous reward for solvents or any specified reagent
+    reagent_guide_path: str # Path to the file contanining the reagents with specific scores
