@@ -31,7 +31,7 @@ Syntheseus (Retrosynthesis Framework)
 
 NameRxn (Proprietary Reaction Labeling Tool from NextMove Software)
 -------------------------------------------------------------------
-**NOTE**: This installation is optional - `NameRxn` is a proprietary tool requiring a license. Both `HazELNut` and `NameRxn` are required and can be downloaded from this link: https://www.nextmovesoftware.com/downloads/hazelnut/releases/. The exact version can be chosen (or download the latest). After downloading, extract and verify the tool works by running the following command (in the directory the tools were downloaded):
+**NOTE**: This installation is mandatory for reproducing the original experiments (QUARC was built using `NameRxn`) - `NameRxn` is a proprietary tool requiring a license. Both `HazELNut` and `NameRxn` are required and can be downloaded from this link: https://www.nextmovesoftware.com/downloads/hazelnut/releases/. The exact version can be chosen (or download the latest). After downloading, extract and verify the tool works by running the following command (in the directory the tools were downloaded):
 
 `./HazELNut/namerxn`
 
