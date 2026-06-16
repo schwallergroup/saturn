@@ -12,7 +12,6 @@ from oracles.similarity.jaccard_distance import JaccardDistance
 from oracles.similarity.jaccard_distance_dataset import JaccardDistanceDataset
 from oracles.similarity.tango import Tango
 from oracles.similarity.MBH_catalyst_score import MBHcatalystscore
-# [agentic-mbh disabled: missing module] from oracles.similarity.Butenolide_catalyst_score import Butenolidecatalystscore
 
 # Physchem properties
 from oracles.physchem.aliphatic_rings import NumAliphaticRings
@@ -76,8 +75,6 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
     # Similarity metrics
     if name == "MBH_catalyst_score":
         return MBHcatalystscore(oracle_component_parameters)
-    elif name == "Butenolide_catalyst_score":
-        return Butenolidecatalystscore(oracle_component_parameters)
     elif name == "jaccard_distance":
         return JaccardDistance(oracle_component_parameters)
     elif name == "jaccard_distance":
