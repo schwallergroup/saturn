@@ -7,11 +7,12 @@ from oracles.dataclass import OracleComponentParameters
 
 # Similarity metrics
 from oracles.similarity.tanimoto_similarity import TanimotoSimilarity
+from oracles.similarity.agentic_mbh_oracle import MBHcatalystscore as _AgenticMBH
 from oracles.similarity.jaccard_distance import JaccardDistance
 from oracles.similarity.jaccard_distance_dataset import JaccardDistanceDataset
 from oracles.similarity.tango import Tango
 from oracles.similarity.MBH_catalyst_score import MBHcatalystscore
-from oracles.similarity.Butenolide_catalyst_score import Butenolidecatalystscore
+# [agentic-mbh disabled: missing module] from oracles.similarity.Butenolide_catalyst_score import Butenolidecatalystscore
 
 # Physchem properties
 from oracles.physchem.aliphatic_rings import NumAliphaticRings
@@ -70,6 +71,8 @@ def construct_oracle_component(oracle_component_parameters: OracleComponentParam
     Matches the OracleComponent name and returns the OracleComponent class.
     """
     name = oracle_component_parameters.name
+    if name == "agentic_mbh_catalyst_score":
+        return _AgenticMBH(oracle_component_parameters)
     # Similarity metrics
     if name == "MBH_catalyst_score":
         return MBHcatalystscore(oracle_component_parameters)

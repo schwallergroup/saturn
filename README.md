@@ -7,6 +7,64 @@
 In the **experimental_reproduction** sub-folder, prepared files and checkpoint models are provided to reproduce the experiments. 
 There is also a `Jupyter` notebook to construct your own configuration files to run `Saturn`.
 
+---
+
+## Adaptation: *De Novo* Discovery of Morita–Baylis–Hillman (MBH) Catalysts
+
+This fork adapts `Saturn` to a chemistry-specific design campaign: the **generative discovery of
+new tertiary-amine catalysts for the Morita–Baylis–Hillman (MBH) reaction** (methyl acrylate +
+*p*-nitrobenzaldehyde in methanol). Instead of optimising toward a numerical property predictor,
+the generative agent is steered by an **LLM-based oracle** that scores each proposed molecule for
+its expected catalytic performance.
+
+### What was added
+
+* **A new oracle component — `MBH_catalyst_score`**
+  ([`oracles/similarity/MBH_catalyst_score.py`](oracles/similarity/MBH_catalyst_score.py)),
+  registered in [`oracles/utils.py`](oracles/utils.py). It:
+  * Applies **hard structural filters** to prevent reward hacking before any scoring
+    (`is_valid_mbh_catalyst`): the molecule must contain a tertiary amine
+    (`[NX3;H0;+0]`), must not contain N–H or positively charged nitrogen, must have
+    MW ≤ 250, and ≤ 3 rotatable bonds (compact, rigid scaffolds).
+  * Sends the surviving molecules to **Google Gemini** (`google-generativeai` SDK) using a
+    heavily contextualised prompt that encodes the MBH mechanism, catalyst requirements
+    (nucleophilicity, low steric hindrance, leaving-group ability), methanol solvent effects,
+    entropic/realism penalties, and a **DABCO = 50.0 calibration anchor**.
+  * **Batches** molecules (`batch_size`) and averages **multiple independent LLM calls per batch**
+    (`num_calls`) to reduce scoring variance, returning a continuous score in `[0, 100]`.
+
+* **A campaign configuration** — [`MBH/MBH_trial.json`](MBH/MBH_trial.json) — a
+  `goal_directed_generation` run combining `MBH_catalyst_score` with a `mw` component
+  (double-sigmoid, target ~50–400) under a 1500-evaluation oracle budget, using the
+  `mamba` architecture and a ZINC-250k prior.
+
+* **A completed run** — [`MBH/mbh_catalyst_run/`](MBH/mbh_catalyst_run/) — containing the model
+  checkpoints, logs, and the oracle history (`oracle_history_MBH_17.csv`).
+
+* **A publication-quality plotting script** —
+  [`MBH/mbh_catalyst_run/plot_score_vs_calls.py`](MBH/mbh_catalyst_run/plot_score_vs_calls.py) —
+  which plots the MBH catalyst score against cumulative oracle calls (individual evaluations,
+  moving average, cumulative maximum) with the aggregated reward on a secondary axis, exporting
+  both `.png` and `.svg`.
+
+### Running the MBH campaign
+
+1. Edit [`MBH/MBH_trial.json`](MBH/MBH_trial.json) and set your Gemini `api_key`, `model_name`,
+   and the logging/checkpoint paths.
+2. Launch the campaign from the repository root:
+
+        $ python saturn.py MBH/MBH_trial.json
+
+3. Generate the score-vs-calls figure (requires `pandas` + `matplotlib`):
+
+        $ python MBH/mbh_catalyst_run/plot_score_vs_calls.py
+
+> **Note:** `MBH_catalyst_score` requires the `google-generativeai` package and a valid API key.
+> Do **not** commit real API keys — supply them via the config file locally or an environment
+> variable and keep them out of version control.
+
+---
+
 Git Hash Code Versions
 ----------------------
 * [Saturn Pre-print](https://arxiv.org/abs/2405.17066): fee0179
