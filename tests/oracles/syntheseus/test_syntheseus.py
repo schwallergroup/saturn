@@ -113,13 +113,22 @@ def base_oracle_params() -> dict:
                 "use_namerxn": False,
                 # NOTE: The tests assume NameRXN version 3.7.3 (reaction classification may differ between different versions)
                 # NOTE: Users should modify the path below to their local path
-                "namerxn_binary_path": "<path to your namerxn binary executable>/HazELNut/namerxn",
+                "namerxn_binary_path": "/bin/leadmine/HazELNut/namerxn",
                 "enforced_rxn_classes": [],
                 "avoid_rxn_classes": [],
                 "rxn_insight_extraction_script_path": os.path.join(CURRENT_DIR, "../../../oracles/synthesizability/utils/extract_rxn_insight_info.py"),
                 "namerxn_extraction_script_path": os.path.join(CURRENT_DIR, "../../../oracles/synthesizability/utils/extract_namerxn_info.py"),
                 "seed_reactions": False,
-                "seed_reactions_file_folder": os.path.join(CURRENT_DIR, "../../../test/mitsunobu-seeding-preprocessed")
+                "seed_reactions_file_folder": os.path.join(CURRENT_DIR, "../../../test/mitsunobu-seeding-preprocessed"),
+            },
+            "enforced_conditions": {
+                #NOTE: conditions block, not used here
+                "avoid_conditions": [],
+                "enforce_conditions": [],
+                "enforce_temperature_range": [],
+                "quarc_env_name": "quarc",
+                "quarc_repo_path": "/home/sabanza/Documents/quarc",
+                "condition_extraction_script_path": "../../../oracles/synthesizability/utils/extract_conditions.py"
             },
             "route_extraction_script_path": os.path.join(CURRENT_DIR, "../../../oracles/synthesizability/utils/extract_syntheseus_route_data.py"),
             "time_limit_s": 180,
