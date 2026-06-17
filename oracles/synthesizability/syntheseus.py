@@ -41,7 +41,7 @@ class Syntheseus(OracleComponent):
         self.minimize_path_length = self.parameters.specific_parameters.get("minimize_path_length", False)
 
         # Whether to parallelize Syntheseus execution
-        self.parallelize = self.parameters.specific_parameters.get("parallelize", True)  # Defaults to True
+        self.parallelize = self.parameters.specific_parameters.get("parallelize", False)  # Defaults to False (not working)
         self.max_workers = self.parameters.specific_parameters.get("max_workers", 4)  # Default to 4 workers
 
         # Reaction model
