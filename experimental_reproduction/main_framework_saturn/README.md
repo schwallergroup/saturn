@@ -20,6 +20,8 @@ Part 2: Transferability of Sample Efficiency to Physics-based Oracles
 
 **NOTE**: Reproducing this experiment requires `DockStream` to perform `AutoDock Vina` docking. It can be found here: https://github.com/MolecularAI/DockStream. Clone the repository and install the conda environment using the `environment.yml` AutoDock Vina can be downloaded here: https://vina.scripps.edu/downloads/. The experiments were run on a Linux machine so the autodock_vina_1_1_2_linux_x86.tgz file was downloaded.
 
+**NOTE (environment isolation)**: `DockStream` runs in its own conda environment as a subprocess launched from the `saturn` environment. Because both environments ship their own `OpenBabel`, the `BABEL_LIBDIR`/`BABEL_DATADIR` variables must not leak from `saturn` into the `DockStream` subprocess, otherwise docking silently fails for every molecule. Saturn now strips these variables from the subprocess automatically and aborts the run if ≥10% of a batch fails docking. See [`oracles/docking/README-dockstream.md`](../../oracles/docking/README-dockstream.md) for details.
+
 Docking was performed against 3 targets: `6cm4`, `3kc3`, `1eve`. The docking grid files and configuration `JSONs` (the actual Saturn `JSON` and the docking `JSON`) are provided in each corresponding sub-folder. The prepared files make the assumption that docking will be parallelized on 16 CPU cores. Since the batch size is 16, going beyond 16 cores will yield benefit and 16 cores *may* also not be optimal due to the overhead of parallelizing. To parallelize over fewer CPU cores, change the `number_cores` parameter in the docking `JSON`.
 
 

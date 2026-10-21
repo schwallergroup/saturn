@@ -12,9 +12,20 @@ There is also a `Jupyter` notebook to construct your own configuration files to 
 
 1. Install [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html)
 2. Clone this Git repository
-3. Open terminal and install the `saturn` environment:
-   
+3. Open terminal and install the `saturn` environment. There are two options:
+
+   **Option A — step-by-step install.** Run the installation script, which
+   installs the same packages one by one (useful if you want to adapt
+   individual versions; used historically in the development of the framework).:
+
         $ source setup.sh
+
+   **Option B — pre-configured environment.** A ready-made,
+   fully pinned export of the exact environment used for the paper is provided
+   in [`environment.yml`](environment.yml). Recreate it in one command:
+
+        $ conda env create -f environment.yml
+        $ conda activate saturn
 
 Potential Installation Issues
 -----------------------------
@@ -36,9 +47,18 @@ Potential Installation Issues
 ⚙️ System Requirements
 -------------------
 
-* Python 3.10
-* Cuda-enabled GPU (CPU-only works but runs times will be much slower)
-* Tested on Linux
+* **Python** 3.10
+* **GPU / CUDA:** a CUDA-enabled GPU with a driver compatible with **CUDA 11.3**. CPU-only execution also
+  works but run times are much longer.
+* **Operating system:** Linux. Tested on
+  **Ubuntu 20.04 LTS**, **Ubuntu 24.04 LTS**, and **Red Hat Enterprise Linux 9.4**.
+  Very recent distributions (e.g. Ubuntu 26.04) may conflict with the pinned dependencies.
+
+<details>
+<summary><b>ℹ️ A note on the pinned dependencies.</b></summary>
+Saturn is the shared framework
+underpinning a series of related works (see the References section). To keep results consistent and reproducible across all of these works, the framework deliberately pins a single, tested dependency stack (PyTorch, CUDA, Mamba, etc.) rather than tracking the latest releases. The exact versions are captured in [`environment.yml`](environment.yml); using the pre-configured environment above is the most reliable way to reproduce the reported results.
+</details>
 
 📋 Workflow
 -------------------

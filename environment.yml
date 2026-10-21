@@ -1,0 +1,173 @@
+# =============================================================================
+# Saturn pre-configured conda environment
+# =============================================================================
+# This file is a direct export of the exact `saturn` environment used to run
+# the experiments reported in the paper. It is provided so the environment can
+# be recreated in a single command, without manually following `setup.sh`:
+#
+#     conda env create -f environment.yml
+#     conda activate saturn
+#
+# Notes
+# -----
+# * The PyTorch wheels are the CUDA 11.3 builds (`+cu113`). The extra pip index
+#   below points pip at the official PyTorch download server so these wheels
+#   resolve automatically. A CUDA-enabled GPU with a driver compatible with
+#   CUDA 11.3 is required for GPU execution (CPU-only also works, but is slow).
+# * These pins reflect the environment that was actually used and tested, so a
+#   few versions differ from `setup.sh` (e.g. `transformers`, `triton`); the
+#   pins here take precedence.
+# * See the "System requirements" section of the README for the operating
+#   systems and hardware this environment was validated on.
+# =============================================================================
+name: saturn
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - _libgcc_mutex=0.1
+  - _openmp_mutex=4.5
+  - bzip2=1.0.8
+  - ca-certificates=2025.1.31
+  - cairo=1.18.2
+  - colorama=0.4.6
+  - dftd4=3.7.0
+  - fire=0.7.0
+  - font-ttf-dejavu-sans-mono=2.37
+  - font-ttf-inconsolata=3.000
+  - font-ttf-source-code-pro=2.038
+  - font-ttf-ubuntu=0.83
+  - fontconfig=2.15.0
+  - fonts-conda-ecosystem=1
+  - fonts-conda-forge=1
+  - freetype=2.12.1
+  - icu=75.1
+  - ld_impl_linux-64=2.40
+  - libblas=3.9.0
+  - libcblas=3.9.0
+  - libexpat=2.6.4
+  - libffi=3.4.4
+  - libgcc=14.2.0
+  - libgcc-ng=14.2.0
+  - libgfortran=14.2.0
+  - libgfortran-ng=14.2.0
+  - libgfortran5=14.2.0
+  - libglib=2.82.2
+  - libiconv=1.17
+  - liblapack=3.9.0
+  - liblzma=5.6.4
+  - liblzma-devel=5.6.4
+  - libnsl=2.0.1
+  - libopenblas=0.3.20
+  - libpng=1.6.46
+  - libsqlite=3.48.0
+  - libstdcxx=14.2.0
+  - libstdcxx-ng=14.2.0
+  - libuuid=2.38.1
+  - libxcb=1.17.0
+  - libxcrypt=4.4.36
+  - libxml2=2.13.5
+  - libzlib=1.3.1
+  - llvm-openmp=19.1.7
+  - mctc-lib=0.3.2
+  - mkl=2021.4.0
+  - morfeus-ml=0.7.2
+  - multicharge=0.3.0
+  - ncurses=6.5
+  - openbabel=3.1.1
+  - openssl=3.4.0
+  - pcre2=10.44
+  - pip=25.0
+  - pixman=0.44.2
+  - pthread-stubs=0.4
+  - pycparser=2.22
+  - python=3.10.16
+  - python_abi=3.10
+  - readline=8.2
+  - setuptools=75.8.0
+  - simple-dftd3=1.2.1
+  - six=1.17.0
+  - tbb=2021.8.0
+  - tblite=0.4.0
+  - termcolor=2.5.0
+  - tk=8.6.13
+  - toml-f=0.4.2
+  - tqdm=4.67.1
+  - wheel=0.45.1
+  - xorg-libice=1.1.2
+  - xorg-libsm=1.2.5
+  - xorg-libx11=1.8.11
+  - xorg-libxau=1.0.12
+  - xorg-libxdmcp=1.1.5
+  - xorg-libxext=1.3.6
+  - xorg-libxrender=0.9.12
+  - xtb=6.7.1
+  - xtb-python=22.1
+  - xz=5.6.4
+  - xz-gpl-tools=5.6.4
+  - xz-tools=5.6.4
+  - pip:
+      # PyTorch CUDA 11.3 wheels live on the official PyTorch index, not PyPI.
+      - --extra-index-url https://download.pytorch.org/whl/cu113
+      - bcrypt==5.0.0
+      - causal-conv1d==1.2.0.post2
+      - certifi==2025.1.31
+      - cffi==2.0.0
+      - charset-normalizer==3.4.1
+      - contourpy==1.3.2
+      - cryptography==46.0.5
+      - cycler==0.12.1
+      - dill==0.3.9
+      - einops==0.7.0
+      - et-xmlfile==2.0.0
+      - exceptiongroup==1.2.2
+      - filelock==3.17.0
+      - fonttools==4.61.1
+      - fsspec==2025.2.0
+      - huggingface-hub==0.28.1
+      - idna==3.10
+      - iniconfig==2.0.0
+      - invoke==2.2.1
+      - joblib==1.5.3
+      - kiwisolver==1.4.9
+      - llvmlite==0.46.0
+      - mamba-ssm==1.2.0.post1
+      - matplotlib==3.10.8
+      - multiprocess==0.70.17
+      - ninja==1.11.1.3
+      - numba==0.64.0
+      - numpy==1.26.4
+      - openpyxl==3.1.5
+      - packaging==24.2
+      - pandas==2.2.1
+      - paramiko==4.0.0
+      - pathos==0.3.3
+      - pillow==11.1.0
+      - pluggy==1.5.0
+      - pox==0.3.5
+      - ppft==1.7.6.9
+      - pynacl==1.6.2
+      - pynndescent==0.6.0
+      - pyparsing==3.3.2
+      - pytest==8.1.1
+      - python-dateutil==2.9.0.post0
+      - pytz==2025.1
+      - pyyaml==6.0.2
+      - rdkit==2023.9.5
+      - regex==2024.11.6
+      - requests==2.32.3
+      - safetensors==0.5.2
+      - scikit-learn==1.7.2
+      - scipy==1.10.0
+      - threadpoolctl==3.6.0
+      - tokenizers==0.21.0
+      - tomli==2.2.1
+      - torch==1.12.1+cu113
+      - torchaudio==0.12.1+cu113
+      - torchvision==0.13.1+cu113
+      - transformers==4.48.2
+      - triton==3.2.0
+      - typing-extensions==4.15.0
+      - tzdata==2025.1
+      - umap-learn==0.5.11
+      - urllib3==2.3.0
