@@ -129,6 +129,10 @@ class Syntheseus(OracleComponent):
         self.quarc_repo_path = self.enforced_conditions_parameters.quarc_repo_path
         self.quarc_env_name = self.enforced_conditions_parameters.quarc_env_name
 
+        # Number of top-N QUARC predicted condition sets per reaction to consider when
+        # checking reaction-condition constraints. Default 1 recovers the top-1-only behaviour.
+        self.num_conditions = self.enforced_conditions_parameters.num_conditions
+
         if self.conditions_check:
             assert self.namerxn_extraction_script_path is not None and self.namerxn_binary_path is not None, "Condition enforcing requires NameRXN, please provide the binary path and the extraction script"
 
@@ -393,7 +397,8 @@ class Syntheseus(OracleComponent):
                                 reaction_depth_smiles.append((node_data["depth"], node_data["rxn_smiles"]))
 
                         all_rxns_labels = []  # List[Tuple[str, str]] --> (rxn_class, rxn_name)
-                        all_conditions = []
+                        all_conditions = []  # Top-1 condition per reaction (used for route reconstruction/tracking)
+                        all_conditions_topk = []  # Top-N conditions per reaction (used for the condition constraint check)
 
                         # NameRXN classification of every reaction in the route
                         if self.enforced_reactions_parameters.use_namerxn:
@@ -426,17 +431,27 @@ class Syntheseus(OracleComponent):
                                     self.namerxn_binary_path,
                                     self.quarc_repo_path,
                                     self.quarc_env_name,
-                                    temp_rxn_smiles_file
+                                    temp_rxn_smiles_file,
+                                    # Number of top-N predicted condition sets per reaction to extract
+                                    str(self.num_conditions)
                                 ], capture_output=True, text=True)
                                 assert conditions.returncode == 0, f"Error during QUARC condition extraction: {conditions.stderr}"
+                                # List[List[Dict]]: per reaction, its top-N predicted condition dicts (ranked)
                                 conditions = ast.literal_eval(conditions.stdout)
 
-                                all_conditions = [(cond["agents"], cond["temperature"]) for cond in conditions]
+                                # Top-1 condition per reaction - used to re-construct/track the synthesis route
+                                all_conditions = [(preds[0]["agents"], preds[0]["temperature"]) for preds in conditions]
+                                # Top-N conditions per reaction - used by the reaction-condition constraint check
+                                all_conditions_topk = [
+                                    [(pred["agents"], pred["temperature"]) for pred in preds]
+                                    for preds in conditions
+                                ]
 
                             # FIXME: in case we don't want conditions, this is needed to iterate and complete the route information
                             else:
-                                all_conditions = [([], []) for i in range(len(all_rxns_labels))]                        
-                                
+                                all_conditions = [([], []) for i in range(len(all_rxns_labels))]
+                                all_conditions_topk = [[] for i in range(len(all_rxns_labels))]
+
                         else:
                             for _, rxn_smiles in reaction_depth_smiles:
                                 # Execute Rxn-INSIGHT on the rxn SMILES
@@ -460,6 +475,7 @@ class Syntheseus(OracleComponent):
 
                             # just to keep logic
                             all_conditions = [([], []) for i in range(len(all_rxns_labels))]
+                            all_conditions_topk = [[] for i in range(len(all_rxns_labels))]
 
                         # Track all reaction information for the route
                         # NOTE: This is for *all* generated molecules that have a solved route
@@ -476,13 +492,20 @@ class Syntheseus(OracleComponent):
                         # All the information required to re-construct the synthesis graph
                         for node, node_data in route.items():
                             if node_data["is_rxn"]:
-                                for (depth, rxn_smiles), (rxn_class, rxn_name), (rxn_agents, rxn_temp) in zip(reaction_depth_smiles, all_rxns_labels, all_conditions):
+                                for (depth, rxn_smiles), (rxn_class, rxn_name), (rxn_agents, rxn_temp), rxn_top_conditions in zip(reaction_depth_smiles, all_rxns_labels, all_conditions, all_conditions_topk):
                                     if depth == node_data["depth"]:
                                         if rxn_smiles == node_data["rxn_smiles"]:
                                             node_data["rxn_class"] = rxn_class
                                             node_data["rxn_name"] = rxn_name
+                                            # Top-1 predicted condition (kept for backward compatibility)
                                             node_data["agents"] = rxn_agents
                                             node_data["temperature"] = rxn_temp
+                                            # Full list of the top-N predicted condition sets considered by
+                                            # the reward check (empty when conditions are not being extracted)
+                                            node_data["top_conditions"] = [
+                                                {"agents": agents, "temperature": temperature}
+                                                for agents, temperature in rxn_top_conditions
+                                            ]
 
                         # Double check that all reaction classes and names are assigned
                         for node, node_data in route.items():
@@ -500,7 +523,7 @@ class Syntheseus(OracleComponent):
                     # -----------------------------------------------------------------------------------------------------------------------------------
                     # If we enforce any reaction condition
                     if self.conditions_check:
-                        conditions_multiplier = self._check_reaction_conditions(all_conditions)
+                        conditions_multiplier = self._check_reaction_conditions(all_conditions_topk)
 
                     # end of conditions check
                     # -----------------------------------------------------------------------------------------------------------------------------------
@@ -829,45 +852,86 @@ class Syntheseus(OracleComponent):
         if self.enforced_reactions_parameters.enforce_all_reactions and len(self.enforced_reactions_parameters.avoid_rxn_classes) > 0:
             raise ValueError("The run specifies to enforce all reactions but also specifies to avoid certain reaction classes. Enforcing all reactions implies reactions not in the list are avoided. Please set `avoid_rxn_classes` to an empty list when enforcing all reactions.")
     
-    def _check_reaction_conditions(self, all_conditions: list[tuple]) -> float:
-        """Check if reaction conditions are satisfied for the given synthesis route and return corresponding multiplier
+    def _check_reaction_conditions(self, all_conditions: list[list[tuple]]) -> float:
+        """Check whether the predicted reaction conditions of a synthesis route satisfy the
+        user-specified constraints and return the corresponding reward multiplier.
+
+        Following reviewer feedback, each reaction is evaluated against the top-N QUARC
+        predicted condition sets (controlled by ``self.num_conditions``) rather than only
+        the single top-1 prediction. A reaction's constraint is considered satisfied as long
+        as AT LEAST ONE of its top-N predicted condition sets satisfies it. This mitigates
+        reliance on a single, possibly low-confidence, top-1 prediction and reflects that a
+        reaction can proceed under multiple valid conditions. Setting ``num_conditions = 1``
+        recovers the previous top-1-only behaviour exactly.
+
+        Args:
+            all_conditions: One entry per reaction in the route. Each entry is the list of
+                that reaction's top-N predicted condition sets, where each predicted set is a
+                ``(agents, temperature)`` tuple (``agents`` is a list of reagent SMILES and
+                ``temperature`` is the predicted temperature-bin label).
+
+        Returns:
+            The conditions reward multiplier. In the binary case: 1.0 if every reaction has at
+            least one top-N prediction jointly satisfying all active constraints, 0.0 otherwise.
+            In the continuous-reward case: the bottleneck (minimum across reactions) of each
+            reaction's best achievable reagent score, where a reaction with no top-N prediction
+            inside the enforced temperature range yields 0.0.
         """
         conditions_multiplier = 1.0
 
-        # Check temperatures
-        if self.enforce_temperature_range:
-            # Check that every temperature in all_conditions is within at least one range in self.enforce_temperature_range
-            for _, temperature in all_conditions:
-                if temperature not in self.enforce_temperature_range:
+        # ------------------------------------------------------------------------------
+        # Continuous reagent reward: score each reaction by its BEST admissible top-N
+        # prediction, then take the route bottleneck (minimum across reactions).
+        # ------------------------------------------------------------------------------
+        if self.use_reagent_continous_reward:
+            per_reaction_scores = []
+            for predictions in all_conditions:
+                prediction_scores = []
+                for agents, temperature in predictions:
+                    # If a temperature range is enforced, only predictions within the range
+                    # are admissible candidates for realizing this reaction.
+                    if self.enforce_temperature_range and temperature not in self.enforce_temperature_range:
+                        continue
+                    # A prediction's score is the minimum (worst) reagent score it contains.
+                    agent_scores = [
+                        self.reagent_score_by_smiles.get(canonicalize_smiles(smi), self.reagent_default_score)
+                        for smi in agents
+                    ]
+                    prediction_scores.append(min(agent_scores) if agent_scores else self.reagent_default_score)
+                # No admissible top-N prediction (all out of temperature range) -> reaction fails.
+                if not prediction_scores:
+                    return 0.0
+                # The reaction can be realized by its best-scoring admissible prediction.
+                per_reaction_scores.append(max(prediction_scores))
+            # The route multiplier is set by the worst (bottleneck) reaction.
+            if per_reaction_scores:
+                conditions_multiplier = min(per_reaction_scores)
+
+        # ------------------------------------------------------------------------------
+        # Binary reagent/temperature constraints: a reaction is satisfied if ANY top-N
+        # prediction JOINTLY satisfies every active constraint.
+        # ------------------------------------------------------------------------------
+        else:
+            for predictions in all_conditions:
+                reaction_satisfied = False
+                for agents, temperature in predictions:
+                    # Temperature constraint
+                    if self.enforce_temperature_range and temperature not in self.enforce_temperature_range:
+                        continue
+                    canonical_conditions = [canonicalize_smiles(smi) for smi in agents]
+                    # Avoided reagents must be absent from this prediction
+                    if self.avoid_conditions and any(avoid in canonical_conditions for avoid in self.avoid_conditions):
+                        continue
+                    # Enforced reagents must all be present in this prediction
+                    if self.enforce_conditions and any(enforce not in canonical_conditions for enforce in self.enforce_conditions):
+                        continue
+                    # This prediction satisfies all active constraints for the reaction
+                    reaction_satisfied = True
+                    break
+                # If no top-N prediction satisfies the constraints, the whole route fails.
+                if not reaction_satisfied:
                     conditions_multiplier = 0.0
                     break
-        
-        # If continous reward is active, assign the score corresponding to the minumum value in the list of SMILES, and multiply the total multiplier
-        if self.use_reagent_continous_reward:
-
-                individual_multipliers = [
-                    self.reagent_score_by_smiles.get(canonicalize_smiles(smi), self.reagent_default_score)
-                    for conditions, _ in all_conditions
-                    for smi in conditions
-                ]
-
-                conditions_multiplier = min(individual_multipliers) * conditions_multiplier
-
-        else:
-            # for each chemical or agent, canonicalize and compare
-            if self.avoid_conditions or self.enforce_conditions:
-                for conditions, _ in all_conditions:
-                    canonical_conditions = [canonicalize_smiles(smi) for smi in conditions]
-                    if self.avoid_conditions:
-                        for avoid_condition in self.avoid_conditions:
-                            if avoid_condition in canonical_conditions:
-                                conditions_multiplier = 0.0
-                                break
-                    if self.enforce_conditions:
-                        for enforce_conditions in self.enforce_conditions:
-                            if enforce_conditions not in canonical_conditions:
-                                conditions_multiplier = 0.0
-                                break
 
         return conditions_multiplier
 
