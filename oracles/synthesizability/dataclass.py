@@ -34,3 +34,4 @@ class EnforcedReactionConditionsParameters:
     quarc_env_name: str # name of the quarc enviroment
     use_continuous_reward: bool # Use continous reward for solvents or any specified reagent
     reagent_guide_path: str # Path to the file contanining the reagents with specific scores
+    num_conditions: int = 1 # Number of top-N QUARC predicted condition sets per reaction to consider when checking constraints (default 1 = top-1, i.e. the previous behaviour)
