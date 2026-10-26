@@ -156,6 +156,14 @@ Use the index below to find the sub-folder associated with each paper:
 | Synthesizability with Reaction-Condition Constraints [[5]](#-references) | [`reaction_conditions_synthesizability/`](experimental_reproduction/reaction_conditions_synthesizability) |
 
 
+Git Hash Code Versions
+----------------------
+* [Saturn](https://www.nature.com/articles/s42256-026-01200-4): fee0179
+* [TANGO Constrained Synthesizability](https://www.nature.com/articles/s43588-026-00959-1): de5cd7f
+* [Steerable and Granular Synthesizability Control Pre-print](https://arxiv.org/abs/2505.08774): 468b1f4
+* [Reaction-Condition Constrained Synthesizability Pre-print](https://openreview.net/pdf?id=KIab6hg0cT): 4a3e10b
+
+
 👋 Acknowledgements
 ----------------
 The `Mamba` architecture code was adapted from the following sources:
