@@ -118,5 +118,7 @@ Two groups:
 | `conditions_water_no_temp.json` | Enforce water as solvent; avoid DMF/DCM |
 | `conditions_no_dmf_dcm.json` | Avoid DMF/DCM; enforce room-temperature range `[20, 30)` |
 | `conditions_continuous.json` | Graded (continuous) reagent-preference reward via `solvent_guide.json` |
+| `unsafe_reagents.json` | Avoid DMF/DCM; enforce room-temperature range `[20, 30)`; avoid hazardous reagents (see `unsafe_reagents.json`) |
+| `top3_no_dmf_no_dcm.json` | Avoid DMF/DCM; enforce room-temperature range `[20, 30)`; use top-3 reaction conditions in the reward|
 
 **Fungicide case study** (docking target PDB `9KQ3`; `syntheseus` + `QuickVina2-GPU`): combinations built on `pesticide_9KQ3_basic.json` — `_solvent` adds the graded solvent-preference reward, `_blocks` enforces building blocks, and `_no_deprotection` avoids protection/deprotection steps.
