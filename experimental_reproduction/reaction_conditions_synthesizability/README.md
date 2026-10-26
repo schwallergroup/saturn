@@ -95,3 +95,30 @@ all experiments can be run by passing the `JSON` configuration:
 The protein crystal structure prepared for docking used in the development experiments (PDB: 7UVU) is available at `experimental_reproduction/synthesizability/7uvu-2-monomers-pdbfixer.pdbqt`, as well as the original ligand `experimental_reproduction/synthesizability/7uvu-reference.pdb`
 
 The protein crystal structure prepared for docking used in the fungicide experiments (PDB: 9KQ3) is available at `experimental_reproduction/reaction_conditions_synthesizability/9KQ3.pdbqt`, as well as the original ligand `experimental_reproduction/reaction_conditions_synthesizability/9KQ3_ligand.pdb`
+
+
+Example Configurations (`example_configs/`)
+-------------------------------------------
+
+Configuration `JSONs` for the pre-print experiments, grouped as follows.
+
+> **⚠️ IMPORTANT — edit the paths before running.** Unlike the convention used elsewhere in this repo, these files still contain the authors' own **absolute paths** rather than `"< >"` placeholders (as we provide the exact config files used in the experiments). Before running any config, update every machine-specific path to match your system, in particular:
+> - the `Saturn` repo paths (e.g. the `extract_*` scripts under `oracles/synthesizability/utils/`, `data/reagents/solvent_guide.json`, prior/checkpoint `.prior` files);
+> - external tool paths (`QUARC` repo, the `NameRxn` binary, the `QuickVina2-GPU` executable);
+> - docking receptor/ligand files and building-block `.smi` files;
+> - the output/logging directories (the `logging_path`, `model_checkpoints_dir`, and `results_dir` fields, which currently point to `/scratch/...`).
+
+Two groups:
+
+**Development / reaction-condition control experiments** (docking target PDB `7UVU`; `syntheseus` + `QED` + `QuickVina2-GPU`):
+
+| Config | Constraint |
+|--------|------------|
+| `baseline.json` | Unconstrained reference run |
+| `conditions_water_no_temp.json` | Enforce water as solvent; avoid DMF/DCM |
+| `conditions_no_dmf_dcm.json` | Avoid DMF/DCM; enforce room-temperature range `[20, 30)` |
+| `conditions_continuous.json` | Graded (continuous) reagent-preference reward via `solvent_guide.json` |
+| `unsafe_reagents.json` | Avoid DMF/DCM; enforce room-temperature range `[20, 30)`; avoid hazardous reagents (see `unsafe_reagents.json`) |
+| `top3_no_dmf_no_dcm.json` | Avoid DMF/DCM; enforce room-temperature range `[20, 30)`; use top-3 reaction conditions in the reward|
+
+**Fungicide case study** (docking target PDB `9KQ3`; `syntheseus` + `QuickVina2-GPU`): combinations built on `pesticide_9KQ3_basic.json` — `_solvent` adds the graded solvent-preference reward, `_blocks` enforces building blocks, and `_no_deprotection` avoids protection/deprotection steps.

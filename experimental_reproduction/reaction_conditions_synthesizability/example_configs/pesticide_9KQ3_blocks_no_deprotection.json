@@ -1,0 +1,147 @@
+{
+    "logging": {
+        "logging_frequency": 100000,
+        "logging_path": "/scratch/sabanza/tango/experiments/conditions/pesticide_9KQ3_blocks_no_deprotection/seed0/log.log",
+        "model_checkpoints_dir": "/scratch/sabanza/tango/experiments/conditions/pesticide_9KQ3_blocks_no_deprotection/seed0"
+    },
+    "oracle": {
+        "budget": 15000,
+        "allow_oracle_repeats": false,
+        "aggregator": "product",
+        "components": [
+            {
+                "name": "syntheseus",
+                "weight": 1,
+                "preliminary_check": false,
+                "specific_parameters": {
+                    "syntheseus_env_name": "syntheseus-full",
+                    "reaction_model": "MEGAN",
+                    "building_blocks_file": "/home/sabanza/projects/pesticides/saturn-dev/building_blocks/enamine_sep_lpdc_blocks.smi",
+                    "enforced_building_blocks": {
+                        "enforced_building_blocks_file": "/home/sabanza/projects/pesticides/saturn-dev/building_blocks/lpdc_specific_reduced.smi",
+                        "enforce_blocks": true,
+                        "enforce_start": false,
+                        "use_dense_reward": true,
+                        "reward_type": "tango_fms",
+                        "tango_weights": {
+                            "tanimoto": 0.5,
+                            "fg": 0.5,
+                            "fms": 0.5
+                        }
+                    },
+                    "enforced_reactions": {
+                        "enforce_rxn_class_presence": false,
+                        "enforce_all_reactions": false,
+                        "rxn_insight_env_name": "rxn-insight",
+                        "namerxn_binary_path": "/home/sabanza/projects/pesticides/bin/namerxn",
+                        "use_namerxn": true,
+                        "enforced_rxn_classes": [],
+                        "avoid_rxn_classes": [
+                            "protection"
+                        ],
+                        "seed_reactions": false,
+                        "seed_reactions_file_folder": "/home/sabanza/projects/pesticides/saturn-dev/building_blocks/",
+                        "rxn_insight_extraction_script_path": "/home/sabanza/projects/saturn-local/oracles/synthesizability/utils/extract_rxn_insight_info.py",
+                        "namerxn_extraction_script_path": "/home/sabanza/projects/saturn-local/oracles/synthesizability/utils/extract_namerxn_info.py"
+                    },
+                    "enforced_conditions": {
+                        "condition_extraction_script_path": "/home/sabanza/projects/saturn-local/oracles/synthesizability/utils/extract_conditions.py",
+                        "quarc_repo_path": "/home/sabanza/projects/quarc",
+                        "quarc_env_name": "quarc",
+                        "avoid_conditions": [],
+                        "enforce_conditions": [],
+                        "enforce_temperature_range": [],
+                        "use_continuous_reward": false,
+                        "reagent_guide_path": "/home/sabanza/projects/saturn-local/data/reagents/solvent_guide.json"
+                    },
+                    "route_extraction_script_path": "/home/sabanza/projects/saturn-local/oracles/synthesizability/utils/extract_syntheseus_route_data.py",
+                    "include_rxn_info": true,
+                    "time_limit_s": 180,
+                    "minimize_path_length": false,
+                    "parallelize": false,
+                    "max_workers": 4,
+                    "results_dir": "/scratch/sabanza/tango/experiments/conditions/pesticide_9KQ3_blocks_no_deprotection/seed0/syntheseus_results"
+                },
+                "reward_shaping_function_parameters": {
+                    "transformation_function": "no_transformation"
+                }
+            },
+            {
+                "name": "quickvina2_gpu",
+                "weight": 1,
+                "preliminary_check": false,
+                "specific_parameters": {
+                    "binary": "/home/sabanza/Vina-GPU-2.1/QuickVina2-GPU-2.1/QuickVina2-GPU-2-1",
+                    "force_field": "uff",
+                    "receptor": "/home/sabanza/projects/saturn-local/data/9KQ3/9KQ3.pdbqt",
+                    "reference_ligand": "/home/sabanza/projects/saturn-local/data/9KQ3/9KQ3_ligand.pdb",
+                    "results_dir": "/scratch/sabanza/tango/experiments/conditions/pesticide_9KQ3_blocks_no_deprotection/seed0/docking_results",
+                    "thread": 8000
+                },
+                "reward_shaping_function_parameters": {
+                    "transformation_function": "reverse_sigmoid",
+                    "parameters": {
+                        "low": -16,
+                        "high": 0,
+                        "k": 0.15
+                    }
+                }
+            }
+        ]
+    },
+    "goal_directed_generation": {
+        "reinforcement_learning": {
+            "prior": "/home/sabanza/projects/pesticides/saturn-dev/pubchem_mamba_5_retrained.prior",
+            "agent": "/home/sabanza/projects/pesticides/saturn-dev/pubchem_mamba_5_retrained.prior",
+            "batch_size": 64,
+            "learning_rate": 0.0001,
+            "sigma": 128.0,
+            "augmented_memory": true,
+            "augmentation_rounds": 2,
+            "selective_memory_purge": true
+        },
+        "experience_replay": {
+            "memory_size": 100,
+            "sample_size": 10,
+            "smiles": []
+        },
+        "diversity_filter": {
+            "name": "IdenticalMurckoScaffold",
+            "bucket_size": 10
+        },
+        "hallucinated_memory": {
+            "execute_hallucinated_memory": false,
+            "hallucination_method": "ga",
+            "num_hallucinations": 100,
+            "num_selected": 5,
+            "selection_criterion": "random"
+        },
+        "beam_enumeration": {
+            "execute_beam_enumeration": false,
+            "beam_k": 2,
+            "beam_steps": 18,
+            "substructure_type": "structure",
+            "structure_min_size": 15,
+            "pool_size": 4,
+            "pool_saving_frequency": 1000,
+            "patience": 5,
+            "token_sampling_method": "topk",
+            "filter_patience_limit": 100000
+        }
+    },
+    "distribution_learning": {
+        "parameters": {
+            "agent": "<unused>",
+            "training_steps": 20,
+            "batch_size": 512,
+            "learning_rate": 0.0001,
+            "training_dataset_path": "cleaned-chembl-33.smi",
+            "train_with_randomization": true,
+            "transfer_learning": false
+        }
+    },
+    "running_mode": "goal_directed_generation",
+    "model_architecture": "mamba",
+    "device": "cuda",
+    "seed": 0
+}
