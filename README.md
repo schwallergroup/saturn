@@ -65,7 +65,7 @@ underpinning a series of related works (see the References section). To keep res
 
 Everything runs through a single entry point — `python saturn.py <config.json>` — where the `running_mode` field selects the phase. The high-level order of steps is: **1.** install (`setup.sh`) → **2.** get a prior (bundled checkpoint *or* `distribution_learning`) → **3.** build a config (`config_generator.ipynb`) → **4.** `goal_directed_generation` (sample → score → filter → memory manipulation → update, looped until the oracle budget runs out) → **5.** analyse the outputs.
 
-Click below for the full flowchart mapping each step to the folder where its code lives, and the standalone navigation guide in [`WORKFLOW.md`](WORKFLOW.md).
+Click below for the full flowchart mapping each step to the folder where its code lives.
 
 <details>
 <summary><b>📊 Click to expand the full workflow flowchart</b></summary>
@@ -149,7 +149,7 @@ Use the index below to find the sub-folder associated with each paper:
 
 | Paper | Sub-folder(s) |
 |-------|---------------|
-| Saturn &mdash; main framework [[1]](#-references) | [`main_framework_saturn/`](experimental_reproduction/main_framework) |
+| Saturn &mdash; main framework [[1]](#-references) | [`main_framework_saturn/`](experimental_reproduction/main_framework_saturn) |
 | Coupling Saturn with Retrosynthesis Models [[2]](#-references) | [`synthesizability/`](experimental_reproduction/synthesizability) |
 | TANGO &mdash; Constrained Synthesizability [[3]](#-references) | [`constrained_synthesizability/`](experimental_reproduction/constrained_synthesizability) |
 | Granular Synthesizability Control [[4]](#-references) | [`synthesizability_control/`](experimental_reproduction/synthesizability) |

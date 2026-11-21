@@ -78,11 +78,7 @@ will display NVIDIA information.
 
 Reaction Condition Synthesizability Control Experiments
 ---------------------------------------------------------------------------
-
-The raw data and building blocks stocks used in the pre-print are available [here](https://doi.org/10.6084/m9.figshare.29040977.v1). In the pre-print, many reaction constraints were imposed. Instead of providing individual run configurations (as `JSONs`), we thought it would be most practical to provide a minimal Jupyter notebook demonstrating how to impose arbitrary constraints. This way, if interested, the framework can be adapted to user-specific case studies. 
-
-
-`./tutorial.ipynb` is a minimal tutorial to generate configuration `JSONs` with arbitrary reaction condition constraints. Running the notebook requires `jupyter notebook` installed in the environment. If the above installation instructions were followed, the `quarc` environment can be used to run the notebook. Otherwise, one can use any other environments as no specific packages are required. We then re-iterate that all experiments can be run as follows:
+In the pre-print, many reaction constraints were imposed. `./tutorial.ipynb` is a minimal tutorial to generate configuration `JSONs` with arbitrary reaction condition constraints. Running the notebook requires `jupyter notebook` installed in the environment. If the above installation instructions were followed, the `quarc` environment can be used to run the notebook. Otherwise, one can use any other environments as no specific packages are required. We then re-iterate that all experiments can be run as follows:
 
 With the `saturn` environment activated:
 
